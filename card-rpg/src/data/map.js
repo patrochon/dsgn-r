@@ -49,14 +49,18 @@ export const MAPS = [
 ];
 
 export const ITEMS = [
-  { id: 'sword', name: 'Épée rouillée', icon: '⚔️', stat: 'attack', bonus: 2 },
-  { id: 'shield', name: 'Bouclier de bois', icon: '🛡️', stat: 'defense', bonus: 2 },
-  { id: 'boots', name: 'Bottes légères', icon: '👢', stat: 'move', bonus: 1 },
-  { id: 'potion', name: 'Potion de soin', icon: '🧪', stat: 'hp', bonus: 10 },
-  { id: 'ring', name: 'Anneau magique', icon: '💍', stat: 'magic', bonus: 3 },
-  { id: 'helm', name: 'Casque en fer', icon: '⛑️', stat: 'defense', bonus: 3 },
-  { id: 'bow', name: 'Arc court', icon: '🏹', stat: 'attack', bonus: 2 },
-  { id: 'amulet', name: 'Amulette ancienne', icon: '📿', stat: 'hp', bonus: 15 },
+  { id: 'sword',   name: 'Épée rouillée',    icon: '⚔️', stat: 'force',       bonus: 2 },
+  { id: 'shield',  name: 'Bouclier de bois', icon: '🛡️', stat: 'force',       bonus: 1 },
+  { id: 'boots',   name: 'Bottes légères',   icon: '👢', stat: 'deplacement', bonus: 2 },
+  { id: 'potion',  name: 'Potion de soin',   icon: '🧪', stat: 'hp',          bonus: 10 },
+  { id: 'ring',    name: 'Anneau magique',   icon: '💍', stat: 'magie',       bonus: 3 },
+  { id: 'helm',    name: 'Casque en fer',    icon: '⛑️', stat: 'vie',         bonus: 2 },
+  { id: 'bow',     name: 'Arc elfique',      icon: '🏹', stat: 'chance',      bonus: 2 },
+  { id: 'amulet',  name: 'Amulette du Destin', icon: '📿', stat: 'destin',    bonus: 3 },
+  { id: 'dagger',  name: 'Dague empoisonnée', icon: '🗡️', stat: 'force',     bonus: 3 },
+  { id: 'staff',   name: 'Bâton de cristal', icon: '🔮', stat: 'magie',      bonus: 4 },
+  { id: 'cloak',   name: 'Cape de l\'ombre', icon: '🌑', stat: 'chance',     bonus: 3 },
+  { id: 'tome',    name: 'Tome interdit',    icon: '📖', stat: 'destin',     bonus: 4 },
 ];
 
 export const ENEMIES = [

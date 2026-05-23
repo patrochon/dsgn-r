@@ -30,13 +30,23 @@ function buildItemMap(grid) {
   return items;
 }
 
-const initPlayer = () => ({
-  x: 1, y: 1,
-  hp: 30, maxHp: 30,
-  xp: 0, level: 1,
-  stats: { attack: 2, defense: 1, move: 3 },
-  inventory: [],
-});
+const initPlayer = () => {
+  const vie = 5;
+  return {
+    x: 1, y: 1,
+    hp: 20 + vie * 2, maxHp: 20 + vie * 2,
+    xp: 0, level: 1,
+    stats: {
+      force:       3,  // dégâts physiques + résistance
+      magie:       2,  // dégâts magiques + soins amplifiés
+      vie:         vie, // points de vie max (maxHp = 20 + vie*2)
+      deplacement: 3,  // cases de mouvement par tour
+      chance:      1,  // bonus aux jets de dé
+      destin:      1,  // cartes supplémentaires + effets critiques
+    },
+    inventory: [],
+  };
+};
 
 export function useGameState() {
   const [mapIndex, setMapIndex] = useState(0);
@@ -88,7 +98,7 @@ export function useGameState() {
 
   // Highlight reachable tiles for movement
   const showMoveRange = useCallback((card) => {
-    const range = player.stats.move + (card?.effect?.type === 'move' ? card.effect.bonus : 0) + 3;
+    const range = player.stats.deplacement + (card?.effect?.type === 'move' ? card.effect.bonus : 0);
     const tiles = [];
     for (let dy = -range; dy <= range; dy++) {
       for (let dx = -range; dx <= range; dx++) {
@@ -149,12 +159,14 @@ export function useGameState() {
     if (itemMap[key]) {
       const item = itemMap[key];
       setPlayer(p => {
-        const newStats = { ...p.stats };
         if (item.stat === 'hp') {
           return { ...p, x: tx, y: ty, hp: Math.min(p.maxHp, p.hp + item.bonus), inventory: [...p.inventory, item] };
         }
+        const newStats = { ...p.stats };
         if (newStats[item.stat] !== undefined) newStats[item.stat] += item.bonus;
-        return { ...p, x: tx, y: ty, stats: newStats, inventory: [...p.inventory, item] };
+        // vie augmente aussi maxHp
+        const newMaxHp = item.stat === 'vie' ? p.maxHp + item.bonus * 2 : p.maxHp;
+        return { ...p, x: tx, y: ty, stats: newStats, maxHp: newMaxHp, inventory: [...p.inventory, item] };
       });
       setItemMap(prev => { const n = { ...prev }; delete n[key]; return n; });
       addLog(`Vous ramassez : ${item.icon} ${item.name} (+${item.bonus} ${item.stat})`);
@@ -194,14 +206,19 @@ export function useGameState() {
     setPhase('roll');
     animateRoll((roll) => {
       const card = selectedCard;
-      let dmg = roll + player.stats.attack;
+      // chance ajoute un bonus au jet brut
+      const chanceBonus = Math.floor(player.stats.chance / 2);
+      const effectiveRoll = Math.min(6, roll + chanceBonus);
+      let dmg = effectiveRoll + player.stats.force;
       if (card?.effect?.type === 'attack') {
-        if (card.effect.special === 'double' && roll === 6) dmg *= 2;
-        else if (card.effect.special === 'crit' && roll <= 2) {
+        if (card.effect.special === 'double' && effectiveRoll === 6) dmg *= 2;
+        else if (card.effect.special === 'crit' && effectiveRoll <= 2) {
           setTimeout(() => attackAction(), 500);
           return;
         } else dmg += card.effect.bonus;
       }
+      // destin : +1 dmg par tranche de 3 points de destin
+      dmg += Math.floor(player.stats.destin / 3);
       dmg = Math.max(1, dmg - combat.enemy.defense);
 
       const newEnemyHp = combat.enemy.hp - dmg;
@@ -217,9 +234,15 @@ export function useGameState() {
             ...p,
             xp: levelUp ? newXp - p.level * 30 : newXp,
             level: levelUp ? p.level + 1 : p.level,
-            maxHp: levelUp ? p.maxHp + 5 : p.maxHp,
-            hp: levelUp ? Math.min(p.maxHp + 5, p.hp + 5) : p.hp,
-            stats: levelUp ? { ...p.stats, attack: p.stats.attack + 1 } : p.stats,
+            maxHp: levelUp ? p.maxHp + 4 : p.maxHp,
+            hp: levelUp ? Math.min(p.maxHp + 4, p.hp + 4) : p.hp,
+            stats: levelUp ? {
+              ...p.stats,
+              force:       p.stats.force + 1,
+              vie:         p.stats.vie + 1,
+              chance:      p.stats.chance + 1,
+              destin:      p.stats.destin + 1,
+            } : p.stats,
           };
         });
         setEnemies(prev => { const n = { ...prev }; delete n[`${combat.pos.x},${combat.pos.y}`]; return n; });
@@ -241,7 +264,9 @@ export function useGameState() {
       if (!combat) return;
       const roll = rollDie();
       const enemy = { ...combat.enemy, hp: enemyHp ?? combat.enemy.hp };
-      const dmg = Math.max(1, roll + enemy.attack - player.stats.defense);
+      // force réduit les dégâts reçus (résistance physique)
+      const resistance = Math.floor(player.stats.force / 3);
+      const dmg = Math.max(1, roll + enemy.attack - resistance);
       addLog(`👹 ${enemy.name} attaque : dé=${roll}, dégâts=${dmg}`);
       setPlayer(p => {
         const newHp = p.hp - dmg;
@@ -262,10 +287,11 @@ export function useGameState() {
     if (!card || card.effect.type !== 'heal') return;
     setPhase('roll');
     animateRoll((roll) => {
-      let heal = roll + card.effect.bonus;
+      // magie amplifie les soins
+      let heal = roll + card.effect.bonus + Math.floor(player.stats.magie / 2);
       if (card.effect.special === 'fullheal' && roll === 6) heal = player.maxHp;
       setPlayer(p => ({ ...p, hp: Math.min(p.maxHp, p.hp + heal) }));
-      addLog(`💚 Soin : dé=${roll}, +${heal} HP`);
+      addLog(`💚 Soin : dé=${roll}, +${heal} HP (magie ${player.stats.magie})`);
       discardSelectedCard();
       setPhase('enemy');
     });
@@ -291,7 +317,8 @@ export function useGameState() {
     if (!combat) return;
     setPhase('roll');
     animateRoll((roll) => {
-      let dmg = card.effect.bonus;
+      // magie amplifie les sorts
+      let dmg = card.effect.bonus + Math.floor(player.stats.magie / 2);
       if (card.effect.special === 'stun' && roll === 6) {
         addLog(`✨ Sort : ÉTOURDISSEMENT ! ${combat.enemy.name} passe son tour.`);
         discardSelectedCard();
