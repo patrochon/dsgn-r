@@ -26,6 +26,12 @@ export default function GameMap({ grid, players, currentIdx, enemies, highlightT
     if (!playerAtTile[key]) playerAtTile[key] = { player: p, idx: i };
   });
 
+  // base tile → player index
+  const baseAtTile = {};
+  (players ?? []).forEach((p, i) => {
+    baseAtTile[`${p.baseX},${p.baseY}`] = { player: p, idx: i };
+  });
+
   const canClick = phase === 'choosing_move' || phase === 'choosing_attack';
 
   return (
@@ -42,19 +48,23 @@ export default function GameMap({ grid, players, currentIdx, enemies, highlightT
         const isTeleport = cell === T.TELEPORT;
         const isHighlight = highlightTiles.includes(key);
         const playerHere = playerAtTile[key];
+        const baseHere = baseAtTile[key];
         const enemy = enemies?.[key];
         const isCurrent = playerHere?.idx === currentIdx;
         const isAttackTarget = isHighlight && phase === 'choosing_attack';
         const isMoveTarget = isHighlight && phase === 'choosing_move';
+        const isOwnBase = playerHere && playerHere.player.baseX === x && playerHere.player.baseY === y;
 
         const bg = isWall ? TILE_BG[T.WALL]
           : isAttackTarget ? 'rgba(255,80,60,0.22)'
           : isMoveTarget ? 'rgba(80,180,255,0.18)'
+          : baseHere ? `${baseHere.player.color}18`
           : TILE_BG[cell] ?? TILE_BG[T.FLOOR];
 
         const bdr = isWall ? TILE_BORDER[T.WALL]
           : isAttackTarget ? '#ff5040'
           : isMoveTarget ? '#5ab4ff'
+          : baseHere ? `${baseHere.player.color}66`
           : TILE_BORDER[cell] ?? TILE_BORDER[T.FLOOR];
 
         return (
@@ -73,6 +83,24 @@ export default function GameMap({ grid, players, currentIdx, enemies, highlightT
             )}
             {isTeleport && !playerHere && (
               <span style={{ fontSize: 16, filter: 'drop-shadow(0 0 4px #9944ff)' }}>🌀</span>
+            )}
+            {baseHere && !playerHere && !enemy && !isTeleport && !isWall && (
+              <div style={{
+                width: 20, height: 20, borderRadius: 4,
+                border: `2px solid ${baseHere.player.color}99`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 10, color: baseHere.player.color, fontWeight: 900, opacity: 0.7,
+              }}>
+                {baseHere.idx + 1}
+              </div>
+            )}
+            {isOwnBase && playerHere && (
+              <div style={{
+                position: 'absolute', inset: 0,
+                border: `2px solid ${playerHere.player.color}`,
+                borderRadius: 2, pointerEvents: 'none',
+                boxShadow: `inset 0 0 6px ${playerHere.player.color}44`,
+              }} />
             )}
             {!isWall && !isTeleport && cell === T.EXIT && !playerHere && <span style={{ fontSize: 16 }}>🚪</span>}
             {!isWall && !playerHere && enemy && (

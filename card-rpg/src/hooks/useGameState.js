@@ -23,6 +23,8 @@ function buildPlayer(charData, index, mapData) {
     spec: charData.spec ?? null,
     x: start.x,
     y: start.y,
+    baseX: start.x,
+    baseY: start.y,
     hp: maxHp,
     maxHp,
     stats: { ...stats },
