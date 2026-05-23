@@ -114,19 +114,14 @@ function generateInitialTiles(mapData) {
   const cy = Math.floor(mapData.grid.length / 2);
   const maxDist = cx + cy;
 
-  // — Enemies (40%) — zone-based monster piles
+  // — Enemies (40%) — tous en pile 1 au départ
   const p1 = shuffleMonsters([...MONSTER_PILE_1]);
-  const p2 = shuffleMonsters([...MONSTER_PILE_2]);
-  const p3 = shuffleMonsters([...MONSTER_PILE_3]);
-  const pIdx = [0, 0, 0];
+  let p1idx = 0;
   const enemies = {};
   for (let i = 0; i < eCount; i++) {
     const { x, y } = free[i];
-    const ratio = (Math.abs(x - cx) + Math.abs(y - cy)) / maxDist;
-    const pi = ratio > 0.6 ? 0 : ratio > 0.3 ? 1 : 2;
-    const pile = [p1, p2, p3][pi];
-    const m = pile[pIdx[pi] % pile.length];
-    pIdx[pi]++;
+    const m = p1[p1idx % p1.length];
+    p1idx++;
     enemies[`${x},${y}`] = { ...m, hp: m.maxHp };
   }
 
@@ -398,8 +393,19 @@ export function useGameState(characters) {
         const won = cp.hp - dmgTaken > 0;
         const loot = won ? (monsterThere.loot ?? 1) : 0;
 
-        addLog(`⚔️ ${cp.name} affronte ${monsterThere.icon} ${monsterThere.name} ! (dé:${roll})`);
-        setEnemies(prev => { const n = { ...prev }; delete n[destKey]; return n; });
+        addLog(`⚔️ ${cp.name} affronte ${monsterThere.icon} ${monsterThere.name} (pile ${monsterThere.pile}) ! (dé:${roll})`);
+        // Pile 1 vaincu → remplacer par pile 2 ; pile 2 vaincu → case libre
+        if (won) {
+          if (monsterThere.pile === 1) {
+            const p2 = MONSTER_PILE_2[Math.floor(Math.random() * MONSTER_PILE_2.length)];
+            setEnemies(prev => ({ ...prev, [destKey]: { ...p2, hp: p2.maxHp } }));
+            addLog(`💀 ${monsterThere.name} vaincu — un ${p2.icon} ${p2.name} surgit sur la case !`);
+          } else {
+            setEnemies(prev => { const n = { ...prev }; delete n[destKey]; return n; });
+          }
+        } else {
+          setEnemies(prev => { const n = { ...prev }; delete n[destKey]; return n; });
+        }
         const nextPlayers = players.map((p, i) => {
           if (i !== currentIdx) return p;
           let np = { ...p, hp: Math.max(0, p.hp - dmgTaken) };
@@ -413,8 +419,13 @@ export function useGameState(characters) {
           return np;
         });
         setPlayers(nextPlayers);
-        if (won) addLog(`✅ Victoire ! ${monsterThere.name} vaincu (-${dmgTaken} PV, +${loot} carte(s))`);
-        else { addLog(`💀 ${cp.name} est tué par ${monsterThere.name} !`); turnEnded = handleDeath(nextPlayers); }
+        if (won) {
+          if (monsterThere.pile !== 1) addLog(`✅ ${monsterThere.name} vaincu (-${dmgTaken} PV, +${loot} carte(s))`);
+          else addLog(`✅ -${dmgTaken} PV, +${loot} carte(s)`);
+        } else {
+          addLog(`💀 ${cp.name} est tué par ${monsterThere.name} !`);
+          turnEnded = handleDeath(nextPlayers);
+        }
       }
 
       // — Trap —
