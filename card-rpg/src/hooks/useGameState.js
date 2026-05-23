@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { FULL_DECK, shuffleDeck } from '../data/cards';
 import { MULTIPLAYER_MAPS } from '../data/multiplayerMaps';
 import { T } from '../data/map';
+import { MONSTER_PILE_1, MONSTER_PILE_2, MONSTER_PILE_3, shuffleMonsters } from '../data/monsters';
 
 const HAND_LIMIT = 5;
 const PLAYER_COLORS = ['#ff4444', '#44aaff', '#44ff88', '#ffcc00', '#ff88ff', '#ff8844'];
@@ -88,11 +89,49 @@ export function isUsable(card) {
   return ['heal', 'buff', 'cure', 'magic'].includes(card?.effect?.type);
 }
 
+function generateInitialEnemies(mapData) {
+  const startKeys = new Set(mapData.playerStarts.map(s => `${s.x},${s.y}`));
+  const free = [];
+  for (let y = 0; y < mapData.grid.length; y++) {
+    for (let x = 0; x < mapData.grid[0].length; x++) {
+      if (mapData.grid[y][x] === T.FLOOR && !startKeys.has(`${x},${y}`)) {
+        free.push({ x, y });
+      }
+    }
+  }
+  // Shuffle free tiles
+  for (let i = free.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [free[i], free[j]] = [free[j], free[i]];
+  }
+  const count = Math.floor(free.length * 0.4);
+  const cx = Math.floor(mapData.grid[0].length / 2);
+  const cy = Math.floor(mapData.grid.length / 2);
+  const maxDist = cx + cy;
+
+  const p1 = shuffleMonsters([...MONSTER_PILE_1]);
+  const p2 = shuffleMonsters([...MONSTER_PILE_2]);
+  const p3 = shuffleMonsters([...MONSTER_PILE_3]);
+  const idx = [0, 0, 0];
+
+  const enemies = {};
+  for (let i = 0; i < count; i++) {
+    const { x, y } = free[i];
+    const ratio = (Math.abs(x - cx) + Math.abs(y - cy)) / maxDist;
+    const pileIdx = ratio > 0.6 ? 0 : ratio > 0.3 ? 1 : 2;
+    const pile = [p1, p2, p3][pileIdx];
+    const m = pile[idx[pileIdx] % pile.length];
+    idx[pileIdx]++;
+    enemies[`${x},${y}`] = { ...m, hp: m.maxHp };
+  }
+  return enemies;
+}
+
 export function useGameState(characters) {
   const [mapData] = useState(() => MULTIPLAYER_MAPS[Math.floor(Math.random() * MULTIPLAYER_MAPS.length)]);
   const [mapName] = useState(() => mapData.name);
   const [grid] = useState(() => mapData.grid.map(r => [...r]));
-  const [enemies, setEnemies] = useState({});
+  const [enemies, setEnemies] = useState(() => generateInitialEnemies(mapData));
 
   const [players, setPlayers] = useState(() =>
     (characters ?? []).map((ch, i) => buildPlayer(ch, i, mapData))
@@ -307,7 +346,61 @@ export function useGameState(characters) {
         });
       }
 
-      setPhase('player_turn');
+      // Monster encounter on landing
+      const destKey = `${finalX},${finalY}`;
+      const monsterThere = enemies[destKey];
+      let monsterEndedTurn = false;
+      if (monsterThere) {
+        const cp = players[currentIdx];
+        const roll = rollDie();
+        const chanceBonus = Math.floor(cp.stats.chance / 2);
+        const pDmgPerRound = Math.max(1, roll + cp.stats.force + chanceBonus - monsterThere.defense);
+        const mDmgPerRound = Math.max(1, monsterThere.attack - Math.floor(cp.stats.force / 3));
+        const roundsToKill = Math.ceil(monsterThere.maxHp / pDmgPerRound);
+        const dmgToPlayer = Math.max(0, (roundsToKill - 1) * mDmgPerRound);
+        const playerWon = cp.hp - dmgToPlayer > 0;
+        const lootCount = playerWon ? (monsterThere.loot ?? 1) : 0;
+
+        addLog(`⚔️ ${cp.name} affronte ${monsterThere.icon} ${monsterThere.name} ! (dé:${roll})`);
+        setEnemies(prev => { const n = { ...prev }; delete n[destKey]; return n; });
+
+        setPlayers(prev => {
+          const next = [...prev];
+          let p = { ...next[currentIdx] };
+          p.hp = Math.max(0, p.hp - dmgToPlayer);
+          if (!playerWon) { p.isAlive = false; p.hp = 0; }
+          if (playerWon && lootCount > 0) {
+            let deck = [...p.deck], discard = [...p.discard];
+            if (deck.length < lootCount) { deck = [...deck, ...shuffleDeck(discard)]; discard = []; }
+            const drawn = deck.splice(0, lootCount);
+            p.hand = [...p.hand, ...drawn];
+            p.deck = deck; p.discard = discard;
+          }
+          next[currentIdx] = p;
+          return next;
+        });
+
+        if (playerWon) {
+          addLog(`✅ ${cp.name} vainc ${monsterThere.name} ! (-${dmgToPlayer} PV, +${lootCount} carte(s))`);
+        } else {
+          addLog(`💀 ${cp.name} est tué par ${monsterThere.name} !`);
+          const updatedAlive = players.map((p, i) => i === currentIdx ? { ...p, isAlive: false } : p).filter(p => p.isAlive);
+          if (updatedAlive.length === 1) {
+            setWinner(updatedAlive[0]);
+            setPhase('win');
+          } else {
+            let ni = (currentIdx + 1) % players.length;
+            while (!players[ni]?.isAlive || ni === currentIdx) ni = (ni + 1) % players.length;
+            setCurrentIdx(ni);
+            setActionsLeft(0);
+            setHasMoved(false);
+            setPhase('draw');
+          }
+          monsterEndedTurn = true;
+        }
+      }
+
+      if (!monsterEndedTurn) setPhase('player_turn');
     } else if (phase === 'choosing_attack') {
       attackTile(tx, ty);
     }

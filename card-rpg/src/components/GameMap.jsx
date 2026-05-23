@@ -108,11 +108,20 @@ export default function GameMap({ grid, players, currentIdx, enemies, highlightT
             )}
             {!isWall && !isTeleport && cell === T.EXIT && !playerHere && <span style={{ fontSize: 16 }}>🚪</span>}
             {!isWall && !playerHere && enemy && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <span style={{ fontSize: 16 }}>{enemy.icon}</span>
-                <div style={{ width: 24, height: 3, background: '#2a0a0a', borderRadius: 2, marginTop: 1 }}>
-                  <div style={{ width: `${(enemy.hp / enemy.maxHp) * 100}%`, height: '100%', background: '#c44', borderRadius: 2 }} />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
+                <span style={{ fontSize: 14 }}>{enemy.icon}</span>
+                <div style={{ width: 24, height: 3, background: '#1a1a1a', borderRadius: 2, marginTop: 1 }}>
+                  <div style={{
+                    width: `${(enemy.hp / enemy.maxHp) * 100}%`, height: '100%', borderRadius: 2,
+                    background: enemy.pile === 1 ? '#44cc44' : enemy.pile === 2 ? '#ccaa00' : '#cc3333',
+                  }} />
                 </div>
+                <div style={{
+                  position: 'absolute', top: -3, right: -3, width: 8, height: 8, borderRadius: '50%',
+                  background: enemy.pile === 1 ? '#44cc44' : enemy.pile === 2 ? '#ccaa00' : '#cc3333',
+                  fontSize: 5, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#000', fontWeight: 900,
+                }}>{enemy.pile}</div>
               </div>
             )}
             {playerHere && (
