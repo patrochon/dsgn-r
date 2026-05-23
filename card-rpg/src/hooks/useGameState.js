@@ -1,131 +1,117 @@
 import { useState, useCallback } from 'react';
-import { DECK, shuffleDeck } from '../data/cards';
-import { MAPS, T, ITEMS, ENEMIES } from '../data/map';
+import { FULL_DECK, shuffleDeck } from '../data/cards';
+import { MULTIPLAYER_MAPS } from '../data/multiplayerMaps';
+import { T } from '../data/map';
 
-const HAND_SIZE = 4;
-const MOVE_RANGE = 3; // highlight tiles within this range
+const HAND_LIMIT = 5;
+const PLAYER_COLORS = ['#ff4444', '#44aaff', '#44ff88', '#ffcc00', '#ff88ff', '#ff8844'];
 
-function randomEnemy() {
-  const pool = ENEMIES.slice(0, 4);
-  const e = pool[Math.floor(Math.random() * pool.length)];
-  return { ...e, maxHp: e.hp, id: Math.random() };
+function rollDie() {
+  return Math.floor(Math.random() * 6) + 1;
 }
 
-function buildEnemyMap(grid) {
-  const enemies = {};
-  grid.forEach((row, y) => row.forEach((cell, x) => {
-    if (cell === T.ENEMY) enemies[`${x},${y}`] = randomEnemy();
-  }));
-  return enemies;
-}
-
-function buildItemMap(grid) {
-  const items = {};
-  grid.forEach((row, y) => row.forEach((cell, x) => {
-    if (cell === T.ITEM || cell === T.CHEST) {
-      const pool = cell === T.CHEST ? ITEMS.slice(0, 4) : ITEMS;
-      items[`${x},${y}`] = { ...pool[Math.floor(Math.random() * pool.length)], isChest: cell === T.CHEST };
-    }
-  }));
-  return items;
-}
-
-const initPlayer = (customStats) => {
-  const stats = customStats ?? {
-    force: 3, magie: 2, vie: 5, deplacement: 3, chance: 1, destin: 1,
-  };
+function buildPlayer(charData, index, mapData) {
+  const stats = charData.stats ?? { force: 3, magie: 2, vie: 5, deplacement: 3, chance: 1, destin: 1 };
   const maxHp = 20 + stats.vie * 2;
+  const start = mapData.playerStarts[index] ?? mapData.playerStarts[0];
+  const deck = shuffleDeck([...FULL_DECK]);
   return {
-    x: 1, y: 1,
-    hp: maxHp, maxHp,
-    xp: 0, level: 1,
-    stats,
+    id: index,
+    name: charData.name ?? `Joueur ${index + 1}`,
+    race: charData.race ?? null,
+    cls: charData.cls ?? null,
+    spec: charData.spec ?? null,
+    x: start.x,
+    y: start.y,
+    hp: maxHp,
+    maxHp,
+    stats: { ...stats },
     inventory: [],
+    hand: [],
+    deck,
+    discard: [],
+    isAlive: true,
+    color: PLAYER_COLORS[index] ?? '#ffffff',
   };
-};
+}
 
-export function useGameState(characterData) {
-  const [mapIndex, setMapIndex] = useState(0);
-  const mapData = MAPS[mapIndex];
+// Parse 'stat:force+2,vie+1' style special strings, returns array of {stat, val}
+function parseStatSpecial(special) {
+  if (!special || !special.startsWith('stat:')) return [];
+  const parts = special.replace('stat:', '').split(',');
+  const result = [];
+  for (const part of parts) {
+    const m = part.match(/^([a-z_]+)([+-]\d+)$/);
+    if (m) result.push({ stat: m[1], val: parseInt(m[2]) });
+  }
+  return result;
+}
 
-  const [player, setPlayer] = useState(() => ({
-    ...initPlayer(characterData?.stats),
-    name: characterData?.name ?? 'Aventurier',
-    race: characterData?.race ?? null,
-    cls: characterData?.cls ?? null,
-    spec: characterData?.spec ?? null,
-    x: mapData.playerStart.x,
-    y: mapData.playerStart.y,
-  }));
+// Parse 'perm:stat+val,...' style
+function parsePermSpecial(special) {
+  if (!special) return [];
+  const permMatch = special.match(/perm:([^)]+)/);
+  if (!permMatch) return [];
+  const parts = permMatch[1].split(',');
+  const result = [];
+  for (const part of parts) {
+    const m = part.match(/^([a-z_]+)([+-]\d+)$/);
+    if (m) result.push({ stat: m[1], val: parseInt(m[2]) });
+  }
+  return result;
+}
 
-  const [grid, setGrid] = useState(() => mapData.grid.map(r => [...r]));
-  const [enemies, setEnemies] = useState(() => buildEnemyMap(mapData.grid));
-  const [itemMap, setItemMap] = useState(() => buildItemMap(mapData.grid));
+function applyStatDeltas(player, deltas) {
+  let p = { ...player, stats: { ...player.stats } };
+  for (const { stat, val } of deltas) {
+    if (stat === 'vie') {
+      const hpGain = val * 2;
+      p.maxHp += hpGain;
+      p.hp = Math.min(p.maxHp, p.hp + hpGain);
+    }
+    if (p.stats[stat] !== undefined) {
+      p.stats[stat] += val;
+    }
+  }
+  return p;
+}
 
-  const [deck, setDeck] = useState(() => shuffleDeck(DECK));
-  const [hand, setHand] = useState([]);
-  const [discard, setDiscard] = useState([]);
-  const [selectedCard, setSelectedCard] = useState(null);
+// Check if card is equippable (free action)
+export function isEquippable(card) {
+  return ['defense', 'attack', 'magic_attack', 'passive', 'legendary'].includes(card?.effect?.type);
+}
 
-  const [phase, setPhase] = useState('draw'); // draw | action | move | combat | roll | enemy | result | gameover | win
+// Check if card is usable (costs action)
+export function isUsable(card) {
+  return ['heal', 'buff', 'cure', 'magic'].includes(card?.effect?.type);
+}
+
+export function useGameState(characters) {
+  const [mapData] = useState(() => MULTIPLAYER_MAPS[Math.floor(Math.random() * MULTIPLAYER_MAPS.length)]);
+  const [mapName] = useState(() => mapData.name);
+  const [grid] = useState(() => mapData.grid.map(r => [...r]));
+  const [enemies, setEnemies] = useState({});
+
+  const [players, setPlayers] = useState(() =>
+    (characters ?? []).map((ch, i) => buildPlayer(ch, i, mapData))
+  );
+
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [actionsLeft, setActionsLeft] = useState(0);
+  const [hasMoved, setHasMoved] = useState(false);
+  const [phase, setPhase] = useState('draw');
   const [diceResult, setDiceResult] = useState(null);
-  const [log, setLog] = useState(['Bienvenue dans le Donjon !', 'Tirez des cartes pour commencer.']);
-  const [combat, setCombat] = useState(null); // { enemy, pos }
-  const [highlightTiles, setHighlightTiles] = useState([]);
   const [rolling, setRolling] = useState(false);
+  const [highlightTiles, setHighlightTiles] = useState([]);
+  const [selectedCard, setSelectedCard] = useState(null);
+  const [log, setLog] = useState(['Bienvenue dans la partie multijoueur !', 'Joueur 1 commence — tirez vos cartes.']);
+  const [winner, setWinner] = useState(null);
 
-  const addLog = (msg) => setLog(prev => [msg, ...prev].slice(0, 20));
+  const currentPlayer = players[currentIdx] ?? players[0];
 
-  // Draw cards up to hand size
-  const drawCards = useCallback(() => {
-    setHand(prev => {
-      const needed = HAND_SIZE - prev.length;
-      if (needed <= 0) return prev;
-      let d = [...deck];
-      let disc = [...discard];
-      if (d.length < needed) {
-        d = [...d, ...shuffleDeck(disc)];
-        disc = [];
-        setDiscard([]);
-      }
-      const drawn = d.splice(0, needed);
-      setDeck(d);
-      addLog(`Vous tirez ${drawn.length} carte(s).`);
-      return [...prev, ...drawn];
-    });
-    setPhase('action');
-  }, [deck, discard]);
+  const addLog = (msg) => setLog(prev => [msg, ...prev].slice(0, 30));
 
-  // Highlight reachable tiles for movement
-  const showMoveRange = useCallback((card) => {
-    const range = player.stats.deplacement + (card?.effect?.type === 'move' ? card.effect.bonus : 0);
-    const tiles = [];
-    for (let dy = -range; dy <= range; dy++) {
-      for (let dx = -range; dx <= range; dx++) {
-        const nx = player.x + dx, ny = player.y + dy;
-        if (Math.abs(dx) + Math.abs(dy) > range) continue;
-        if (nx < 0 || ny < 0 || ny >= grid.length || nx >= grid[0].length) continue;
-        const cell = grid[ny][nx];
-        if (cell !== T.WALL && !(dx === 0 && dy === 0)) {
-          tiles.push(`${nx},${ny}`);
-        }
-      }
-    }
-    setHighlightTiles(tiles);
-  }, [player, grid]);
-
-  const selectCard = useCallback((card) => {
-    setSelectedCard(card);
-    const t = card.effect.type;
-    if (t === 'move') {
-      showMoveRange(card);
-      setPhase('move');
-    }
-  }, [showMoveRange]);
-
-  const rollDie = () => Math.floor(Math.random() * 6) + 1;
-
-  // Animate dice roll
+  // Animate dice, call onDone(finalValue)
   const animateRoll = (onDone) => {
     setRolling(true);
     let count = 0;
@@ -142,349 +128,376 @@ export function useGameState(characterData) {
     }, 80);
   };
 
-  // Move action
+  // Draw cards up to HAND_LIMIT for current player, set actionsLeft, reset hasMoved
+  const drawCards = useCallback(() => {
+    setPlayers(prev => {
+      const next = [...prev];
+      const p = { ...next[currentIdx] };
+      const needed = HAND_LIMIT - p.hand.length;
+      if (needed > 0) {
+        let deck = [...p.deck];
+        let discard = [...p.discard];
+        if (deck.length < needed) {
+          deck = [...deck, ...shuffleDeck(discard)];
+          discard = [];
+        }
+        const drawn = deck.splice(0, needed);
+        p.hand = [...p.hand, ...drawn];
+        p.deck = deck;
+        p.discard = discard;
+        addLog(`${p.name} tire ${drawn.length} carte(s).`);
+      }
+      next[currentIdx] = p;
+      return next;
+    });
+    setActionsLeft(players[currentIdx]?.stats?.deplacement ?? 3);
+    setHasMoved(false);
+    setPhase('player_turn');
+  }, [currentIdx, players]);
+
+  // Equip card — FREE, applies stat bonuses, moves to inventory + discard
+  const equipCard = useCallback((card) => {
+    if (!card || !isEquippable(card)) return false;
+    setPlayers(prev => {
+      const next = [...prev];
+      let p = { ...next[currentIdx], stats: { ...next[currentIdx].stats } };
+      // Apply stat bonuses from effect.special (stat:... or perm:...)
+      const special = card.effect.special ?? '';
+      let deltas = parseStatSpecial(special);
+      if (deltas.length === 0) deltas = parsePermSpecial(special);
+
+      // For attack/defense/magic_attack with bonus, apply the bonus to force or magie
+      if (deltas.length === 0 && card.effect.bonus > 0) {
+        if (card.effect.type === 'magic_attack') {
+          deltas = [{ stat: 'magie', val: card.effect.bonus }, { stat: 'force', val: Math.floor(card.effect.bonus / 2) }];
+        } else if (card.effect.type === 'attack') {
+          deltas = [{ stat: 'force', val: card.effect.bonus }];
+        } else if (card.effect.type === 'defense') {
+          deltas = [{ stat: 'force', val: card.effect.bonus }];
+        } else if (card.effect.type === 'legendary' && special.includes('all+3')) {
+          deltas = Object.keys(p.stats).map(s => ({ stat: s, val: 3 }));
+        }
+      }
+
+      p = applyStatDeltas(p, deltas);
+
+      // Special legendary bonuses
+      if (card.effect.type === 'legendary') {
+        if (special.includes('all+3') && deltas.length === 0) {
+          p = applyStatDeltas(p, Object.keys(p.stats).map(s => ({ stat: s, val: 3 })));
+        }
+        if (special.includes('perm:vie+10') || special.includes('vie+10')) {
+          p.maxHp += 20;
+          p.hp = Math.min(p.maxHp, p.hp + 20);
+        }
+        if (special.includes('force+5') && !deltas.find(d => d.stat === 'force')) {
+          p.stats.force = (p.stats.force ?? 0) + 5;
+        }
+      }
+
+      p.hand = p.hand.filter(c => c !== card);
+      p.discard = [...p.discard, card];
+      p.inventory = [...p.inventory, card];
+      next[currentIdx] = p;
+      return next;
+    });
+    addLog(`${currentPlayer.name} équipe ${card.icon} ${card.name} (gratuit).`);
+    setSelectedCard(null);
+    return true;
+  }, [currentIdx, currentPlayer]);
+
+  // Start move — costs 1 action, animates die, shows reachable tiles
+  const startMove = useCallback(() => {
+    if (actionsLeft < 1 || hasMoved) return;
+    setPhase('rolling_move');
+    const card = selectedCard;
+    animateRoll((roll) => {
+      const moveBonus = (card?.effect?.type === 'move') ? (card.effect.bonus ?? 0) : 0;
+      const range = roll + moveBonus;
+      addLog(`${currentPlayer.name} lance le dé : ${roll}${moveBonus > 0 ? ` +${moveBonus}` : ''} = ${range} cases.`);
+      const tiles = [];
+      const cp = players[currentIdx];
+      for (let dy = -range; dy <= range; dy++) {
+        for (let dx = -range; dx <= range; dx++) {
+          if (Math.abs(dx) + Math.abs(dy) > range) continue;
+          if (dx === 0 && dy === 0) continue;
+          const nx = cp.x + dx;
+          const ny = cp.y + dy;
+          if (nx < 0 || ny < 0 || ny >= grid.length || nx >= grid[0].length) continue;
+          if (grid[ny][nx] === T.WALL) continue;
+          tiles.push(`${nx},${ny}`);
+        }
+      }
+      setHighlightTiles(tiles);
+      setPhase('choosing_move');
+    });
+  }, [actionsLeft, hasMoved, selectedCard, currentIdx, players, grid]);
+
+  // Complete the move
   const moveToTile = useCallback((tx, ty) => {
-    if (phase !== 'move') return;
+    if (phase !== 'choosing_move' && phase !== 'choosing_attack') return;
+
+    if (phase === 'choosing_move') {
+      const key = `${tx},${ty}`;
+      if (!highlightTiles.includes(key)) return;
+      setHighlightTiles([]);
+      setHasMoved(true);
+      setActionsLeft(prev => prev - 1);
+      setPlayers(prev => {
+        const next = [...prev];
+        next[currentIdx] = { ...next[currentIdx], x: tx, y: ty };
+        return next;
+      });
+      // Discard move card if selected
+      if (selectedCard?.effect?.type === 'move') {
+        setPlayers(prev => {
+          const next = [...prev];
+          const p = { ...next[currentIdx] };
+          p.hand = p.hand.filter(c => c !== selectedCard);
+          p.discard = [...p.discard, selectedCard];
+          next[currentIdx] = p;
+          return next;
+        });
+        setSelectedCard(null);
+      }
+      addLog(`${currentPlayer.name} se déplace en (${tx}, ${ty}).`);
+      setPhase('player_turn');
+    } else if (phase === 'choosing_attack') {
+      attackTile(tx, ty);
+    }
+  }, [phase, highlightTiles, currentIdx, selectedCard, currentPlayer]);
+
+  // Show attack targets (adjacent players and enemies)
+  const showAttackTargets = useCallback(() => {
+    if (actionsLeft < 1) return;
+    const cp = players[currentIdx];
+    // Check range from selected weapon card
+    let range = 1;
+    if (selectedCard?.effect?.special) {
+      const sp = selectedCard.effect.special;
+      const rangeMatch = sp.match(/range(\d+)/);
+      if (rangeMatch) range = parseInt(rangeMatch[1]);
+    }
+    const tiles = [];
+    for (let dy = -range; dy <= range; dy++) {
+      for (let dx = -range; dx <= range; dx++) {
+        if (Math.abs(dx) + Math.abs(dy) > range) continue;
+        if (dx === 0 && dy === 0) continue;
+        const nx = cp.x + dx;
+        const ny = cp.y + dy;
+        if (nx < 0 || ny < 0 || ny >= grid.length || nx >= grid[0].length) continue;
+        if (grid[ny][nx] === T.WALL) continue;
+        // Check if another player or enemy is here
+        const hasTarget = players.some((p, i) => i !== currentIdx && p.isAlive && p.x === nx && p.y === ny)
+          || enemies[`${nx},${ny}`];
+        if (hasTarget) tiles.push(`${nx},${ny}`);
+      }
+    }
+    setHighlightTiles(tiles);
+    setPhase('choosing_attack');
+    addLog(`${cp.name} choisit une cible...`);
+  }, [actionsLeft, currentIdx, players, grid, enemies, selectedCard]);
+
+  // Attack a tile
+  const attackTile = useCallback((tx, ty) => {
+    if (phase !== 'choosing_attack') return;
     const key = `${tx},${ty}`;
     if (!highlightTiles.includes(key)) return;
-
     setHighlightTiles([]);
+    setPhase('rolling_attack');
 
-    if (enemies[key]) {
-      setCombat({ enemy: enemies[key], pos: { x: tx, y: ty } });
-      setPhase('combat');
-      addLog(`Vous rencontrez ${enemies[key].name} !`);
-      return;
-    }
+    const cp = players[currentIdx];
+    const card = selectedCard;
+    const targetPlayerIdx = players.findIndex((p, i) => i !== currentIdx && p.isAlive && p.x === tx && p.y === ty);
+    const targetEnemy = enemies[key];
 
-    if (itemMap[key]) {
-      const item = itemMap[key];
-      setPlayer(p => {
-        if (item.stat === 'hp') {
-          return { ...p, x: tx, y: ty, hp: Math.min(p.maxHp, p.hp + item.bonus), inventory: [...p.inventory, item] };
-        }
-        const newStats = { ...p.stats };
-        if (newStats[item.stat] !== undefined) newStats[item.stat] += item.bonus;
-        // vie augmente aussi maxHp
-        const newMaxHp = item.stat === 'vie' ? p.maxHp + item.bonus * 2 : p.maxHp;
-        return { ...p, x: tx, y: ty, stats: newStats, maxHp: newMaxHp, inventory: [...p.inventory, item] };
-      });
-      setItemMap(prev => { const n = { ...prev }; delete n[key]; return n; });
-      addLog(`Vous ramassez : ${item.icon} ${item.name} (+${item.bonus} ${item.stat})`);
-      discardSelectedCard();
-      setPhase('enemy');
-      return;
-    }
-
-    const cell = grid[ty][tx];
-    if (cell === T.EXIT) {
-      if (mapIndex + 1 < MAPS.length) {
-        nextLevel();
-      } else {
-        setPhase('win');
-        addLog('🏆 Vous avez conquis le donjon !');
-      }
-      return;
-    }
-
-    setPlayer(p => ({ ...p, x: tx, y: ty }));
-    discardSelectedCard();
-    addLog(`Vous vous déplacez en (${tx}, ${ty}).`);
-    setPhase('enemy');
-  }, [phase, highlightTiles, enemies, itemMap, grid, selectedCard]);
-
-  const discardSelectedCard = () => {
-    if (selectedCard) {
-      setHand(prev => prev.filter(c => c !== selectedCard));
-      setDiscard(prev => [...prev, selectedCard]);
-      setSelectedCard(null);
-    }
-  };
-
-  // Attack action (handles 'attack' and 'magic_attack')
-  const attackAction = useCallback(() => {
-    if (!combat) return;
-    setPhase('roll');
     animateRoll((roll) => {
-      const card = selectedCard;
-      const chanceBonus = Math.floor(player.stats.chance / 2);
+      const chanceBonus = Math.floor(cp.stats.chance / 2);
       const effectiveRoll = Math.min(6, roll + chanceBonus);
-      const isMagicAtk = card?.effect?.type === 'magic_attack';
-      // magie remplace force pour les armes magiques
-      const baseStat = isMagicAtk ? player.stats.magie : player.stats.force;
-      let dmg = effectiveRoll + baseStat;
-      if (card?.effect?.type === 'attack' || isMagicAtk) {
+      const isMagic = card?.effect?.type === 'magic_attack';
+      const baseStat = isMagic ? cp.stats.magie : cp.stats.force;
+      let dmg = effectiveRoll + baseStat + Math.floor(cp.stats.destin / 3);
+      if (card) {
+        dmg += card.effect.bonus ?? 0;
+        if (card.effect.special === 'crit_5_6' && effectiveRoll >= 5) dmg = Math.floor(dmg * 1.5);
         if (card.effect.special === 'double_on_6' && effectiveRoll === 6) dmg *= 2;
-        else if (card.effect.special === 'crit_5_6' && effectiveRoll >= 5) dmg = Math.floor(dmg * 1.5);
-        else if (card.effect.special === 'stun_6' && effectiveRoll === 6) {
-          addLog(`🌀 ${combat.enemy.name} est étourdi — passe son prochain tour !`);
-        }
-        dmg += card.effect.bonus;
-        if (isMagicAtk && card.effect.special === 'ignore_armor') {
-          // lame spectrale ignore l'armure — on ne soustrait pas defense
-        }
       }
-      // destin : +1 dmg par tranche de 3 points de destin
-      dmg += Math.floor(player.stats.destin / 3);
-      dmg = Math.max(1, dmg - combat.enemy.defense);
 
-      const newEnemyHp = combat.enemy.hp - dmg;
-      addLog(`🗡️ Vous attaquez ${combat.enemy.name} : dé=${roll}, dégâts=${dmg}`);
-
-      if (newEnemyHp <= 0) {
-        addLog(`✅ ${combat.enemy.name} est vaincu ! +${combat.enemy.xp} XP`);
-        setPlayer(p => {
-          const newXp = p.xp + combat.enemy.xp;
-          const levelUp = newXp >= p.level * 30;
-          if (levelUp) addLog(`🎉 Niveau ${p.level + 1} !`);
-          return {
-            ...p,
-            xp: levelUp ? newXp - p.level * 30 : newXp,
-            level: levelUp ? p.level + 1 : p.level,
-            maxHp: levelUp ? p.maxHp + 4 : p.maxHp,
-            hp: levelUp ? Math.min(p.maxHp + 4, p.hp + 4) : p.hp,
-            stats: levelUp ? {
-              ...p.stats,
-              force:       p.stats.force + 1,
-              vie:         p.stats.vie + 1,
-              chance:      p.stats.chance + 1,
-              destin:      p.stats.destin + 1,
-            } : p.stats,
-          };
+      if (targetPlayerIdx >= 0) {
+        const target = players[targetPlayerIdx];
+        const defense = Math.floor(target.stats.force / 3);
+        const actualDmg = Math.max(1, dmg - defense);
+        addLog(`${cp.name} attaque ${target.name} : dé=${roll}, dégâts=${actualDmg}`);
+        setPlayers(prev => {
+          const next = [...prev];
+          const t = { ...next[targetPlayerIdx] };
+          t.hp = Math.max(0, t.hp - actualDmg);
+          if (t.hp <= 0) {
+            t.isAlive = false;
+            addLog(`💀 ${t.name} est éliminé !`);
+          }
+          next[targetPlayerIdx] = t;
+          // Check win
+          const alive = next.filter(p => p.isAlive);
+          if (alive.length === 1) {
+            setWinner(alive[0]);
+            setPhase('win');
+          } else {
+            setPhase('player_turn');
+          }
+          return next;
         });
-        setEnemies(prev => { const n = { ...prev }; delete n[`${combat.pos.x},${combat.pos.y}`]; return n; });
-        setPlayer(p => ({ ...p, x: combat.pos.x, y: combat.pos.y }));
-        setCombat(null);
-        discardSelectedCard();
-        setPhase('enemy');
-      } else {
-        setCombat(prev => ({ ...prev, enemy: { ...prev.enemy, hp: newEnemyHp } }));
-        discardSelectedCard();
-        setPhase('enemy_attack');
-        enemyAttack(newEnemyHp);
-      }
-    });
-  }, [combat, player, selectedCard]);
-
-  const enemyAttack = useCallback((enemyHp) => {
-    setTimeout(() => {
-      if (!combat) return;
-      const roll = rollDie();
-      const enemy = { ...combat.enemy, hp: enemyHp ?? combat.enemy.hp };
-      // force réduit les dégâts reçus (résistance physique)
-      const resistance = Math.floor(player.stats.force / 3);
-      const dmg = Math.max(1, roll + enemy.attack - resistance);
-      addLog(`👹 ${enemy.name} attaque : dé=${roll}, dégâts=${dmg}`);
-      setPlayer(p => {
-        const newHp = p.hp - dmg;
+      } else if (targetEnemy) {
+        const defense = targetEnemy.defense ?? 0;
+        const actualDmg = Math.max(1, dmg - defense);
+        addLog(`${cp.name} attaque ${targetEnemy.name} : dé=${roll}, dégâts=${actualDmg}`);
+        const newHp = targetEnemy.hp - actualDmg;
         if (newHp <= 0) {
-          setPhase('gameover');
-          addLog('💀 Vous êtes mort...');
-          return { ...p, hp: 0 };
+          addLog(`✅ ${targetEnemy.name} est vaincu !`);
+          setEnemies(prev => { const n = { ...prev }; delete n[key]; return n; });
+        } else {
+          setEnemies(prev => ({ ...prev, [key]: { ...targetEnemy, hp: newHp } }));
         }
-        return { ...p, hp: newHp };
-      });
-      setCombat(prev => prev ? { ...prev, enemy: enemy } : null);
-      setPhase('combat');
-    }, 800);
-  }, [combat, player]);
+        setPhase('player_turn');
+      } else {
+        setPhase('player_turn');
+      }
 
-  const useCardAction = useCallback(() => {
-    const card = selectedCard;
-    if (!card) return;
-    const t = card.effect.type;
-
-    // Soins directs
-    if (t === 'heal') {
-      setPhase('roll');
-      animateRoll((roll) => {
-        let heal = card.effect.bonus + Math.floor(player.stats.magie / 2);
-        if (roll === 6) heal = Math.floor(heal * 1.5);
-        setPlayer(p => ({ ...p, hp: Math.min(p.maxHp, p.hp + heal) }));
-        addLog(`💚 Soin : +${heal} HP`);
-        discardSelectedCard();
-        setPhase(combat ? 'combat' : 'enemy');
-      });
-      return;
-    }
-
-    // Buffs temporaires & permanents
-    if (t === 'buff' || t === 'cure') {
-      const special = card.effect.special ?? '';
-      // Permanent stat boost (perm:stat+val)
-      if (special.startsWith('perm:')) {
-        const parts = special.replace('perm:', '').split(',');
-        setPlayer(p => {
-          let next = { ...p, stats: { ...p.stats } };
-          parts.forEach(part => {
-            const m = part.match(/^([a-z]+)([+-]\d+)$/);
-            if (!m) return;
-            const [, stat, valStr] = m;
-            const val = parseInt(valStr);
-            if (stat === 'vie') {
-              next.maxHp += val * 2;
-              next.hp = Math.min(next.maxHp, next.hp + val * 2);
-            }
-            if (next.stats[stat] !== undefined) next.stats[stat] += val;
-          });
+      // Discard attack card if it's a usable attack (not an equipped weapon)
+      if (card && (card.effect.type === 'attack' || card.effect.type === 'magic_attack')) {
+        // Only discard from hand if it's still in the hand (not already in inventory)
+        setPlayers(prev => {
+          const next = [...prev];
+          const p = { ...next[currentIdx] };
+          if (p.hand.includes(card)) {
+            p.hand = p.hand.filter(c => c !== card);
+            p.discard = [...p.discard, card];
+            next[currentIdx] = p;
+          }
           return next;
         });
-        addLog(`✨ ${card.name} : effet permanent appliqué !`);
-      } else if (t === 'cure') {
-        addLog(`🌿 ${card.name} : effets négatifs annulés.`);
-      } else {
-        addLog(`⚗️ ${card.name} : ${card.desc}`);
+        setSelectedCard(null);
       }
-      discardSelectedCard();
-      setPhase(combat ? 'combat' : 'enemy');
-      return;
-    }
 
-    // Passive / Rare / Legendary — appliqués immédiatement
-    if (t === 'passive' || t === 'legendary') {
-      const special = card.effect.special ?? '';
-      const permMatch = special.match(/perm:([^,]+(?:,[^,]+)*)/);
-      if (permMatch) {
-        const parts = permMatch[1].split(',').filter(s => s.includes('+') || s.includes('-'));
-        setPlayer(p => {
-          let next = { ...p, stats: { ...p.stats } };
-          parts.forEach(part => {
-            const m = part.match(/^([a-z]+)([+-]\d+)$/);
-            if (!m) return;
-            const [, stat, valStr] = m;
-            const val = parseInt(valStr);
-            if (stat === 'vie') { next.maxHp += val * 2; next.hp = Math.min(next.maxHp, next.hp + val * 2); }
-            if (next.stats[stat] !== undefined) next.stats[stat] += val;
-          });
-          return next;
-        });
-      }
-      if (t === 'legendary') {
-        const allStat = special.includes('all+3');
-        if (allStat) setPlayer(p => ({
-          ...p, maxHp: p.maxHp + 6, hp: Math.min(p.maxHp + 6, p.hp + 6),
-          stats: Object.fromEntries(Object.entries(p.stats).map(([k, v]) => [k, v + 3])),
-        }));
-        if (special.includes('reroll3')) addLog(`👁️ L'Œil du Destin : vous pouvez rejouer 3 dés cette partie !`);
-        if (special.includes('regen2')) addLog(`🐉 Cœur de Dragon : régénération de 2 HP/tour activée !`);
-      }
-      addLog(`${card.icon} ${card.name} équipé ! Effets permanents actifs.`);
-      discardSelectedCard();
-      setPhase(combat ? 'combat' : 'enemy');
-      return;
-    }
-
-    // Sorts de parchemin — traités par magicAction (appelé séparément depuis CombatPanel)
-    if (t === 'magic') {
-      addLog(`📜 ${card.name} : utilisez le bouton Sort en combat, ou attendez.`);
-      return;
-    }
-
-    addLog(`${card.icon} ${card.name} utilisé.`);
-    discardSelectedCard();
-    setPhase(combat ? 'combat' : 'enemy');
-  }, [selectedCard, player, combat]);
-
-  // Kept for backward compat in ActionBar
-  const healAction = useCallback(() => {
-    useCardAction();
-  }, [useCardAction]);
-
-  const defenseAction = useCallback(() => {
-    const card = selectedCard;
-    if (!card) return;
-    if (combat) {
-      setPhase('roll');
-      animateRoll((roll) => {
-        const bonus = card.effect.bonus || 0;
-        addLog(`🛡️ Défense : dé=${roll}, +${roll + bonus} DEF ce tour`);
-        discardSelectedCard();
-        enemyAttack();
-      });
-    }
-  }, [selectedCard, combat, enemyAttack]);
-
-  const magicAction = useCallback(() => {
-    const card = selectedCard;
-    if (!card || card.effect.type !== 'magic') return;
-    if (!combat) return;
-    setPhase('roll');
-    animateRoll((roll) => {
-      // magie amplifie les sorts
-      let dmg = card.effect.bonus + Math.floor(player.stats.magie / 2);
-      if (card.effect.special === 'stun' && roll === 6) {
-        addLog(`✨ Sort : ÉTOURDISSEMENT ! ${combat.enemy.name} passe son tour.`);
-        discardSelectedCard();
-        setPhase('draw');
-        return;
-      }
-      dmg = Math.max(1, dmg - combat.enemy.defense);
-      const newHp = combat.enemy.hp - dmg;
-      addLog(`✨ Sort de feu : ${dmg} dégâts fixes sur ${combat.enemy.name}`);
-      if (newHp <= 0) {
-        addLog(`✅ ${combat.enemy.name} est vaincu ! +${combat.enemy.xp} XP`);
-        setEnemies(prev => { const n = { ...prev }; delete n[`${combat.pos.x},${combat.pos.y}`]; return n; });
-        setPlayer(p => ({ ...p, x: combat.pos.x, y: combat.pos.y, xp: p.xp + combat.enemy.xp }));
-        setCombat(null);
-      } else {
-        setCombat(prev => ({ ...prev, enemy: { ...prev.enemy, hp: newHp } }));
-      }
-      discardSelectedCard();
-      setPhase('enemy');
+      setActionsLeft(prev => prev - 1);
     });
-  }, [selectedCard, combat]);
+  }, [phase, highlightTiles, currentIdx, players, enemies, selectedCard]);
 
-  const enemyTurn = useCallback(() => {
-    if (phase !== 'enemy') return;
-    if (combat) {
-      enemyAttack(combat.enemy.hp);
-    } else {
-      setPhase('draw');
-      addLog('Tour ennemi : aucun ennemi en combat.');
+  // Use item (heal / buff / cure / magic scroll) — costs 1 action
+  const useItem = useCallback(() => {
+    const card = selectedCard;
+    if (!card || !isUsable(card)) return;
+    const cp = players[currentIdx];
+
+    if (card.effect.type === 'heal') {
+      const healAmt = card.effect.bonus + Math.floor(cp.stats.magie / 2);
+      setPlayers(prev => {
+        const next = [...prev];
+        const p = { ...next[currentIdx] };
+        p.hp = Math.min(p.maxHp, p.hp + healAmt);
+        p.hand = p.hand.filter(c => c !== card);
+        p.discard = [...p.discard, card];
+        next[currentIdx] = p;
+        return next;
+      });
+      addLog(`${cp.name} utilise ${card.icon} ${card.name} : +${healAmt} HP.`);
+    } else if (card.effect.type === 'buff') {
+      const special = card.effect.special ?? '';
+      if (special.startsWith('perm:')) {
+        const deltas = parsePermSpecial(special);
+        setPlayers(prev => {
+          const next = [...prev];
+          let p = { ...next[currentIdx] };
+          p = applyStatDeltas(p, deltas);
+          p.hand = p.hand.filter(c => c !== card);
+          p.discard = [...p.discard, card];
+          next[currentIdx] = p;
+          return next;
+        });
+        addLog(`${cp.name} utilise ${card.icon} ${card.name} : effet permanent !`);
+      } else {
+        setPlayers(prev => {
+          const next = [...prev];
+          const p = { ...next[currentIdx] };
+          p.hand = p.hand.filter(c => c !== card);
+          p.discard = [...p.discard, card];
+          next[currentIdx] = p;
+          return next;
+        });
+        addLog(`${cp.name} utilise ${card.icon} ${card.name} : ${card.desc}`);
+      }
+    } else if (card.effect.type === 'cure') {
+      setPlayers(prev => {
+        const next = [...prev];
+        const p = { ...next[currentIdx] };
+        p.hand = p.hand.filter(c => c !== card);
+        p.discard = [...p.discard, card];
+        next[currentIdx] = p;
+        return next;
+      });
+      addLog(`${cp.name} utilise ${card.icon} ${card.name} : effets négatifs annulés.`);
+    } else if (card.effect.type === 'magic') {
+      const dmg = card.effect.bonus + Math.floor(cp.stats.magie / 2);
+      addLog(`${cp.name} lance ${card.icon} ${card.name} : ${dmg} dégâts magiques !`);
+      setPlayers(prev => {
+        const next = [...prev];
+        const p = { ...next[currentIdx] };
+        p.hand = p.hand.filter(c => c !== card);
+        p.discard = [...p.discard, card];
+        next[currentIdx] = p;
+        return next;
+      });
     }
-  }, [phase, combat, enemyAttack]);
 
-  const nextLevel = () => {
-    const nextIdx = mapIndex + 1;
-    const nextMap = MAPS[nextIdx];
-    setMapIndex(nextIdx);
-    setGrid(nextMap.grid.map(r => [...r]));
-    setEnemies(buildEnemyMap(nextMap.grid));
-    setItemMap(buildItemMap(nextMap.grid));
-    setPlayer(p => ({ ...p, x: nextMap.playerStart.x, y: nextMap.playerStart.y }));
-    setPhase('draw');
-    addLog(`🗺️ Nouveau niveau : ${nextMap.name}`);
-  };
-
-  const restart = () => {
-    const m = MAPS[0];
-    setMapIndex(0);
-    setGrid(m.grid.map(r => [...r]));
-    setEnemies(buildEnemyMap(m.grid));
-    setItemMap(buildItemMap(m.grid));
-    setPlayer({ ...initPlayer(characterData?.stats), name: characterData?.name ?? 'Aventurier', race: characterData?.race ?? null, cls: characterData?.cls ?? null, spec: characterData?.spec ?? null, x: m.playerStart.x, y: m.playerStart.y });
-    setDeck(shuffleDeck(DECK));
-    setHand([]);
-    setDiscard([]);
     setSelectedCard(null);
-    setPhase('draw');
-    setDiceResult(null);
-    setLog(['Nouvelle partie commencée !']);
-    setCombat(null);
+    setActionsLeft(prev => prev - 1);
+  }, [selectedCard, currentIdx, players]);
+
+  // End turn — advance to next living player
+  const endTurn = useCallback(() => {
+    let next = currentIdx;
+    let attempts = 0;
+    do {
+      next = (next + 1) % players.length;
+      attempts++;
+    } while (!players[next].isAlive && attempts < players.length);
+
+    setCurrentIdx(next);
+    setActionsLeft(0);
+    setHasMoved(false);
+    setSelectedCard(null);
     setHighlightTiles([]);
-  };
+    setPhase('draw');
+    addLog(`--- Tour de ${players[next].name} ---`);
+  }, [currentIdx, players]);
 
   return {
-    player, grid, enemies, itemMap,
-    hand, deck, discard, selectedCard, setSelectedCard,
-    phase, setPhase,
-    diceResult, rolling,
-    log, combat,
+    players,
+    currentIdx,
+    currentPlayer,
+    grid,
+    enemies,
+    actionsLeft,
+    hasMoved,
+    phase,
+    setPhase,
+    diceResult,
+    rolling,
+    log,
     highlightTiles,
-    mapName: mapData.name,
-    drawCards, selectCard, moveToTile, showMoveRange,
-    attackAction, healAction, defenseAction, magicAction, useCardAction,
-    enemyTurn, restart,
-    discardSelectedCard,
+    selectedCard,
+    setSelectedCard,
+    mapName,
+    drawCards,
+    equipCard,
+    startMove,
+    moveToTile,
+    showAttackTargets,
+    attackTile,
+    useItem,
+    endTurn,
+    winner,
+    isEquippable,
+    isUsable,
   };
 }

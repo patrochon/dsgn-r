@@ -88,7 +88,7 @@ function ChoiceCard({ item, selected, onClick }) {
   );
 }
 
-export default function CharacterCreation({ onComplete }) {
+export default function CharacterCreation({ onComplete, playerIndex = 0, totalPlayers = 1 }) {
   const [step, setStep] = useState(0);
   const [race, setRace] = useState(null);
   const [cls, setCls] = useState(null);
@@ -125,6 +125,11 @@ export default function CharacterCreation({ onComplete }) {
       <h1 style={{ margin: '0 0 6px', fontSize: 22, color: '#88aaff', letterSpacing: 3 }}>
         ⚔️ CRÉATION DE PERSONNAGE
       </h1>
+      {totalPlayers > 1 && (
+        <div style={{ fontSize: 14, color: '#ffcc44', marginBottom: 6, fontWeight: 700 }}>
+          Joueur {playerIndex + 1} sur {totalPlayers}
+        </div>
+      )}
 
       {/* Step indicators */}
       <div style={{ display: 'flex', gap: 0, marginBottom: 28, alignItems: 'center' }}>

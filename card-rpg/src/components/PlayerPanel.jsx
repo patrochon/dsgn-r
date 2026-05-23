@@ -9,12 +9,14 @@ const STAT_META = [
 
 export default function PlayerPanel({ player }) {
   const hpPct = Math.max(0, player.hp / player.maxHp);
-  const xpPct = Math.min(1, player.xp / (player.level * 30));
+  const level = player.level ?? null;
+  const xp = player.xp ?? null;
+  const xpPct = level ? Math.min(1, xp / (level * 30)) : 0;
 
   return (
     <div style={{ background: '#12121e', border: '1px solid #333', borderRadius: 10, padding: 14, minWidth: 200 }}>
       <div style={{ color: '#eee', fontWeight: 700, fontSize: 15, marginBottom: 2 }}>
-        🧙 {player.name ?? 'Aventurier'} — Niv. {player.level}
+        🧙 {player.name ?? 'Aventurier'}{level ? ` — Niv. ${level}` : ''}
       </div>
       {player.race && (
         <div style={{ fontSize: 11, color: '#555', marginBottom: 8 }}>
@@ -35,15 +37,17 @@ export default function PlayerPanel({ player }) {
         </div>
       </div>
 
-      {/* XP bar */}
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#666', marginBottom: 2 }}>
-          <span>⭐ XP</span><span>{player.xp}/{player.level * 30}</span>
+      {/* XP bar — only shown in single-player mode */}
+      {level !== null && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#666', marginBottom: 2 }}>
+            <span>⭐ XP</span><span>{xp}/{level * 30}</span>
+          </div>
+          <div style={{ background: '#1a1a2a', borderRadius: 4, height: 5 }}>
+            <div style={{ background: '#7766ff', width: `${xpPct * 100}%`, height: '100%', borderRadius: 4, transition: 'width 0.3s' }} />
+          </div>
         </div>
-        <div style={{ background: '#1a1a2a', borderRadius: 4, height: 5 }}>
-          <div style={{ background: '#7766ff', width: `${xpPct * 100}%`, height: '100%', borderRadius: 4, transition: 'width 0.3s' }} />
-        </div>
-      </div>
+      )}
 
       {/* 6 stats */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>
