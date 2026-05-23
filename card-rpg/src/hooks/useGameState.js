@@ -394,12 +394,16 @@ export function useGameState(characters) {
         const loot = won ? (monsterThere.loot ?? 1) : 0;
 
         addLog(`⚔️ ${cp.name} affronte ${monsterThere.icon} ${monsterThere.name} (pile ${monsterThere.pile}) ! (dé:${roll})`);
-        // Pile 1 vaincu → remplacer par pile 2 ; pile 2 vaincu → case libre
+        // Pile 1 vaincu → pile 2 ; pile 2 vaincu → pile 3 ; pile 3 vaincu → case libre
         if (won) {
           if (monsterThere.pile === 1) {
             const p2 = MONSTER_PILE_2[Math.floor(Math.random() * MONSTER_PILE_2.length)];
             setEnemies(prev => ({ ...prev, [destKey]: { ...p2, hp: p2.maxHp } }));
             addLog(`💀 ${monsterThere.name} vaincu — un ${p2.icon} ${p2.name} surgit sur la case !`);
+          } else if (monsterThere.pile === 2) {
+            const p3 = MONSTER_PILE_3[Math.floor(Math.random() * MONSTER_PILE_3.length)];
+            setEnemies(prev => ({ ...prev, [destKey]: { ...p3, hp: p3.maxHp } }));
+            addLog(`💀 ${monsterThere.name} vaincu — un ${p3.icon} ${p3.name} surgit sur la case !`);
           } else {
             setEnemies(prev => { const n = { ...prev }; delete n[destKey]; return n; });
           }
