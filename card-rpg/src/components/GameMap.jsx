@@ -15,7 +15,7 @@ const TILE_BORDER = {
   [T.TELEPORT]: '#9944ff', [T.SHOP]: '#aaaa22',
 };
 
-export default function GameMap({ grid, players, currentIdx, enemies, highlightTiles, phase, onTileClick }) {
+export default function GameMap({ grid, players, currentIdx, enemies, traps, chests, highlightTiles, phase, onTileClick }) {
   const rows = grid.length;
   const cols = grid[0].length;
 
@@ -51,6 +51,8 @@ export default function GameMap({ grid, players, currentIdx, enemies, highlightT
         const playerHere = playerAtTile[key];
         const baseHere = baseAtTile[key];
         const enemy = enemies?.[key];
+        const trap = traps?.[key];
+        const chest = chests?.[key];
         const isCurrent = playerHere?.idx === currentIdx;
         const isAttackTarget = isHighlight && phase === 'choosing_attack';
         const isMoveTarget = isHighlight && phase === 'choosing_move';
@@ -59,12 +61,16 @@ export default function GameMap({ grid, players, currentIdx, enemies, highlightT
         const bg = isWall ? TILE_BG[T.WALL]
           : isAttackTarget ? 'rgba(255,80,60,0.22)'
           : isMoveTarget ? 'rgba(80,180,255,0.18)'
+          : trap ? '#1e1208'
+          : chest ? '#181408'
           : baseHere ? `${baseHere.player.color}18`
           : TILE_BG[cell] ?? TILE_BG[T.FLOOR];
 
         const bdr = isWall ? TILE_BORDER[T.WALL]
           : isAttackTarget ? '#ff5040'
           : isMoveTarget ? '#5ab4ff'
+          : trap ? `${trap.color}99`
+          : chest ? '#aa8822'
           : baseHere ? `${baseHere.player.color}66`
           : TILE_BORDER[cell] ?? TILE_BORDER[T.FLOOR];
 
@@ -87,6 +93,18 @@ export default function GameMap({ grid, players, currentIdx, enemies, highlightT
             )}
             {isShop && !playerHere && (
               <span style={{ fontSize: 16, filter: 'drop-shadow(0 0 4px #dddd00)' }}>🏪</span>
+            )}
+            {trap && !playerHere && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <span style={{ fontSize: 14, filter: `drop-shadow(0 0 3px ${trap.color})` }}>{trap.icon}</span>
+                <div style={{ fontSize: 6, color: trap.color, fontWeight: 700, letterSpacing: 0.5, opacity: 0.8, marginTop: 1 }}>PIÈGE</div>
+              </div>
+            )}
+            {chest && !playerHere && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <span style={{ fontSize: 14, filter: 'drop-shadow(0 0 3px #ffcc44)' }}>💰</span>
+                <div style={{ fontSize: 6, color: '#ffcc44', fontWeight: 700, opacity: 0.8, marginTop: 1 }}>×{chest.loot}</div>
+              </div>
             )}
             {baseHere && !playerHere && !enemy && !isTeleport && !isWall && (
               <div style={{

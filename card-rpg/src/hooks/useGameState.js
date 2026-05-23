@@ -3,6 +3,7 @@ import { FULL_DECK, shuffleDeck } from '../data/cards';
 import { MULTIPLAYER_MAPS } from '../data/multiplayerMaps';
 import { T } from '../data/map';
 import { MONSTER_PILE_1, MONSTER_PILE_2, MONSTER_PILE_3, shuffleMonsters } from '../data/monsters';
+import { TRAPS } from '../data/traps';
 
 const HAND_LIMIT = 5;
 const PLAYER_COLORS = ['#ff4444', '#44aaff', '#44ff88', '#ffcc00', '#ff88ff', '#ff8844'];
@@ -89,7 +90,7 @@ export function isUsable(card) {
   return ['heal', 'buff', 'cure', 'magic'].includes(card?.effect?.type);
 }
 
-function generateInitialEnemies(mapData) {
+function generateInitialTiles(mapData) {
   const startKeys = new Set(mapData.playerStarts.map(s => `${s.x},${s.y}`));
   const free = [];
   for (let y = 0; y < mapData.grid.length; y++) {
@@ -99,39 +100,63 @@ function generateInitialEnemies(mapData) {
       }
     }
   }
-  // Shuffle free tiles
   for (let i = free.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [free[i], free[j]] = [free[j], free[i]];
   }
-  const count = Math.floor(free.length * 0.4);
+
+  const total = free.length;
+  const eCount = Math.floor(total * 0.40);
+  const tCount = Math.floor(total * 0.25);
+  const cCount = Math.floor(total * 0.25);
+
   const cx = Math.floor(mapData.grid[0].length / 2);
   const cy = Math.floor(mapData.grid.length / 2);
   const maxDist = cx + cy;
 
+  // — Enemies (40%) — zone-based monster piles
   const p1 = shuffleMonsters([...MONSTER_PILE_1]);
   const p2 = shuffleMonsters([...MONSTER_PILE_2]);
   const p3 = shuffleMonsters([...MONSTER_PILE_3]);
-  const idx = [0, 0, 0];
-
+  const pIdx = [0, 0, 0];
   const enemies = {};
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < eCount; i++) {
     const { x, y } = free[i];
     const ratio = (Math.abs(x - cx) + Math.abs(y - cy)) / maxDist;
-    const pileIdx = ratio > 0.6 ? 0 : ratio > 0.3 ? 1 : 2;
-    const pile = [p1, p2, p3][pileIdx];
-    const m = pile[idx[pileIdx] % pile.length];
-    idx[pileIdx]++;
+    const pi = ratio > 0.6 ? 0 : ratio > 0.3 ? 1 : 2;
+    const pile = [p1, p2, p3][pi];
+    const m = pile[pIdx[pi] % pile.length];
+    pIdx[pi]++;
     enemies[`${x},${y}`] = { ...m, hp: m.maxHp };
   }
-  return enemies;
+
+  // — Traps (25%) — random among 6 trap types
+  const traps = {};
+  for (let i = eCount; i < eCount + tCount; i++) {
+    const { x, y } = free[i];
+    traps[`${x},${y}`] = { ...TRAPS[Math.floor(Math.random() * TRAPS.length)] };
+  }
+
+  // — Chests (25%) — loot scales with proximity to center
+  const chests = {};
+  for (let i = eCount + tCount; i < eCount + tCount + cCount; i++) {
+    const { x, y } = free[i];
+    const ratio = (Math.abs(x - cx) + Math.abs(y - cy)) / maxDist;
+    const loot = ratio > 0.6 ? 2 : ratio > 0.3 ? 3 : 4;
+    chests[`${x},${y}`] = { loot };
+  }
+
+  return { enemies, traps, chests };
 }
 
 export function useGameState(characters) {
   const [mapData] = useState(() => MULTIPLAYER_MAPS[Math.floor(Math.random() * MULTIPLAYER_MAPS.length)]);
   const [mapName] = useState(() => mapData.name);
   const [grid] = useState(() => mapData.grid.map(r => [...r]));
-  const [enemies, setEnemies] = useState(() => generateInitialEnemies(mapData));
+  const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useState(() => generateInitialTiles(mapData));
+  const [enemies, setEnemies] = useState(initEnemies);
+  const [traps,   setTraps]   = useState(initTraps);
+  const [chests,  setChests]  = useState(initChests);
 
   const [players, setPlayers] = useState(() =>
     (characters ?? []).map((ch, i) => buildPlayer(ch, i, mapData))
@@ -346,65 +371,112 @@ export function useGameState(characters) {
         });
       }
 
-      // Monster encounter on landing
       const destKey = `${finalX},${finalY}`;
+      const cp = players[currentIdx];
+      let turnEnded = false;
+
+      // Helper: handle player death after damage
+      const handleDeath = (updPlayers) => {
+        const alive = updPlayers.filter(p => p.isAlive);
+        if (alive.length === 1) { setWinner(alive[0]); setPhase('win'); }
+        else {
+          let ni = (currentIdx + 1) % updPlayers.length;
+          while (!updPlayers[ni]?.isAlive) ni = (ni + 1) % updPlayers.length;
+          setCurrentIdx(ni); setActionsLeft(0); setHasMoved(false); setPhase('draw');
+        }
+        return true;
+      };
+
+      // — Monster encounter —
       const monsterThere = enemies[destKey];
-      let monsterEndedTurn = false;
-      if (monsterThere) {
-        const cp = players[currentIdx];
+      if (monsterThere && !turnEnded) {
         const roll = rollDie();
-        const chanceBonus = Math.floor(cp.stats.chance / 2);
-        const pDmgPerRound = Math.max(1, roll + cp.stats.force + chanceBonus - monsterThere.defense);
-        const mDmgPerRound = Math.max(1, monsterThere.attack - Math.floor(cp.stats.force / 3));
-        const roundsToKill = Math.ceil(monsterThere.maxHp / pDmgPerRound);
-        const dmgToPlayer = Math.max(0, (roundsToKill - 1) * mDmgPerRound);
-        const playerWon = cp.hp - dmgToPlayer > 0;
-        const lootCount = playerWon ? (monsterThere.loot ?? 1) : 0;
+        const pDmg = Math.max(1, roll + cp.stats.force + Math.floor(cp.stats.chance / 2) - monsterThere.defense);
+        const mDmg = Math.max(1, monsterThere.attack - Math.floor(cp.stats.force / 3));
+        const rounds = Math.ceil(monsterThere.maxHp / pDmg);
+        const dmgTaken = Math.max(0, (rounds - 1) * mDmg);
+        const won = cp.hp - dmgTaken > 0;
+        const loot = won ? (monsterThere.loot ?? 1) : 0;
 
         addLog(`⚔️ ${cp.name} affronte ${monsterThere.icon} ${monsterThere.name} ! (dé:${roll})`);
         setEnemies(prev => { const n = { ...prev }; delete n[destKey]; return n; });
-
-        setPlayers(prev => {
-          const next = [...prev];
-          let p = { ...next[currentIdx] };
-          p.hp = Math.max(0, p.hp - dmgToPlayer);
-          if (!playerWon) { p.isAlive = false; p.hp = 0; }
-          if (playerWon && lootCount > 0) {
-            let deck = [...p.deck], discard = [...p.discard];
-            if (deck.length < lootCount) { deck = [...deck, ...shuffleDeck(discard)]; discard = []; }
-            const drawn = deck.splice(0, lootCount);
-            p.hand = [...p.hand, ...drawn];
-            p.deck = deck; p.discard = discard;
+        const nextPlayers = players.map((p, i) => {
+          if (i !== currentIdx) return p;
+          let np = { ...p, hp: Math.max(0, p.hp - dmgTaken) };
+          if (!won) { np.isAlive = false; np.hp = 0; }
+          if (won && loot > 0) {
+            let deck = [...np.deck], discard = [...np.discard];
+            if (deck.length < loot) { deck = [...deck, ...shuffleDeck(discard)]; discard = []; }
+            const drawn = deck.splice(0, loot);
+            np = { ...np, hand: [...np.hand, ...drawn], deck, discard };
           }
-          next[currentIdx] = p;
-          return next;
+          return np;
         });
+        setPlayers(nextPlayers);
+        if (won) addLog(`✅ Victoire ! ${monsterThere.name} vaincu (-${dmgTaken} PV, +${loot} carte(s))`);
+        else { addLog(`💀 ${cp.name} est tué par ${monsterThere.name} !`); turnEnded = handleDeath(nextPlayers); }
+      }
 
-        if (playerWon) {
-          addLog(`✅ ${cp.name} vainc ${monsterThere.name} ! (-${dmgToPlayer} PV, +${lootCount} carte(s))`);
-        } else {
-          addLog(`💀 ${cp.name} est tué par ${monsterThere.name} !`);
-          const updatedAlive = players.map((p, i) => i === currentIdx ? { ...p, isAlive: false } : p).filter(p => p.isAlive);
-          if (updatedAlive.length === 1) {
-            setWinner(updatedAlive[0]);
-            setPhase('win');
-          } else {
-            let ni = (currentIdx + 1) % players.length;
-            while (!players[ni]?.isAlive || ni === currentIdx) ni = (ni + 1) % players.length;
-            setCurrentIdx(ni);
-            setActionsLeft(0);
-            setHasMoved(false);
-            setPhase('draw');
+      // — Trap —
+      const trapThere = traps[destKey];
+      if (trapThere && !turnEnded) {
+        const roll = rollDie();
+        addLog(`🪤 ${cp.name} déclenche ${trapThere.icon} ${trapThere.name} !`);
+        setTraps(prev => { const n = { ...prev }; delete n[destKey]; return n; });
+
+        let dmg = 0, loseActions = 0, discardCard = false;
+        if (trapThere.effect === 'damage')         { dmg = roll + trapThere.value; }
+        if (trapThere.effect === 'damage_action')  { dmg = roll + trapThere.value; loseActions = 1; }
+        if (trapThere.effect === 'damage_discard') { dmg = roll + trapThere.value; discardCard = true; }
+        if (trapThere.effect === 'lose_actions')   { loseActions = trapThere.value; }
+
+        if (loseActions > 0) setActionsLeft(prev => Math.max(0, prev - loseActions));
+
+        const nextPlayers = players.map((p, i) => {
+          if (i !== currentIdx) return p;
+          let np = { ...p, hp: Math.max(0, p.hp - dmg) };
+          if (np.hp <= 0) { np.isAlive = false; np.hp = 0; }
+          if (discardCard && np.hand.length > 0) {
+            const di = Math.floor(Math.random() * np.hand.length);
+            np = { ...np, hand: np.hand.filter((_, j) => j !== di), discard: [...np.discard, np.hand[di]] };
           }
-          monsterEndedTurn = true;
+          return np;
+        });
+        setPlayers(nextPlayers);
+
+        const msgs = [];
+        if (dmg > 0) msgs.push(`-${dmg} PV`);
+        if (loseActions > 0) msgs.push(`-${loseActions} action(s)`);
+        if (discardCard) msgs.push(`-1 carte`);
+        addLog(`💥 ${trapThere.desc} — ${msgs.join(', ')}`);
+        if (nextPlayers[currentIdx]?.hp <= 0) {
+          addLog(`💀 ${cp.name} est tué par ${trapThere.name} !`);
+          turnEnded = handleDeath(nextPlayers);
         }
       }
 
-      if (!monsterEndedTurn) setPhase('player_turn');
+      // — Chest —
+      const chestThere = chests[destKey];
+      if (chestThere && !turnEnded) {
+        const loot = chestThere.loot ?? 2;
+        setChests(prev => { const n = { ...prev }; delete n[destKey]; return n; });
+        setPlayers(prev => {
+          const next = [...prev];
+          const p = { ...next[currentIdx] };
+          let deck = [...p.deck], discard = [...p.discard];
+          if (deck.length < loot) { deck = [...deck, ...shuffleDeck(discard)]; discard = []; }
+          const drawn = deck.splice(0, loot);
+          next[currentIdx] = { ...p, hand: [...p.hand, ...drawn], deck, discard };
+          return next;
+        });
+        addLog(`💰 ${cp.name} ouvre un coffre ! +${loot} carte(s) piochée(s)`);
+      }
+
+      if (!turnEnded) setPhase('player_turn');
     } else if (phase === 'choosing_attack') {
       attackTile(tx, ty);
     }
-  }, [phase, highlightTiles, currentIdx, selectedCard, currentPlayer]);
+  }, [phase, highlightTiles, currentIdx, selectedCard, currentPlayer, enemies, traps, chests, players]);
 
   // Show attack targets (adjacent players and enemies)
   const showAttackTargets = useCallback(() => {
@@ -616,6 +688,8 @@ export function useGameState(characters) {
     currentPlayer,
     grid,
     enemies,
+    traps,
+    chests,
     actionsLeft,
     hasMoved,
     phase,
