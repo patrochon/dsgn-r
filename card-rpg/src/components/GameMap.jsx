@@ -6,13 +6,13 @@ const TILE_BG = {
   [T.FLOOR]: '#1e1e30', [T.WALL]: '#0a0a15',
   [T.ENEMY]: '#2a1a1a', [T.ITEM]: '#1a2a1a',
   [T.CHEST]: '#2a2010', [T.EXIT]: '#1a1a3a',
-  [T.TELEPORT]: '#1a0a2e',
+  [T.TELEPORT]: '#1a0a2e', [T.SHOP]: '#1a1a10',
 };
 const TILE_BORDER = {
   [T.FLOOR]: '#2a2a42', [T.WALL]: '#050510',
   [T.ENEMY]: '#5a2a2a', [T.ITEM]: '#2a5a2a',
   [T.CHEST]: '#6a5020', [T.EXIT]: '#4a4aaa',
-  [T.TELEPORT]: '#9944ff',
+  [T.TELEPORT]: '#9944ff', [T.SHOP]: '#aaaa22',
 };
 
 export default function GameMap({ grid, players, currentIdx, enemies, highlightTiles, phase, onTileClick }) {
@@ -46,6 +46,7 @@ export default function GameMap({ grid, players, currentIdx, enemies, highlightT
         const key = `${x},${y}`;
         const isWall = cell === T.WALL;
         const isTeleport = cell === T.TELEPORT;
+        const isShop = cell === T.SHOP;
         const isHighlight = highlightTiles.includes(key);
         const playerHere = playerAtTile[key];
         const baseHere = baseAtTile[key];
@@ -83,6 +84,9 @@ export default function GameMap({ grid, players, currentIdx, enemies, highlightT
             )}
             {isTeleport && !playerHere && (
               <span style={{ fontSize: 16, filter: 'drop-shadow(0 0 4px #9944ff)' }}>🌀</span>
+            )}
+            {isShop && !playerHere && (
+              <span style={{ fontSize: 16, filter: 'drop-shadow(0 0 4px #dddd00)' }}>🏪</span>
             )}
             {baseHere && !playerHere && !enemy && !isTeleport && !isWall && (
               <div style={{

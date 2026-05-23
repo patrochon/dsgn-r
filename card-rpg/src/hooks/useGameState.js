@@ -288,6 +288,25 @@ export function useGameState(characters) {
       } else {
         addLog(`${currentPlayer.name} se déplace en (${tx}, ${ty}).`);
       }
+
+      // Shop: draw 3 bonus cards on landing
+      if (grid[finalY][finalX] === T.SHOP) {
+        setPlayers(prev => {
+          const next = [...prev];
+          const p = { ...next[currentIdx] };
+          let deck = [...p.deck];
+          let discard = [...p.discard];
+          if (deck.length < 3) { deck = [...deck, ...shuffleDeck(discard)]; discard = []; }
+          const drawn = deck.splice(0, 3);
+          p.hand = [...p.hand, ...drawn];
+          p.deck = deck;
+          p.discard = discard;
+          next[currentIdx] = p;
+          addLog(`🏪 ${p.name} visite le magasin et pioche 3 cartes !`);
+          return next;
+        });
+      }
+
       setPhase('player_turn');
     } else if (phase === 'choosing_attack') {
       attackTile(tx, ty);
