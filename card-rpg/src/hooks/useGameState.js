@@ -243,9 +243,30 @@ export function useGameState(characters) {
       setHighlightTiles([]);
       setHasMoved(true);
       setActionsLeft(prev => prev - 1);
+
+      // Collect all teleport tiles on the map
+      const teleportTiles = [];
+      for (let y = 0; y < grid.length; y++) {
+        for (let x = 0; x < grid[0].length; x++) {
+          if (grid[y][x] === T.TELEPORT) teleportTiles.push({ x, y });
+        }
+      }
+
+      let finalX = tx;
+      let finalY = ty;
+      let teleported = false;
+
+      if (grid[ty][tx] === T.TELEPORT && teleportTiles.length > 1) {
+        const others = teleportTiles.filter(t => !(t.x === tx && t.y === ty));
+        const dest = others[Math.floor(Math.random() * others.length)];
+        finalX = dest.x;
+        finalY = dest.y;
+        teleported = true;
+      }
+
       setPlayers(prev => {
         const next = [...prev];
-        next[currentIdx] = { ...next[currentIdx], x: tx, y: ty };
+        next[currentIdx] = { ...next[currentIdx], x: finalX, y: finalY };
         return next;
       });
       // Discard move card if selected
@@ -260,7 +281,11 @@ export function useGameState(characters) {
         });
         setSelectedCard(null);
       }
-      addLog(`${currentPlayer.name} se déplace en (${tx}, ${ty}).`);
+      if (teleported) {
+        addLog(`🌀 ${currentPlayer.name} est téléporté en (${finalX}, ${finalY}) !`);
+      } else {
+        addLog(`${currentPlayer.name} se déplace en (${tx}, ${ty}).`);
+      }
       setPhase('player_turn');
     } else if (phase === 'choosing_attack') {
       attackTile(tx, ty);

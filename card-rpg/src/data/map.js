@@ -7,6 +7,7 @@ export const T = {
   EXIT: 4,
   PLAYER: 5,
   CHEST: 6,
+  TELEPORT: 7,
 };
 
 export const MAPS = [
