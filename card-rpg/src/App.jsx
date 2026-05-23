@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useGameState } from './hooks/useGameState';
 import GameMap from './components/GameMap';
 import CardHand from './components/CardHand';
@@ -6,9 +7,13 @@ import CombatPanel from './components/CombatPanel';
 import DiceDisplay from './components/DiceDisplay';
 import Inventory from './components/Inventory';
 import ActionBar from './components/ActionBar';
+import CharacterCreation from './CharacterCreation';
 
 export default function App() {
-  const g = useGameState();
+  const [character, setCharacter] = useState(null);
+  const g = useGameState(character);
+
+  if (!character) return <CharacterCreation onComplete={setCharacter} />;
 
   const handleMove = () => {
     g.showMoveRange(g.selectedCard);
@@ -51,14 +56,26 @@ export default function App() {
       boxSizing: 'border-box',
     }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <h1 style={{ margin: 0, fontSize: 18, color: '#88aaff', letterSpacing: 2 }}>
           ⚔️ CARD DUNGEON RPG
         </h1>
-        <div style={{ color: '#555', fontSize: 13 }}>{g.mapName}</div>
-        <button onClick={g.restart} style={{ ...btnStyle('#1a1a2e', '#666'), fontSize: 11, padding: '4px 10px' }}>
-          🔄 Reset
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {character && (
+            <div style={{ fontSize: 12, color: '#666' }}>
+              {character.race?.icon} {character.race?.name} · {character.cls?.icon} {character.cls?.name} · {character.spec?.icon} {character.spec?.name}
+            </div>
+          )}
+          <div style={{ color: '#555', fontSize: 13 }}>{g.mapName}</div>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setCharacter(null)} style={{ ...btnStyle('#1a1a2e', '#666'), fontSize: 11, padding: '4px 10px' }}>
+            👤 Nouveau perso
+          </button>
+          <button onClick={g.restart} style={{ ...btnStyle('#1a1a2e', '#666'), fontSize: 11, padding: '4px 10px' }}>
+            🔄 Reset
+          </button>
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>

@@ -13,7 +13,14 @@ export default function PlayerPanel({ player }) {
 
   return (
     <div style={{ background: '#12121e', border: '1px solid #333', borderRadius: 10, padding: 14, minWidth: 200 }}>
-      <div style={{ color: '#eee', fontWeight: 700, fontSize: 15, marginBottom: 10 }}>🧙 Aventurier — Niv. {player.level}</div>
+      <div style={{ color: '#eee', fontWeight: 700, fontSize: 15, marginBottom: 2 }}>
+        🧙 {player.name ?? 'Aventurier'} — Niv. {player.level}
+      </div>
+      {player.race && (
+        <div style={{ fontSize: 11, color: '#555', marginBottom: 8 }}>
+          {player.race.icon} {player.race.name} · {player.cls?.icon} {player.cls?.name}
+        </div>
+      )}
 
       {/* HP bar */}
       <div style={{ marginBottom: 6 }}>

@@ -30,30 +30,30 @@ function buildItemMap(grid) {
   return items;
 }
 
-const initPlayer = () => {
-  const vie = 5;
+const initPlayer = (customStats) => {
+  const stats = customStats ?? {
+    force: 3, magie: 2, vie: 5, deplacement: 3, chance: 1, destin: 1,
+  };
+  const maxHp = 20 + stats.vie * 2;
   return {
     x: 1, y: 1,
-    hp: 20 + vie * 2, maxHp: 20 + vie * 2,
+    hp: maxHp, maxHp,
     xp: 0, level: 1,
-    stats: {
-      force:       3,  // dégâts physiques + résistance
-      magie:       2,  // dégâts magiques + soins amplifiés
-      vie:         vie, // points de vie max (maxHp = 20 + vie*2)
-      deplacement: 3,  // cases de mouvement par tour
-      chance:      1,  // bonus aux jets de dé
-      destin:      1,  // cartes supplémentaires + effets critiques
-    },
+    stats,
     inventory: [],
   };
 };
 
-export function useGameState() {
+export function useGameState(characterData) {
   const [mapIndex, setMapIndex] = useState(0);
   const mapData = MAPS[mapIndex];
 
   const [player, setPlayer] = useState(() => ({
-    ...initPlayer(),
+    ...initPlayer(characterData?.stats),
+    name: characterData?.name ?? 'Aventurier',
+    race: characterData?.race ?? null,
+    cls: characterData?.cls ?? null,
+    spec: characterData?.spec ?? null,
     x: mapData.playerStart.x,
     y: mapData.playerStart.y,
   }));
@@ -369,7 +369,7 @@ export function useGameState() {
     setGrid(m.grid.map(r => [...r]));
     setEnemies(buildEnemyMap(m.grid));
     setItemMap(buildItemMap(m.grid));
-    setPlayer({ ...initPlayer(), x: m.playerStart.x, y: m.playerStart.y });
+    setPlayer({ ...initPlayer(characterData?.stats), name: characterData?.name ?? 'Aventurier', race: characterData?.race ?? null, cls: characterData?.cls ?? null, spec: characterData?.spec ?? null, x: m.playerStart.x, y: m.playerStart.y });
     setDeck(shuffleDeck(DECK));
     setHand([]);
     setDiscard([]);
