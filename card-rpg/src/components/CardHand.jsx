@@ -1,57 +1,110 @@
-const SUIT_COLOR = { '♠': '#ccc', '♥': '#e55', '♦': '#e88', '♣': '#8e8' };
-const TYPE_LABEL = { attack: 'ATK', heal: 'HP', move: 'MV', defense: 'DEF', magic: 'MAG' };
+import { RARITY_COLOR } from '../data/cards';
+
+const CAT_LABEL = {
+  deplacement:  'MV',
+  armure:       'ARM',
+  arme:         'ATK',
+  arme_magique: 'MAG⚔',
+  potion:       'POT',
+  parchemin:    'SCR',
+  objet_rare:   'RARE',
+  legendaire:   '★LEG',
+};
 
 export default function CardHand({ hand, selected, onSelect, disabled }) {
   return (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
       {hand.map((card, i) => {
         const isSelected = selected === card;
-        const color = SUIT_COLOR[card.suit] ?? '#ccc';
+        const rarityColor = RARITY_COLOR[card.rarity] ?? '#888';
+        const catColor = card.catColor ?? '#888';
+
         return (
           <div
             key={i}
             onClick={() => !disabled && onSelect(isSelected ? null : card)}
+            title={card.desc}
             style={{
-              width: 70,
-              height: 100,
-              background: isSelected ? '#1a3a5a' : '#1a1a2e',
-              border: `2px solid ${isSelected ? '#5ab4ff' : '#444'}`,
-              borderRadius: 8,
+              width: 80,
+              height: 116,
+              background: isSelected ? '#1a2a3a' : '#0f0f1e',
+              border: `2px solid ${isSelected ? rarityColor : catColor + '55'}`,
+              borderRadius: 9,
               cursor: disabled ? 'default' : 'pointer',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '6px 4px',
-              color,
-              transition: 'transform 0.1s, border 0.1s',
-              transform: isSelected ? 'translateY(-8px) scale(1.05)' : 'none',
-              boxShadow: isSelected ? '0 4px 16px #5ab4ff55' : '0 2px 6px #0006',
+              padding: '6px 4px 5px',
+              transition: 'transform 0.12s, border 0.12s, box-shadow 0.12s',
+              transform: isSelected ? 'translateY(-10px) scale(1.06)' : 'none',
+              boxShadow: isSelected ? `0 6px 20px ${rarityColor}55` : '0 2px 6px #0006',
               userSelect: 'none',
               boxSizing: 'border-box',
+              position: 'relative',
+              flexShrink: 0,
             }}
           >
-            <div style={{ fontSize: 13, fontWeight: 700, alignSelf: 'flex-start', marginLeft: 2 }}>
-              {card.label}
-            </div>
-            <div style={{ fontSize: 11, color: '#aaa', textAlign: 'center', lineHeight: 1.2 }}>
-              {card.desc}
-            </div>
+            {/* Rarity dot top-right */}
             <div style={{
-              fontSize: 10,
-              background: '#ffffff18',
-              borderRadius: 4,
+              position: 'absolute', top: 5, right: 6,
+              width: 7, height: 7, borderRadius: '50%',
+              background: rarityColor,
+              boxShadow: `0 0 4px ${rarityColor}`,
+            }} />
+
+            {/* Category badge */}
+            <div style={{
+              fontSize: 9, fontWeight: 700,
+              color: catColor,
+              background: catColor + '18',
+              borderRadius: 3,
               padding: '1px 5px',
-              color: '#88ccff',
+              marginBottom: 4,
+              letterSpacing: 0.5,
+              alignSelf: 'flex-start',
             }}>
-              {TYPE_LABEL[card.effect.type] ?? card.effect.type}
-              {card.effect.bonus > 0 ? ` +${card.effect.bonus}` : ''}
+              {CAT_LABEL[card.category] ?? card.category.toUpperCase()}
             </div>
+
+            {/* Icon */}
+            <div style={{ fontSize: 26, lineHeight: 1, marginBottom: 4 }}>{card.icon}</div>
+
+            {/* Name */}
+            <div style={{
+              fontSize: 9.5,
+              fontWeight: 700,
+              color: isSelected ? '#eee' : '#bbb',
+              textAlign: 'center',
+              lineHeight: 1.2,
+              marginBottom: 4,
+              wordBreak: 'break-word',
+              maxWidth: 72,
+            }}>
+              {card.name}
+            </div>
+
+            {/* Bonus badge */}
+            {card.effect.bonus > 0 && (
+              <div style={{
+                fontSize: 10,
+                background: catColor + '22',
+                border: `1px solid ${catColor}44`,
+                borderRadius: 4,
+                padding: '1px 5px',
+                color: catColor,
+                fontWeight: 700,
+                marginTop: 'auto',
+              }}>
+                +{card.effect.bonus}
+              </div>
+            )}
           </div>
         );
       })}
       {hand.length === 0 && (
-        <div style={{ color: '#555', fontSize: 13, padding: '20px 0' }}>Main vide — tirez des cartes</div>
+        <div style={{ color: '#444', fontSize: 13, padding: '20px 0' }}>
+          Main vide — tirez des cartes
+        </div>
       )}
     </div>
   );

@@ -1,9 +1,14 @@
+const ATTACK_TYPES = new Set(['attack', 'magic_attack']);
+const USE_TYPES    = new Set(['heal', 'buff', 'cure', 'passive', 'legendary']);
+
 export default function ActionBar({ phase, selectedCard, combat, onDraw, onMove, onHeal, onEnemyTurn }) {
   const cardType = selectedCard?.effect?.type;
   const inCombat = !!combat;
+  const inRoll = phase === 'roll' || phase === 'enemy_attack';
 
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+
       {phase === 'draw' && (
         <Btn label="🃏 Tirer des cartes" onClick={onDraw} primary />
       )}
@@ -14,16 +19,16 @@ export default function ActionBar({ phase, selectedCard, combat, onDraw, onMove,
             label="🗺️ Se déplacer"
             onClick={onMove}
             disabled={!selectedCard || cardType !== 'move'}
-            hint={!selectedCard ? 'Sélectionnez une carte ♦ d\'abord' : cardType !== 'move' ? 'Carte de déplacement (♦) requise' : 'Cliquez une tuile surlignée'}
+            hint={!selectedCard ? 'Sélectionnez une carte de déplacement' : cardType !== 'move' ? 'Carte de déplacement requise' : 'Cliquez une tuile surlignée'}
             primary={cardType === 'move'}
           />
-          {cardType === 'heal' && (
-            <Btn label="💚 Se soigner" onClick={onHeal} primary />
+          {USE_TYPES.has(cardType) && (
+            <Btn label={`${selectedCard?.icon ?? '🧪'} Utiliser`} onClick={onHeal} primary hint={selectedCard?.desc} />
           )}
           <Btn
-            label="⏩ Passer (sans carte)"
+            label="⏩ Passer"
             onClick={onEnemyTurn}
-            hint="Passer votre tour"
+            hint="Passer votre tour sans action"
           />
         </>
       )}
@@ -36,7 +41,7 @@ export default function ActionBar({ phase, selectedCard, combat, onDraw, onMove,
 
       {phase === 'combat' && (
         <div style={{ color: '#f88', fontSize: 13 }}>
-          ⚔️ Combat ! Choisissez une carte et une action ci-dessus
+          ⚔️ Sélectionnez une carte puis une action dans le panneau combat
         </div>
       )}
 

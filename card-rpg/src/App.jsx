@@ -113,7 +113,7 @@ export default function App() {
             selectedCard={g.selectedCard}
             phase={g.phase}
             onAttack={g.attackAction}
-            onHeal={g.healAction}
+            onHeal={g.useCardAction}
             onDefend={g.defenseAction}
             onMagic={g.magicAction}
           />
@@ -138,7 +138,7 @@ export default function App() {
             combat={g.combat}
             onDraw={g.drawCards}
             onMove={handleMove}
-            onHeal={g.healAction}
+            onHeal={g.useCardAction}
             onEnemyTurn={g.enemyTurn}
           />
         </div>

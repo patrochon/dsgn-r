@@ -1,10 +1,13 @@
+const ATTACK_TYPES = new Set(['attack', 'magic_attack']);
+const HEAL_TYPES   = new Set(['heal', 'buff', 'cure', 'passive', 'legendary']);
+
 export default function CombatPanel({ combat, player, selectedCard, phase, onAttack, onHeal, onDefend, onMagic }) {
   if (!combat) return null;
   const e = combat.enemy;
   const hpPct = Math.max(0, e.hp / e.maxHp);
-
   const cardType = selectedCard?.effect?.type;
   const inRoll = phase === 'roll' || phase === 'enemy_attack';
+  const canAct = ['combat', 'action'].includes(phase) && !inRoll;
 
   return (
     <div style={{
@@ -30,32 +33,32 @@ export default function CombatPanel({ combat, player, selectedCard, phase, onAtt
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <ActionBtn
-          label="⚔️ Attaquer"
-          active={cardType === 'attack'}
-          disabled={inRoll || !['combat', 'action'].includes(phase)}
+          label={cardType === 'magic_attack' ? '✨ Attaque magique' : '⚔️ Attaquer'}
+          active={ATTACK_TYPES.has(cardType)}
+          disabled={!canAct}
           onClick={onAttack}
-          hint={cardType === 'attack' ? `+${selectedCard.effect.bonus} bonus` : 'Jouer une carte ♠'}
+          hint={ATTACK_TYPES.has(cardType) ? selectedCard.desc : 'Sélectionnez une arme (arme / arme magique)'}
         />
         <ActionBtn
           label="🛡️ Défendre"
           active={cardType === 'defense'}
-          disabled={inRoll || !['combat', 'action'].includes(phase)}
+          disabled={!canAct}
           onClick={onDefend}
-          hint={cardType === 'defense' ? `+${selectedCard.effect.bonus} DEF` : 'Jouer une carte ♣'}
+          hint={cardType === 'defense' ? selectedCard?.desc : 'Sélectionnez une armure'}
         />
         <ActionBtn
           label="✨ Sort"
           active={cardType === 'magic'}
-          disabled={inRoll || !['combat', 'action'].includes(phase) || cardType !== 'magic'}
+          disabled={!canAct || cardType !== 'magic'}
           onClick={onMagic}
-          hint={cardType === 'magic' ? selectedCard.desc : 'Jouer une carte ♣ magique'}
+          hint={cardType === 'magic' ? selectedCard?.desc : 'Sélectionnez un parchemin'}
         />
         <ActionBtn
-          label="💚 Soigner"
-          active={cardType === 'heal'}
-          disabled={inRoll || !['combat', 'action'].includes(phase) || cardType !== 'heal'}
+          label="🧪 Utiliser"
+          active={HEAL_TYPES.has(cardType)}
+          disabled={!canAct || !HEAL_TYPES.has(cardType)}
           onClick={onHeal}
-          hint={cardType === 'heal' ? selectedCard.desc : 'Jouer une carte ♥'}
+          hint={HEAL_TYPES.has(cardType) ? selectedCard?.desc : 'Sélectionnez potion / objet / légendaire'}
         />
       </div>
     </div>

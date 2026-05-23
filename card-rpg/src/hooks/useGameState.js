@@ -116,7 +116,8 @@ export function useGameState(characterData) {
 
   const selectCard = useCallback((card) => {
     setSelectedCard(card);
-    if (card.effect.type === 'move') {
+    const t = card.effect.type;
+    if (t === 'move') {
       showMoveRange(card);
       setPhase('move');
     }
@@ -200,22 +201,28 @@ export function useGameState(characterData) {
     }
   };
 
-  // Attack action
+  // Attack action (handles 'attack' and 'magic_attack')
   const attackAction = useCallback(() => {
     if (!combat) return;
     setPhase('roll');
     animateRoll((roll) => {
       const card = selectedCard;
-      // chance ajoute un bonus au jet brut
       const chanceBonus = Math.floor(player.stats.chance / 2);
       const effectiveRoll = Math.min(6, roll + chanceBonus);
-      let dmg = effectiveRoll + player.stats.force;
-      if (card?.effect?.type === 'attack') {
-        if (card.effect.special === 'double' && effectiveRoll === 6) dmg *= 2;
-        else if (card.effect.special === 'crit' && effectiveRoll <= 2) {
-          setTimeout(() => attackAction(), 500);
-          return;
-        } else dmg += card.effect.bonus;
+      const isMagicAtk = card?.effect?.type === 'magic_attack';
+      // magie remplace force pour les armes magiques
+      const baseStat = isMagicAtk ? player.stats.magie : player.stats.force;
+      let dmg = effectiveRoll + baseStat;
+      if (card?.effect?.type === 'attack' || isMagicAtk) {
+        if (card.effect.special === 'double_on_6' && effectiveRoll === 6) dmg *= 2;
+        else if (card.effect.special === 'crit_5_6' && effectiveRoll >= 5) dmg = Math.floor(dmg * 1.5);
+        else if (card.effect.special === 'stun_6' && effectiveRoll === 6) {
+          addLog(`🌀 ${combat.enemy.name} est étourdi — passe son prochain tour !`);
+        }
+        dmg += card.effect.bonus;
+        if (isMagicAtk && card.effect.special === 'ignore_armor') {
+          // lame spectrale ignore l'armure — on ne soustrait pas defense
+        }
       }
       // destin : +1 dmg par tranche de 3 points de destin
       dmg += Math.floor(player.stats.destin / 3);
@@ -282,20 +289,106 @@ export function useGameState(characterData) {
     }, 800);
   }, [combat, player]);
 
-  const healAction = useCallback(() => {
+  const useCardAction = useCallback(() => {
     const card = selectedCard;
-    if (!card || card.effect.type !== 'heal') return;
-    setPhase('roll');
-    animateRoll((roll) => {
-      // magie amplifie les soins
-      let heal = roll + card.effect.bonus + Math.floor(player.stats.magie / 2);
-      if (card.effect.special === 'fullheal' && roll === 6) heal = player.maxHp;
-      setPlayer(p => ({ ...p, hp: Math.min(p.maxHp, p.hp + heal) }));
-      addLog(`💚 Soin : dé=${roll}, +${heal} HP (magie ${player.stats.magie})`);
+    if (!card) return;
+    const t = card.effect.type;
+
+    // Soins directs
+    if (t === 'heal') {
+      setPhase('roll');
+      animateRoll((roll) => {
+        let heal = card.effect.bonus + Math.floor(player.stats.magie / 2);
+        if (roll === 6) heal = Math.floor(heal * 1.5);
+        setPlayer(p => ({ ...p, hp: Math.min(p.maxHp, p.hp + heal) }));
+        addLog(`💚 Soin : +${heal} HP`);
+        discardSelectedCard();
+        setPhase(combat ? 'combat' : 'enemy');
+      });
+      return;
+    }
+
+    // Buffs temporaires & permanents
+    if (t === 'buff' || t === 'cure') {
+      const special = card.effect.special ?? '';
+      // Permanent stat boost (perm:stat+val)
+      if (special.startsWith('perm:')) {
+        const parts = special.replace('perm:', '').split(',');
+        setPlayer(p => {
+          let next = { ...p, stats: { ...p.stats } };
+          parts.forEach(part => {
+            const m = part.match(/^([a-z]+)([+-]\d+)$/);
+            if (!m) return;
+            const [, stat, valStr] = m;
+            const val = parseInt(valStr);
+            if (stat === 'vie') {
+              next.maxHp += val * 2;
+              next.hp = Math.min(next.maxHp, next.hp + val * 2);
+            }
+            if (next.stats[stat] !== undefined) next.stats[stat] += val;
+          });
+          return next;
+        });
+        addLog(`✨ ${card.name} : effet permanent appliqué !`);
+      } else if (t === 'cure') {
+        addLog(`🌿 ${card.name} : effets négatifs annulés.`);
+      } else {
+        addLog(`⚗️ ${card.name} : ${card.desc}`);
+      }
       discardSelectedCard();
-      setPhase('enemy');
-    });
-  }, [selectedCard, player]);
+      setPhase(combat ? 'combat' : 'enemy');
+      return;
+    }
+
+    // Passive / Rare / Legendary — appliqués immédiatement
+    if (t === 'passive' || t === 'legendary') {
+      const special = card.effect.special ?? '';
+      const permMatch = special.match(/perm:([^,]+(?:,[^,]+)*)/);
+      if (permMatch) {
+        const parts = permMatch[1].split(',').filter(s => s.includes('+') || s.includes('-'));
+        setPlayer(p => {
+          let next = { ...p, stats: { ...p.stats } };
+          parts.forEach(part => {
+            const m = part.match(/^([a-z]+)([+-]\d+)$/);
+            if (!m) return;
+            const [, stat, valStr] = m;
+            const val = parseInt(valStr);
+            if (stat === 'vie') { next.maxHp += val * 2; next.hp = Math.min(next.maxHp, next.hp + val * 2); }
+            if (next.stats[stat] !== undefined) next.stats[stat] += val;
+          });
+          return next;
+        });
+      }
+      if (t === 'legendary') {
+        const allStat = special.includes('all+3');
+        if (allStat) setPlayer(p => ({
+          ...p, maxHp: p.maxHp + 6, hp: Math.min(p.maxHp + 6, p.hp + 6),
+          stats: Object.fromEntries(Object.entries(p.stats).map(([k, v]) => [k, v + 3])),
+        }));
+        if (special.includes('reroll3')) addLog(`👁️ L'Œil du Destin : vous pouvez rejouer 3 dés cette partie !`);
+        if (special.includes('regen2')) addLog(`🐉 Cœur de Dragon : régénération de 2 HP/tour activée !`);
+      }
+      addLog(`${card.icon} ${card.name} équipé ! Effets permanents actifs.`);
+      discardSelectedCard();
+      setPhase(combat ? 'combat' : 'enemy');
+      return;
+    }
+
+    // Sorts de parchemin — traités par magicAction (appelé séparément depuis CombatPanel)
+    if (t === 'magic') {
+      addLog(`📜 ${card.name} : utilisez le bouton Sort en combat, ou attendez.`);
+      return;
+    }
+
+    addLog(`${card.icon} ${card.name} utilisé.`);
+    discardSelectedCard();
+    setPhase(combat ? 'combat' : 'enemy');
+  }, [selectedCard, player, combat]);
+
+  // Kept for backward compat in ActionBar
+  const healAction = useCallback(() => {
+    useCardAction();
+  }, [useCardAction]);
 
   const defenseAction = useCallback(() => {
     const card = selectedCard;
@@ -390,7 +483,7 @@ export function useGameState(characterData) {
     highlightTiles,
     mapName: mapData.name,
     drawCards, selectCard, moveToTile, showMoveRange,
-    attackAction, healAction, defenseAction, magicAction,
+    attackAction, healAction, defenseAction, magicAction, useCardAction,
     enemyTurn, restart,
     discardSelectedCard,
   };
