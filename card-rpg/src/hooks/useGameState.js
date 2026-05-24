@@ -370,9 +370,34 @@ export function useGameState(characters) {
       let finalX = tx;
       let finalY = ty;
       let teleported = false;
+      const hasChapeaux = players[currentIdx]?.race?.passive === 'chapeaux';
 
       if (grid[ty][tx] === T.TELEPORT && teleportTiles.length > 1) {
         const others = teleportTiles.filter(t => !(t.x === tx && t.y === ty));
+        if (hasChapeaux && others.length > 1) {
+          // Discard move card before suspending for portal choice
+          if (selectedCard?.effect?.type === 'move') {
+            setPlayers(prev => {
+              const next = [...prev];
+              const p = { ...next[currentIdx] };
+              p.hand = p.hand.filter(c => c !== selectedCard);
+              p.discard = [...p.discard, selectedCard];
+              next[currentIdx] = p;
+              return next;
+            });
+            setSelectedCard(null);
+          }
+          // Move player to entry portal, then let them choose exit
+          setPlayers(prev => {
+            const next = [...prev];
+            next[currentIdx] = { ...next[currentIdx], x: tx, y: ty };
+            return next;
+          });
+          setHighlightTiles(others.map(t => `${t.x},${t.y}`));
+          setPhase('choosing_portal');
+          addLog(`🎩 ${currentPlayer.name} choisit sa sortie de portail !`);
+          return;
+        }
         const dest = others[Math.floor(Math.random() * others.length)];
         finalX = dest.x;
         finalY = dest.y;
@@ -528,17 +553,18 @@ export function useGameState(characters) {
       const chestThere = chests[destKey];
       if (chestThere && !turnEnded) {
         const loot = chestThere.loot ?? 2;
+        const totalLoot = hasChapeaux ? loot * 2 : loot;
         setChests(prev => { const n = { ...prev }; delete n[destKey]; return n; });
         setPlayers(prev => {
           const next = [...prev];
           const p = { ...next[currentIdx] };
           let deck = [...p.deck], discard = [...p.discard];
-          if (deck.length < loot) { deck = [...deck, ...shuffleDeck(discard)]; discard = []; }
-          const drawn = deck.splice(0, loot);
+          if (deck.length < totalLoot) { deck = [...deck, ...shuffleDeck(discard)]; discard = []; }
+          const drawn = deck.splice(0, totalLoot);
           next[currentIdx] = { ...p, hand: [...p.hand, ...drawn], deck, discard };
           return next;
         });
-        addLog(`💰 ${cp.name} ouvre un coffre ! +${loot} carte(s) piochée(s)`);
+        addLog(`💰 ${cp.name} ouvre un coffre !${hasChapeaux ? ` 🎩 ×2 —` : ''} +${totalLoot} carte(s) piochée(s)`);
       }
 
       if (!turnEnded) {
@@ -616,6 +642,31 @@ export function useGameState(characters) {
           return next;
         });
         addLog(`🦾 ${cp.name} saisit le coffre adjacent ! +${loot} carte(s)`);
+      }
+      setPhase('player_turn');
+    } else if (phase === 'choosing_portal') {
+      const key = `${tx},${ty}`;
+      if (!highlightTiles.includes(key)) return;
+      setHighlightTiles([]);
+      setPlayers(prev => {
+        const next = [...prev];
+        next[currentIdx] = { ...next[currentIdx], x: tx, y: ty };
+        return next;
+      });
+      addLog(`🎩 ${currentPlayer.name} sort du portail en (${tx}, ${ty}) !`);
+      // Apply shop effect if portal destination happens to be a shop (edge case)
+      if (grid[ty][tx] === T.SHOP) {
+        setPlayers(prev => {
+          const next = [...prev];
+          const p = { ...next[currentIdx] };
+          let deck = [...p.deck], discard = [...p.discard];
+          if (deck.length < 3) { deck = [...deck, ...shuffleDeck(discard)]; discard = []; }
+          const drawn = deck.splice(0, 3);
+          p.hand = [...p.hand, ...drawn]; p.deck = deck; p.discard = discard;
+          next[currentIdx] = p;
+          addLog(`🏪 ${p.name} visite le magasin et pioche 3 cartes !`);
+          return next;
+        });
       }
       setPhase('player_turn');
     } else if (phase === 'choosing_attack') {
@@ -806,7 +857,10 @@ export function useGameState(characters) {
     }
 
     setSelectedCard(null);
-    setActionsLeft(prev => prev - 1);
+    // Passif Chapeaux : utiliser un parchemin (magic) ne coûte pas d'action
+    const isFreeScroll = card.effect.type === 'magic' && cp.race?.passive === 'chapeaux';
+    if (!isFreeScroll) setActionsLeft(prev => prev - 1);
+    else addLog(`🎩 Passif Chapeaux : parchemin utilisé sans coût d'action.`);
   }, [selectedCard, currentIdx, players]);
 
   // End turn — advance to next living player
@@ -831,6 +885,21 @@ export function useGameState(characters) {
     setHighlightTiles([]);
     setPhase('player_turn');
   }, []);
+
+  const skipPortalChoice = useCallback(() => {
+    // Pick a random portal from highlighted ones
+    if (highlightTiles.length === 0) { setPhase('player_turn'); return; }
+    const pick = highlightTiles[Math.floor(Math.random() * highlightTiles.length)];
+    const [px, py] = pick.split(',').map(Number);
+    setHighlightTiles([]);
+    setPlayers(prev => {
+      const next = [...prev];
+      next[currentIdx] = { ...next[currentIdx], x: px, y: py };
+      return next;
+    });
+    addLog(`🌀 Sortie aléatoire en (${px}, ${py}).`);
+    setPhase('player_turn');
+  }, [highlightTiles, currentIdx]);
 
   return {
     players,
@@ -859,6 +928,7 @@ export function useGameState(characters) {
     showAttackTargets,
     attackTile,
     skipPassive,
+    skipPortalChoice,
     useItem,
     endTurn,
     winner,

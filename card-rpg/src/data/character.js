@@ -14,7 +14,8 @@ export const RACES = [
     name: 'Les Chapeaux',
     icon: '🎩',
     flavor: 'Nul ne sait ce qui se cache sous leurs bords. Leur destin est écrit dans l\'ombre.',
-    bonuses: { destin: 3, chance: 2 },
+    bonuses: { magie: 2, chance: 1 },
+    passive: 'chapeaux',
   },
   {
     id: 'cailloux',

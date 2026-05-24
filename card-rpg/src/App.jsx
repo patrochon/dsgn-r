@@ -125,6 +125,7 @@ function Game({ characters, onRestart }) {
               : g.phase === 'choosing_move' ? '🗺️ Choisissez une case'
               : g.phase === 'choosing_attack' ? '⚔️ Choisissez une cible'
               : g.phase === 'longs_bras_passive' ? '🦾 Passif — case adjacente'
+              : g.phase === 'choosing_portal' ? '🎩 Choisissez votre portail de sortie'
               : g.phase}
           </span>
         </div>
@@ -219,6 +220,10 @@ function Game({ characters, onRestart }) {
           {g.phase === 'longs_bras_passive' && (<>
             <div style={{ color: '#aaffcc', fontSize: 13, padding: '8px 0' }}>🦾 Cliquez une case adjacente surlignée pour activer son effet (gratuit)</div>
             <Btn label="⏭️ Passer" onClick={g.skipPassive} />
+          </>)}
+          {g.phase === 'choosing_portal' && (<>
+            <div style={{ color: '#cc88ff', fontSize: 13, padding: '8px 0' }}>🎩 Cliquez un portail surlighté pour choisir votre sortie</div>
+            <Btn label="🎲 Sortie aléatoire" onClick={g.skipPortalChoice} />
           </>)}
           {(g.phase === 'rolling_move' || g.phase === 'rolling_attack') && (
             <div style={{ color: '#ffcc44', fontSize: 13, padding: '8px 0' }}>🎲 Lancement du dé…</div>
