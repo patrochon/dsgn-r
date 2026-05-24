@@ -144,10 +144,36 @@ function generateInitialTiles(mapData) {
   return { enemies, traps, chests };
 }
 
+// Generate organic height map (0 = flat, 1 = elevated, 2 = high ground)
+function generateHeights(grid) {
+  const rows = grid.length;
+  const cols = grid[0].length;
+  const h = Array.from({ length: rows }, () => new Array(cols).fill(0));
+  const seeds = Math.floor(rows * cols * 0.07);
+  for (let s = 0; s < seeds; s++) {
+    const sy = Math.floor(Math.random() * rows);
+    const sx = Math.floor(Math.random() * cols);
+    if (grid[sy][sx] === T.WALL) continue;
+    const peak = Math.random() < 0.35 ? 2 : 1;
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        const ny = sy + dy, nx = sx + dx;
+        if (ny < 0 || ny >= rows || nx < 0 || nx >= cols) continue;
+        if (grid[ny][nx] === T.WALL) continue;
+        const d = Math.abs(dx) + Math.abs(dy);
+        const th = peak - Math.floor(d / 2);
+        if (th > 0) h[ny][nx] = Math.max(h[ny][nx], th);
+      }
+    }
+  }
+  return h;
+}
+
 export function useGameState(characters) {
   const [mapData] = useState(() => MULTIPLAYER_MAPS[Math.floor(Math.random() * MULTIPLAYER_MAPS.length)]);
   const [mapName] = useState(() => mapData.name);
   const [grid] = useState(() => mapData.grid.map(r => [...r]));
+  const [heights] = useState(() => generateHeights(mapData.grid));
   const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useState(() => generateInitialTiles(mapData));
   const [enemies, setEnemies] = useState(initEnemies);
   const [traps,   setTraps]   = useState(initTraps);
@@ -293,22 +319,34 @@ export function useGameState(characters) {
 
       addLog(`🎲 ${currentPlayer.name} lance le dé : ${roll}${logSuffix} = ${range} cases.${card?.effect?.type === 'move' ? ` [${card.name}]` : ''}`);
 
+      // Dijkstra — each step costs max(0, 1 + heightDiff)
+      // uphill (+1 height) costs 2, downhill (-1) costs 0, same level costs 1
+      const visited = {};
+      const queue = [{ x: cp.x, y: cp.y, budget: range }];
       const tiles = [];
-      for (let dy = -range; dy <= range; dy++) {
-        for (let dx = -range; dx <= range; dx++) {
-          if (Math.abs(dx) + Math.abs(dy) > range) continue;
-          if (dx === 0 && dy === 0) continue;
-          const nx = cp.x + dx;
-          const ny = cp.y + dy;
+      while (queue.length > 0) {
+        queue.sort((a, b) => b.budget - a.budget);
+        const { x, y, budget } = queue.shift();
+        const key = `${x},${y}`;
+        if (visited[key]) continue;
+        visited[key] = true;
+        if (!(x === cp.x && y === cp.y)) tiles.push(key);
+        for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+          const nx = x + dx, ny = y + dy;
           if (nx < 0 || ny < 0 || ny >= grid.length || nx >= grid[0].length) continue;
           if (!wallPass && grid[ny][nx] === T.WALL) continue;
-          tiles.push(`${nx},${ny}`);
+          const nkey = `${nx},${ny}`;
+          if (visited[nkey]) continue;
+          const hDiff = (heights[ny]?.[nx] ?? 0) - (heights[y]?.[x] ?? 0);
+          const stepCost = Math.max(0, 1 + hDiff);
+          const newBudget = budget - stepCost;
+          if (newBudget >= 0) queue.push({ x: nx, y: ny, budget: newBudget });
         }
       }
       setHighlightTiles(tiles);
       setPhase('choosing_move');
     });
-  }, [actionsLeft, hasMoved, selectedCard, currentIdx, players, grid]);
+  }, [actionsLeft, hasMoved, selectedCard, currentIdx, players, grid, heights]);
 
   // Complete the move
   const moveToTile = useCallback((tx, ty) => {
@@ -718,6 +756,7 @@ export function useGameState(characters) {
     currentIdx,
     currentPlayer,
     grid,
+    heights,
     enemies,
     traps,
     chests,

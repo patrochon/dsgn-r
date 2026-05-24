@@ -15,7 +15,11 @@ const TILE_BORDER = {
   [T.TELEPORT]: '#9944ff', [T.SHOP]: '#aaaa22',
 };
 
-export default function GameMap({ grid, players, currentIdx, enemies, traps, chests, highlightTiles, phase, onTileClick }) {
+// Height visual overlays: h1 = slightly lighter, h2 = noticeably brighter stone
+const HEIGHT_BG_OVERLAY = ['', 'rgba(255,255,255,0.06)', 'rgba(255,255,255,0.14)'];
+const HEIGHT_BORDER_BOOST = ['', '44', '88']; // appended to border hex for opacity boost
+
+export default function GameMap({ grid, players, currentIdx, enemies, traps, chests, heights, highlightTiles, phase, onTileClick }) {
   const rows = grid.length;
   const cols = grid[0].length;
 
@@ -57,14 +61,18 @@ export default function GameMap({ grid, players, currentIdx, enemies, traps, che
         const isAttackTarget = isHighlight && phase === 'choosing_attack';
         const isMoveTarget = isHighlight && phase === 'choosing_move';
         const isOwnBase = playerHere && playerHere.player.baseX === x && playerHere.player.baseY === y;
+        const tileH = (!isWall && heights?.[y]?.[x]) ? Math.min(heights[y][x], 2) : 0;
 
-        const bg = isWall ? TILE_BG[T.WALL]
+        const baseBg = isWall ? TILE_BG[T.WALL]
           : isAttackTarget ? 'rgba(255,80,60,0.22)'
           : isMoveTarget ? 'rgba(80,180,255,0.18)'
           : trap ? '#1e1208'
           : chest ? '#181408'
           : baseHere ? `${baseHere.player.color}18`
           : TILE_BG[cell] ?? TILE_BG[T.FLOOR];
+        const bg = tileH > 0 && !isAttackTarget && !isMoveTarget
+          ? `linear-gradient(${HEIGHT_BG_OVERLAY[tileH]}, ${HEIGHT_BG_OVERLAY[tileH]}), ${baseBg}`
+          : baseBg;
 
         const bdr = isWall ? TILE_BORDER[T.WALL]
           : isAttackTarget ? '#ff5040'
@@ -87,6 +95,14 @@ export default function GameMap({ grid, players, currentIdx, enemies, traps, che
           >
             {isWall && (
               <div style={{ width: '100%', height: '100%', background: 'repeating-linear-gradient(45deg,#0d0d1a 0,#0d0d1a 5px,#080812 5px,#080812 10px)' }} />
+            )}
+            {tileH > 0 && !isWall && (
+              <div style={{
+                position: 'absolute', top: 2, left: 2,
+                fontSize: 7, color: tileH === 2 ? '#ffdd88' : '#aabbcc',
+                fontWeight: 900, lineHeight: 1, opacity: 0.75, pointerEvents: 'none',
+                textShadow: '0 0 3px #000',
+              }}>{tileH === 2 ? '▲▲' : '▲'}</div>
             )}
             {isTeleport && !playerHere && (
               <span style={{ fontSize: 16, filter: 'drop-shadow(0 0 4px #9944ff)' }}>🌀</span>
