@@ -4,7 +4,7 @@ const STAT_META = [
   { key: 'vie',         icon: '❤️',  label: 'Vie',         color: '#ff4466', desc: 'Points de vie maximum' },
   { key: 'deplacement', icon: '👢',  label: 'Déplacement', color: '#55ccff', desc: 'Cases parcourues par tour' },
   { key: 'richesse',    icon: '💰',  label: 'Richesse',    color: '#88ff44', desc: 'Or reçu par tour & bonus aux combats' },
-  { key: 'destin',      icon: '🌟',  label: 'Destin',      color: '#ffcc22', desc: 'Effets critiques & bonus de destin' },
+  { key: 'destin',      icon: '🌟',  label: 'Destin',      color: '#ffcc22', desc: 'Vies restantes — renaît à la base en perdant l\'or et les cartes' },
 ];
 
 export default function PlayerPanel({ player }) {

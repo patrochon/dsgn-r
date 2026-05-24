@@ -394,8 +394,9 @@ export function useGameState(characters) {
       const hasZeles = cp.race?.passive === 'zeles';
       const hasFeuxFollets = cp.race?.passive === 'feux_follets';
       const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, range, hasZeles, wallPass, hasFeuxFollets, grid, heights);
+      const otherBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
       setTilesBudget(budgetAtTile);
-      setHighlightTiles(tiles);
+      setHighlightTiles(tiles.filter(t => !otherBases.has(t)));
       setPhase('choosing_move');
     });
   }, [actionsLeft, hasMoved, selectedCard, currentIdx, players, grid, heights, setTilesBudget]);
@@ -420,8 +421,9 @@ export function useGameState(characters) {
       const hasZeles = false;
       const hasFeuxFollets = cp.race?.passive === 'feux_follets';
       const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, range, hasZeles, wallPass, hasFeuxFollets, grid, heights);
+      const otherBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
       setTilesBudget(budgetAtTile);
-      setHighlightTiles(tiles);
+      setHighlightTiles(tiles.filter(t => !otherBases.has(t)));
       setPhase('choosing_move');
     });
   }, [moveRerolled, currentIdx, players, selectedCard, grid, heights]);
@@ -434,6 +436,7 @@ export function useGameState(characters) {
     if (phase === 'choosing_move') {
       const key = `${tx},${ty}`;
       if (!highlightTiles.includes(key)) return;
+      if (players.some((p, i) => i !== currentIdx && p.isAlive && p.baseX === tx && p.baseY === ty)) return;
       setHighlightTiles([]);
       const isContinuation = hasMoved; // Zélés mid-move continuation
       if (!isContinuation) {
@@ -582,7 +585,14 @@ export function useGameState(characters) {
         const nextPlayers = players.map((p, i) => {
           if (i !== currentIdx) return p;
           let np = { ...p, hp: Math.max(0, p.hp - dmgTaken) };
-          if (!won) { np.isAlive = false; np.hp = 0; }
+          if (!won) {
+            if (np.stats.destin > 0) {
+              const newDeck = shuffleDeck([...FULL_DECK]);
+              np = { ...np, hp: np.maxHp, x: np.baseX, y: np.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], stats: { ...np.stats, destin: np.stats.destin - 1 } };
+            } else {
+              np.isAlive = false; np.hp = 0;
+            }
+          }
           if (won && loot > 0) {
             let deck = [...np.deck], discard = [...np.discard];
             if (deck.length < loot) { deck = [...deck, ...shuffleDeck(discard)]; discard = []; }
@@ -596,8 +606,15 @@ export function useGameState(characters) {
         if (won) {
           if (monsterThere.pile !== 1) addLog(`✅ ${monsterThere.name} vaincu (-${dmgTaken} PV, +${loot} carte(s))`);
           else addLog(`✅ -${dmgTaken} PV, +${loot} carte(s)`);
+        } else if (nextPlayers[currentIdx].isAlive) {
+          addLog(`✨ ${cp.name} renaît à sa base ! (${nextPlayers[currentIdx].stats.destin} vie(s) restante(s))`);
+          let ni = (currentIdx + 1) % nextPlayers.length;
+          while (!nextPlayers[ni]?.isAlive) ni = (ni + 1) % nextPlayers.length;
+          setCurrentIdx(ni); setActionsLeft(0); setHasMoved(false); setPhase('draw');
+          addLog(`--- Tour de ${nextPlayers[ni].name} ---`);
+          turnEnded = true;
         } else {
-          addLog(`💀 ${cp.name} est tué par ${monsterThere.name} !`);
+          addLog(`💀 ${cp.name} est définitivement tué par ${monsterThere.name} !`);
           turnEnded = handleDeath(nextPlayers);
         }
       }
@@ -620,11 +637,20 @@ export function useGameState(characters) {
         if (cp.physicalImmune && rawDmg > 0) addLog(`🪨 Immunité physique — dégâts du piège annulés !`);
         if (loseActions > 0) setActionsLeft(prev => Math.max(0, prev - loseActions));
 
+        let trapFatal = false;
         const nextPlayers = players.map((p, i) => {
           if (i !== currentIdx) return p;
           let np = { ...p, hp: Math.max(0, p.hp - dmg) };
-          if (np.hp <= 0) { np.isAlive = false; np.hp = 0; }
-          if (discardCard && np.hand.length > 0) {
+          if (np.hp <= 0) {
+            trapFatal = true;
+            if (np.stats.destin > 0) {
+              const newDeck = shuffleDeck([...FULL_DECK]);
+              np = { ...np, hp: np.maxHp, x: np.baseX, y: np.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], stats: { ...np.stats, destin: np.stats.destin - 1 } };
+            } else {
+              np.isAlive = false; np.hp = 0;
+            }
+          }
+          if (!trapFatal && discardCard && np.hand.length > 0) {
             const di = Math.floor(Math.random() * np.hand.length);
             np = { ...np, hand: np.hand.filter((_, j) => j !== di), discard: [...np.discard, np.hand[di]] };
           }
@@ -635,11 +661,20 @@ export function useGameState(characters) {
         const msgs = [];
         if (dmg > 0) msgs.push(`-${dmg} PV`);
         if (loseActions > 0) msgs.push(`-${loseActions} action(s)`);
-        if (discardCard) msgs.push(`-1 carte`);
+        if (discardCard && !trapFatal) msgs.push(`-1 carte`);
         addLog(`💥 ${trapThere.desc} — ${msgs.join(', ')}`);
-        if (nextPlayers[currentIdx]?.hp <= 0) {
-          addLog(`💀 ${cp.name} est tué par ${trapThere.name} !`);
-          turnEnded = handleDeath(nextPlayers);
+        if (trapFatal) {
+          if (nextPlayers[currentIdx]?.isAlive) {
+            addLog(`✨ ${cp.name} renaît à sa base ! (${nextPlayers[currentIdx].stats.destin} vie(s) restante(s))`);
+            let ni = (currentIdx + 1) % nextPlayers.length;
+            while (!nextPlayers[ni]?.isAlive) ni = (ni + 1) % nextPlayers.length;
+            setCurrentIdx(ni); setActionsLeft(0); setHasMoved(false); setPhase('draw');
+            addLog(`--- Tour de ${nextPlayers[ni].name} ---`);
+            turnEnded = true;
+          } else {
+            addLog(`💀 ${cp.name} est tué par ${trapThere.name} !`);
+            turnEnded = handleDeath(nextPlayers);
+          }
         }
       }
 
@@ -666,9 +701,11 @@ export function useGameState(characters) {
         if (hasZeles && damageTakenThisMove === 0 && budgetHere > 0) {
           const { tiles: contTiles, budgetAtTile: contBudget } =
             runMoveDijkstra(finalX, finalY, budgetHere, true, false, false, grid, heights);
-          if (contTiles.length > 0) {
+          const zelOtherBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
+          const filteredCont = contTiles.filter(t => !zelOtherBases.has(t));
+          if (filteredCont.length > 0) {
             setTilesBudget(contBudget);
-            setHighlightTiles(contTiles);
+            setHighlightTiles(filteredCont);
             setPhase('choosing_move');
             addLog(`⚡ Zélés continue son déplacement (${budgetHere} pts restants) !`);
             return;
@@ -720,11 +757,24 @@ export function useGameState(characters) {
         const nextPlayers = players.map((p, i) => {
           if (i !== currentIdx) return p;
           let np = { ...p, hp: Math.max(0, p.hp - dmgTaken) };
-          if (!won) { np.isAlive = false; np.hp = 0; }
+          if (!won) {
+            if (np.stats.destin > 0) {
+              const newDeck = shuffleDeck([...FULL_DECK]);
+              np = { ...np, hp: np.maxHp, x: np.baseX, y: np.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], stats: { ...np.stats, destin: np.stats.destin - 1 } };
+            } else {
+              np.isAlive = false; np.hp = 0;
+            }
+          }
           return np;
         });
         setPlayers(nextPlayers);
-        if (!won) addLog(`💀 ${cp.name} est tué par ${m.name} !`);
+        if (!won) {
+          if (nextPlayers[currentIdx].isAlive) {
+            addLog(`✨ ${cp.name} renaît à sa base ! (${nextPlayers[currentIdx].stats.destin} vie(s) restante(s))`);
+          } else {
+            addLog(`💀 ${cp.name} est tué par ${m.name} !`);
+          }
+        }
       } else if (traps[key]) {
         const trap = traps[key];
         const roll = rollDie();
@@ -872,11 +922,18 @@ export function useGameState(characters) {
         addLog(`${cp.name} attaque ${target.name} : dé=${roll}, dégâts=${actualDmg}`);
         setPlayers(prev => {
           const next = [...prev];
-          const t = { ...next[targetPlayerIdx] };
+          let t = { ...next[targetPlayerIdx] };
           t.hp = Math.max(0, t.hp - actualDmg);
           if (t.hp <= 0) {
-            t.isAlive = false;
-            addLog(`💀 ${t.name} est éliminé !`);
+            if (t.stats.destin > 0) {
+              const newDeck = shuffleDeck([...FULL_DECK]);
+              const livesLeft = t.stats.destin - 1;
+              t = { ...t, hp: t.maxHp, x: t.baseX, y: t.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], stats: { ...t.stats, destin: livesLeft } };
+              addLog(`✨ ${next[targetPlayerIdx].name} renaît à sa base ! (${livesLeft} vie(s) restante(s))`);
+            } else {
+              t.isAlive = false;
+              addLog(`💀 ${t.name} est définitivement éliminé !`);
+            }
           }
           next[targetPlayerIdx] = t;
           // Check win
