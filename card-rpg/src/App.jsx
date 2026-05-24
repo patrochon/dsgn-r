@@ -77,7 +77,9 @@ function Game({ characters, onRestart }) {
   const isUsable = cardType && ['heal', 'buff', 'cure', 'magic'].includes(cardType);
   const canAttack = g.actionsLeft >= 1 && g.phase === 'player_turn';
   const canMove = g.actionsLeft >= 1 && !g.hasMoved && g.phase === 'player_turn';
-  const canUse = g.actionsLeft >= 1 && g.phase === 'player_turn' && isUsable;
+  const magieCost = g.selectedCard?.effect?.magieCost ?? 0;
+  const hasMagie = magieCost === 0 || (cp?.stats?.magie ?? 0) >= magieCost;
+  const canUse = g.actionsLeft >= 1 && g.phase === 'player_turn' && isUsable && hasMagie;
 
   const clickable = g.phase === 'choosing_move' || g.phase === 'choosing_attack';
 
@@ -203,10 +205,11 @@ function Game({ characters, onRestart }) {
             )}
             {isUsable && (
               <Btn
-                label={`🧪 Utiliser ${g.selectedCard?.icon ?? ''} (1 action)`}
+                label={`🧪 Utiliser ${g.selectedCard?.icon ?? ''}${magieCost > 0 ? ` ✨${magieCost}` : ''} (1 action)`}
                 onClick={g.useItem}
                 disabled={!canUse}
                 primary={canUse}
+                hint={!hasMagie ? `Magie insuffisante — requis : ${magieCost}, actuel : ${cp?.stats?.magie ?? 0}` : undefined}
               />
             )}
             <Btn label="⏭️ Fin de tour" onClick={g.endTurn} />

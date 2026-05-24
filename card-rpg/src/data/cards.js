@@ -14,8 +14,8 @@ const C = {
 
 const R = { COMMON: 'common', UNCOMMON: 'uncommon', RARE: 'rare', LEGENDARY: 'legendary' };
 
-function card(id, name, icon, cat, rarity, effectType, bonus, desc, special = null) {
-  return { id, name, icon, category: cat.key, catColor: cat.color, catLabel: cat.label, rarity, effect: { type: effectType, bonus, special }, desc };
+function card(id, name, icon, cat, rarity, effectType, bonus, desc, special = null, magieCost = 0) {
+  return { id, name, icon, category: cat.key, catColor: cat.color, catLabel: cat.label, rarity, effect: { type: effectType, bonus, special, magieCost }, desc };
 }
 
 // ─── DÉPLACEMENT (12) ─────────────────────────────────────────────────────────
@@ -84,31 +84,31 @@ const MAGIC_WEAPON_CARDS = [
 
 // ─── POTIONS (12) ─────────────────────────────────────────────────────────────
 const POTION_CARDS = [
-  card('soin_mineur',  'Potion de soin mineur',  '🧪', C.POTION, R.COMMON,   'heal', 10, 'Restaure 10 HP immédiatement.'),
-  card('soin_moyen',   'Potion de soin moyen',   '💚', C.POTION, R.COMMON,   'heal', 20, 'Restaure 20 HP immédiatement.'),
-  card('soin_majeur',  'Potion de soin majeur',  '💊', C.POTION, R.UNCOMMON, 'heal', 30, 'Restaure 30 HP immédiatement.'),
-  card('force_brew',   'Potion de Force',         '💪', C.POTION, R.COMMON,   'buff', 3,  '+3 Force pendant 1 combat.', 'buff:force+3,duration:combat'),
-  card('celerite',     'Potion de Célérité',      '⚡', C.POTION, R.COMMON,   'buff', 3,  '+3 Déplacement pendant 1 tour.', 'buff:deplacement+3,duration:turn'),
-  card('resistance',   'Potion de Résistance',    '🛡️', C.POTION, R.UNCOMMON, 'buff', 4,  '+4 Force défensive pendant 1 combat.', 'buff:defense+4,duration:combat'),
-  card('chance_brew',  'Potion de Richesse',       '🍀', C.POTION, R.UNCOMMON, 'buff', 3,  '+3 Richesse pendant 3 tours.', 'buff:richesse+3,duration:3turns'),
-  card('antidote',     'Antidote',                '🌿', C.POTION, R.COMMON,   'cure', 0,  'Annule poison, malédiction ou ralentissement.', 'cure_all'),
-  card('magie_brew',   'Potion de Magie',         '🔮', C.POTION, R.UNCOMMON, 'buff', 5,  '+5 Magie. Lance immédiatement un sort aléatoire.', 'buff:magie+5,cast_random'),
-  card('elixir_vie',   'Élixir de Vie',           '❤️', C.POTION, R.RARE,    'buff', 0,  '+5 Vie permanent (augmente le HP max).', 'perm:vie+5'),
-  card('destin_brew',  'Potion de Destin',        '🌟', C.POTION, R.RARE,    'buff', 0,  '+2 Destin permanent.', 'perm:destin+2'),
-  card('philtre_rage', 'Philtre de rage',         '🩸', C.POTION, R.RARE,    'buff', 6,  '+6 Force pendant 1 combat. -3 Déplacement. Frénésie : attaque deux fois.', 'buff:force+6,deplacement-3,frenzy'),
+  card('soin_mineur',  'Potion de soin mineur',  '🧪', C.POTION, R.COMMON,   'heal', 10, 'Restaure 10 HP. (✨1)', null, 1),
+  card('soin_moyen',   'Potion de soin moyen',   '💚', C.POTION, R.COMMON,   'heal', 20, 'Restaure 20 HP. (✨2)', null, 2),
+  card('soin_majeur',  'Potion de soin majeur',  '💊', C.POTION, R.UNCOMMON, 'heal', 30, 'Restaure 30 HP. (✨3)', null, 3),
+  card('force_brew',   'Potion de Force',         '💪', C.POTION, R.COMMON,   'buff', 3,  '+3 Force pendant 1 combat. (✨1)', 'buff:force+3,duration:combat', 1),
+  card('celerite',     'Potion de Célérité',      '⚡', C.POTION, R.COMMON,   'buff', 3,  '+3 Déplacement pendant 1 tour. (✨1)', 'buff:deplacement+3,duration:turn', 1),
+  card('resistance',   'Potion de Résistance',    '🛡️', C.POTION, R.UNCOMMON, 'buff', 4,  '+4 Force défensive pendant 1 combat. (✨2)', 'buff:defense+4,duration:combat', 2),
+  card('chance_brew',  'Potion de Richesse',       '🍀', C.POTION, R.UNCOMMON, 'buff', 3,  '+3 Richesse pendant 3 tours. (✨2)', 'buff:richesse+3,duration:3turns', 2),
+  card('antidote',     'Antidote',                '🌿', C.POTION, R.COMMON,   'cure', 0,  'Annule poison, malédiction ou ralentissement. (✨1)', 'cure_all', 1),
+  card('magie_brew',   'Potion de Magie',         '🔮', C.POTION, R.UNCOMMON, 'buff', 5,  '+5 Magie. Lance immédiatement un sort aléatoire. (✨2)', 'buff:magie+5,cast_random', 2),
+  card('elixir_vie',   'Élixir de Vie',           '❤️', C.POTION, R.RARE,    'buff', 0,  '+5 Vie permanent (augmente le HP max). (✨4)', 'perm:vie+5', 4),
+  card('destin_brew',  'Potion de Destin',        '🌟', C.POTION, R.RARE,    'buff', 0,  '+2 Destin permanent. (✨3)', 'perm:destin+2', 3),
+  card('philtre_rage', 'Philtre de rage',         '🩸', C.POTION, R.RARE,    'buff', 6,  '+6 Force pendant 1 combat. -3 Déplacement. Frénésie : attaque deux fois. (✨3)', 'buff:force+6,deplacement-3,frenzy', 3),
 ];
 
 // ─── PARCHEMINS MAGIQUES (9) ──────────────────────────────────────────────────
 const SCROLL_CARDS = [
-  card('boule_feu',    'Boule de Feu',         '🔥', C.SCROLL, R.UNCOMMON, 'magic', 8,  '8 dégâts magiques à l\'ennemi ciblé + 4 aux adjacents.', 'aoe'),
-  card('eclair',       'Éclair',               '⚡', C.SCROLL, R.UNCOMMON, 'magic', 6,  '6 dégâts magiques. Touche jusqu\'à 3 ennemis en ligne.', 'chain'),
-  card('gel',          'Nova de Givre',        '❄️', C.SCROLL, R.UNCOMMON, 'magic', 5,  '5 dégâts. Gèle l\'ennemi : passe son prochain tour.', 'freeze'),
-  card('invocation',   'Invocation',           '👾', C.SCROLL, R.RARE,    'magic', 0,  'Crée un allié combattant pendant 2 tours (HP=10, ATK=3).', 'summon'),
-  card('soin_masse',   'Soin de masse',        '✨', C.SCROLL, R.UNCOMMON, 'magic', 15, 'Restaure 15 HP. Si dé = 6, restaure tous les HP.', 'aoe_heal'),
-  card('malediction',  'Malédiction',          '🧿', C.SCROLL, R.UNCOMMON, 'magic', 0,  'Réduit toutes les stats ennemies de 2 pendant 3 tours.', 'debuff_all'),
-  card('bouclier_mag', 'Bouclier Magique',     '🔵', C.SCROLL, R.RARE,    'magic', 0,  'Absorbe les 10 prochains dégâts reçus.', 'shield10'),
-  card('vision',       'Vision prophétique',   '👁️', C.SCROLL, R.RARE,    'magic', 0,  'Révèle toute la carte. +2 Richesse pour ce tour.', 'reveal_map'),
-  card('resurrection', 'Résurrection',         '💀', C.SCROLL, R.LEGENDARY,'magic', 0,  'Si tu tombes à 0 HP ce tour, reviens à 50% HP. Usage unique.', 'revive_50'),
+  card('boule_feu',    'Boule de Feu',         '🔥', C.SCROLL, R.UNCOMMON, 'magic', 8,  '8 dégâts magiques à l\'ennemi ciblé + 4 aux adjacents. (✨3)', 'aoe', 3),
+  card('eclair',       'Éclair',               '⚡', C.SCROLL, R.UNCOMMON, 'magic', 6,  '6 dégâts magiques. Touche jusqu\'à 3 ennemis en ligne. (✨2)', 'chain', 2),
+  card('gel',          'Nova de Givre',        '❄️', C.SCROLL, R.UNCOMMON, 'magic', 5,  '5 dégâts. Gèle l\'ennemi : passe son prochain tour. (✨2)', 'freeze', 2),
+  card('invocation',   'Invocation',           '👾', C.SCROLL, R.RARE,    'magic', 0,  'Crée un allié combattant pendant 2 tours (HP=10, ATK=3). (✨4)', 'summon', 4),
+  card('soin_masse',   'Soin de masse',        '✨', C.SCROLL, R.UNCOMMON, 'magic', 15, 'Restaure 15 HP. Si dé = 6, restaure tous les HP. (✨3)', 'aoe_heal', 3),
+  card('malediction',  'Malédiction',          '🧿', C.SCROLL, R.UNCOMMON, 'magic', 0,  'Réduit toutes les stats ennemies de 2 pendant 3 tours. (✨2)', 'debuff_all', 2),
+  card('bouclier_mag', 'Bouclier Magique',     '🔵', C.SCROLL, R.RARE,    'magic', 0,  'Absorbe les 10 prochains dégâts reçus. (✨3)', 'shield10', 3),
+  card('vision',       'Vision prophétique',   '👁️', C.SCROLL, R.RARE,    'magic', 0,  'Révèle toute la carte. +2 Richesse pour ce tour. (✨2)', 'reveal_map', 2),
+  card('resurrection', 'Résurrection',         '💀', C.SCROLL, R.LEGENDARY,'magic', 0,  'Si tu tombes à 0 HP ce tour, reviens à 50% HP. Usage unique. (✨6)', 'revive_50', 6),
 ];
 
 // ─── OBJETS RARES (6) ─────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 const STAT_META = [
   { key: 'force',       icon: '⚔️',  label: 'Force',       color: '#ff7755', desc: 'Dégâts physiques & résistance' },
-  { key: 'magie',       icon: '✨',  label: 'Magie',       color: '#aa77ff', desc: 'Sorts & amplification des soins' },
+  { key: 'magie',       icon: '✨',  label: 'Magie',       color: '#aa77ff', desc: 'Puissance requise pour utiliser objets et parchemins' },
   { key: 'vie',         icon: '❤️',  label: 'Vie',         color: '#ff4466', desc: 'Points de vie maximum' },
   { key: 'deplacement', icon: '👢',  label: 'Déplacement', color: '#55ccff', desc: 'Cases parcourues par tour' },
   { key: 'richesse',    icon: '💰',  label: 'Richesse',    color: '#88ff44', desc: 'Or reçu par tour & bonus aux combats' },

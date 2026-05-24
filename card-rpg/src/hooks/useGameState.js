@@ -988,8 +988,15 @@ export function useGameState(characters) {
     if (!card || !isUsable(card)) return;
     const cp = players[currentIdx];
 
+    // Magie prerequisite: player must have enough magie to power the item
+    const magieCost = card.effect.magieCost ?? 0;
+    if (magieCost > 0 && (cp.stats.magie ?? 0) < magieCost) {
+      addLog(`❌ ${cp.name} n'a pas assez de Magie pour utiliser ${card.icon} ${card.name} (requis : ${magieCost}, actuel : ${cp.stats.magie ?? 0}).`);
+      return;
+    }
+
     if (card.effect.type === 'heal') {
-      const healAmt = card.effect.bonus + Math.floor(cp.stats.magie / 2);
+      const healAmt = card.effect.bonus;
       setPlayers(prev => {
         const next = [...prev];
         const p = { ...next[currentIdx] };
@@ -1036,7 +1043,7 @@ export function useGameState(characters) {
       });
       addLog(`${cp.name} utilise ${card.icon} ${card.name} : effets négatifs annulés.`);
     } else if (card.effect.type === 'magic') {
-      const dmg = card.effect.bonus + Math.floor(cp.stats.magie / 2);
+      const dmg = card.effect.bonus;
       addLog(`${cp.name} lance ${card.icon} ${card.name} : ${dmg} dégâts magiques !`);
       setPlayers(prev => {
         const next = [...prev];
