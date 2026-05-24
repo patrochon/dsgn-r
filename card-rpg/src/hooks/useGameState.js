@@ -291,7 +291,8 @@ export function useGameState(characters) {
         p.magicAbsorbAvailable = true;
         p.forcedImmobile = false;
       }
-      const needed = HAND_LIMIT - p.hand.length;
+      // Draw exactly 1 card per turn (up to hand limit)
+      const needed = p.hand.length < HAND_LIMIT ? 1 : 0;
       if (needed > 0) {
         let deck = [...p.deck];
         let discard = [...p.discard];
@@ -306,7 +307,7 @@ export function useGameState(characters) {
       return next;
     });
     setMoveRerolled(false);
-    setActionsLeft(cp?.stats?.deplacement ?? 3);
+    setActionsLeft(3); // 3 actions per turn: move, attack, class ability
     if (wasForcedImmobile) {
       setHasMoved(true);
       addLog(`🌙 ${cp.name} reste immobile ce tour (prix de l'absorption magique).`);
@@ -1135,10 +1136,7 @@ export function useGameState(characters) {
     }
 
     setSelectedCard(null);
-    // Passif Chapeaux : utiliser un parchemin (magic) ne coûte pas d'action
-    const isFreeScroll = card.effect.type === 'magic' && cp.race?.passive === 'chapeaux';
-    if (!isFreeScroll) setActionsLeft(prev => prev - 1);
-    else addLog(`🎩 Passif Chapeaux : parchemin utilisé sans coût d'action.`);
+    // Playing cards is free — no action cost
   }, [selectedCard, currentIdx, players]);
 
   // Fou passive: replay last scroll's damage on a valid target (1 action)

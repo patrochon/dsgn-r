@@ -7,9 +7,10 @@ import DiceDisplay from './components/DiceDisplay';
 import Inventory from './components/Inventory';
 import AllPlayersStatus from './components/AllPlayersStatus';
 import CharacterCreation from './CharacterCreation';
+import SpecEditor from './components/SpecEditor';
 
 // ─── Player count selection ────────────────────────────────────────────────────
-function PlayerCountSelect({ onSelect }) {
+function PlayerCountSelect({ onSelect, onEditSpecs }) {
   return (
     <div style={{
       minHeight: '100vh', background: '#08080f',
@@ -34,6 +35,16 @@ function PlayerCountSelect({ onSelect }) {
           ))}
         </div>
       </div>
+      <button
+        onClick={onEditSpecs}
+        style={{
+          background: 'transparent', border: '1px solid #2a2a3a', borderRadius: 8,
+          color: '#555', padding: '8px 20px', cursor: 'pointer', fontSize: 12,
+          transition: 'all 0.15s',
+        }}
+        onMouseOver={e => { e.currentTarget.style.color = '#88aaff'; e.currentTarget.style.borderColor = '#3a3a5a'; }}
+        onMouseOut={e => { e.currentTarget.style.color = '#555'; e.currentTarget.style.borderColor = '#2a2a3a'; }}
+      >✦ Modifier les spécialisations</button>
     </div>
   );
 }
@@ -43,9 +54,13 @@ export default function App() {
   const [playerCount, setPlayerCount] = useState(null);
   const [characters, setCharacters] = useState([]);
   const [setupIdx, setSetupIdx] = useState(0);
+  const [editingSpecs, setEditingSpecs] = useState(false);
+
+  // Spec editor
+  if (editingSpecs) return <SpecEditor onClose={() => setEditingSpecs(false)} />;
 
   // Step 1: choose player count
-  if (!playerCount) return <PlayerCountSelect onSelect={setPlayerCount} />;
+  if (!playerCount) return <PlayerCountSelect onSelect={setPlayerCount} onEditSpecs={() => setEditingSpecs(true)} />;
 
   // Step 2: create each character
   if (setupIdx < playerCount) {
@@ -79,7 +94,7 @@ function Game({ characters, onRestart }) {
   const canMove = g.actionsLeft >= 1 && !g.hasMoved && g.phase === 'player_turn';
   const magieCost = g.selectedCard?.effect?.magieCost ?? 0;
   const hasMagie = magieCost === 0 || (cp?.stats?.magie ?? 0) >= magieCost;
-  const canUse = g.actionsLeft >= 1 && g.phase === 'player_turn' && isUsable && hasMagie;
+  const canUse = g.phase === 'player_turn' && isUsable && hasMagie; // card use is free
 
   const clickable = g.phase === 'choosing_move' || g.phase === 'choosing_attack';
 
@@ -122,7 +137,7 @@ function Game({ characters, onRestart }) {
           <span style={{ color: '#555', fontSize: 12 }}>—</span>
           <span style={{ fontSize: 12, color: '#aaa' }}>
             {g.phase === 'draw' ? '🃏 Tirez vos cartes'
-              : g.phase === 'player_turn' ? `${g.actionsLeft} action${g.actionsLeft !== 1 ? 's' : ''} restante${g.actionsLeft !== 1 ? 's' : ''}`
+              : g.phase === 'player_turn' ? `Tour actif — ${g.actionsLeft} action${g.actionsLeft !== 1 ? 's' : ''}`
               : g.phase === 'rolling_move' || g.phase === 'rolling_attack' ? '🎲 Lancement…'
               : g.phase === 'choosing_move' ? '🗺️ Choisissez une case'
               : g.phase === 'choosing_attack' ? '⚔️ Choisissez une cible'
