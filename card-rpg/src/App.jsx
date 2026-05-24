@@ -124,6 +124,7 @@ function Game({ characters, onRestart }) {
               : g.phase === 'rolling_move' || g.phase === 'rolling_attack' ? '🎲 Lancement…'
               : g.phase === 'choosing_move' ? '🗺️ Choisissez une case'
               : g.phase === 'choosing_attack' ? '⚔️ Choisissez une cible'
+              : g.phase === 'longs_bras_passive' ? '🦾 Passif — case adjacente'
               : g.phase}
           </span>
         </div>
@@ -215,6 +216,10 @@ function Game({ characters, onRestart }) {
           {g.phase === 'choosing_attack' && (
             <div style={{ color: '#ff6644', fontSize: 13, padding: '8px 0' }}>⚔️ Cliquez une cible surlignée pour attaquer</div>
           )}
+          {g.phase === 'longs_bras_passive' && (<>
+            <div style={{ color: '#aaffcc', fontSize: 13, padding: '8px 0' }}>🦾 Cliquez une case adjacente surlignée pour activer son effet (gratuit)</div>
+            <Btn label="⏭️ Passer" onClick={g.skipPassive} />
+          </>)}
           {(g.phase === 'rolling_move' || g.phase === 'rolling_attack') && (
             <div style={{ color: '#ffcc44', fontSize: 13, padding: '8px 0' }}>🎲 Lancement du dé…</div>
           )}

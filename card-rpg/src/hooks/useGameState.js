@@ -541,7 +541,83 @@ export function useGameState(characters) {
         addLog(`💰 ${cp.name} ouvre un coffre ! +${loot} carte(s) piochée(s)`);
       }
 
-      if (!turnEnded) setPhase('player_turn');
+      if (!turnEnded) {
+        // Passif Longs Bras : après déplacement, propose d'activer une case adjacente
+        const hasPassive = players[currentIdx]?.race?.passive === 'longs_bras';
+        if (hasPassive) {
+          const adjKeys = [[-1,0],[1,0],[0,-1],[0,1]].map(([dx,dy]) => `${finalX+dx},${finalY+dy}`);
+          const adjTargets = adjKeys.filter(k => enemies[k] || traps[k] || chests[k]);
+          if (adjTargets.length > 0) {
+            setHighlightTiles(adjTargets);
+            setPhase('longs_bras_passive');
+            addLog(`🦾 Passif Longs Bras : choisissez une case adjacente à activer (ou ⏭️ pour passer).`);
+            return;
+          }
+        }
+        setPhase('player_turn');
+      }
+    } else if (phase === 'longs_bras_passive') {
+      const key = `${tx},${ty}`;
+      if (!highlightTiles.includes(key)) return;
+      setHighlightTiles([]);
+      const cp = players[currentIdx];
+      // Trigger the adjacent tile effect at no action cost
+      if (enemies[key]) {
+        const m = enemies[key];
+        const roll = rollDie();
+        const pDmg = Math.max(1, roll + cp.stats.force + Math.floor(cp.stats.chance / 2) - m.defense);
+        const mDmg = Math.max(1, m.attack - Math.floor(cp.stats.force / 3));
+        const rounds = Math.ceil(m.maxHp / pDmg);
+        const dmgTaken = mDmg * rounds;
+        const won = pDmg * rounds >= m.maxHp;
+        addLog(`🦾 ${cp.name} frappe ${m.icon} ${m.name} depuis la case adjacente !`);
+        if (won) {
+          if (m.pile === 1) {
+            const p2 = MONSTER_PILE_2[Math.floor(Math.random() * MONSTER_PILE_2.length)];
+            setEnemies(prev => ({ ...prev, [key]: { ...p2, hp: p2.maxHp } }));
+            addLog(`💀 ${m.name} vaincu — un ${p2.icon} ${p2.name} surgit !`);
+          } else if (m.pile === 2) {
+            const p3 = MONSTER_PILE_3[Math.floor(Math.random() * MONSTER_PILE_3.length)];
+            setEnemies(prev => ({ ...prev, [key]: { ...p3, hp: p3.maxHp } }));
+            addLog(`💀 ${m.name} vaincu — un ${p3.icon} ${p3.name} surgit !`);
+          } else {
+            setEnemies(prev => { const n = { ...prev }; delete n[key]; return n; });
+            addLog(`✅ ${m.name} vaincu !`);
+          }
+        }
+        const nextPlayers = players.map((p, i) => {
+          if (i !== currentIdx) return p;
+          let np = { ...p, hp: Math.max(0, p.hp - dmgTaken) };
+          if (!won) { np.isAlive = false; np.hp = 0; }
+          return np;
+        });
+        setPlayers(nextPlayers);
+        if (!won) addLog(`💀 ${cp.name} est tué par ${m.name} !`);
+      } else if (traps[key]) {
+        const trap = traps[key];
+        const roll = rollDie();
+        addLog(`🦾 ${cp.name} déclenche ${trap.icon} ${trap.name} à distance !`);
+        setTraps(prev => { const n = { ...prev }; delete n[key]; return n; });
+        let dmg = 0;
+        if (trap.effect === 'damage' || trap.effect === 'damage_action' || trap.effect === 'damage_discard')
+          dmg = roll + trap.value;
+        if (dmg > 0) addLog(`💥 Piège détruit (${dmg} dégâts absorbés par les longs bras).`);
+        else addLog(`💥 Piège désamorcé.`);
+      } else if (chests[key]) {
+        const loot = chests[key].loot ?? 2;
+        setChests(prev => { const n = { ...prev }; delete n[key]; return n; });
+        setPlayers(prev => {
+          const next = [...prev];
+          const p = { ...next[currentIdx] };
+          let deck = [...p.deck], discard = [...p.discard];
+          if (deck.length < loot) { deck = [...deck, ...shuffleDeck(discard)]; discard = []; }
+          const drawn = deck.splice(0, loot);
+          next[currentIdx] = { ...p, hand: [...p.hand, ...drawn], deck, discard };
+          return next;
+        });
+        addLog(`🦾 ${cp.name} saisit le coffre adjacent ! +${loot} carte(s)`);
+      }
+      setPhase('player_turn');
     } else if (phase === 'choosing_attack') {
       attackTile(tx, ty);
     }
@@ -551,12 +627,12 @@ export function useGameState(characters) {
   const showAttackTargets = useCallback(() => {
     if (actionsLeft < 1) return;
     const cp = players[currentIdx];
-    // Check range from selected weapon card
-    let range = 1;
+    // Base range from stat portee, extended by weapon card special
+    let range = cp.stats.portee ?? 1;
     if (selectedCard?.effect?.special) {
       const sp = selectedCard.effect.special;
       const rangeMatch = sp.match(/range(\d+)/);
-      if (rangeMatch) range = parseInt(rangeMatch[1]);
+      if (rangeMatch) range = Math.max(range, parseInt(rangeMatch[1]));
     }
     const tiles = [];
     for (let dy = -range; dy <= range; dy++) {
@@ -751,6 +827,11 @@ export function useGameState(characters) {
     addLog(`--- Tour de ${players[next].name} ---`);
   }, [currentIdx, players]);
 
+  const skipPassive = useCallback(() => {
+    setHighlightTiles([]);
+    setPhase('player_turn');
+  }, []);
+
   return {
     players,
     currentIdx,
@@ -777,6 +858,7 @@ export function useGameState(characters) {
     moveToTile,
     showAttackTargets,
     attackTile,
+    skipPassive,
     useItem,
     endTurn,
     winner,

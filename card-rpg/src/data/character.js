@@ -6,7 +6,8 @@ export const RACES = [
     name: 'Les Longs Bras',
     icon: '🦾',
     flavor: 'Créatures d\'une allonge démesurée. Ils frappent là où personne ne les attend.',
-    bonuses: { force: 3, deplacement: 2 },
+    bonuses: { force: 2, vie: 1, deplacement: 1, portee: 1 },
+    passive: 'longs_bras',
   },
   {
     id: 'chapeaux',
@@ -178,7 +179,7 @@ export const SPECS = [
 ];
 
 export const BASE_STATS = {
-  force: 2, magie: 2, vie: 4, deplacement: 3, chance: 1, destin: 1,
+  force: 2, magie: 2, vie: 4, deplacement: 3, chance: 1, destin: 1, portee: 1,
 };
 
 export function computeStats(race, cls, spec) {
