@@ -154,15 +154,16 @@ function generateInitialTiles(mapData) {
 // hasZeles   : uphill costs 1 (not 2), downhill grants +2 budget
 // wallPass   : traverse all walls freely
 // oneWallPass: traverse at most one wall (Feux Follets passive)
-function runMoveDijkstra(fromX, fromY, budget, hasZeles, wallPass, oneWallPass, grid, heights) {
+function runMoveDijkstra(fromX, fromY, budget, facing, hasZeles, wallPass, oneWallPass, grid, heights) {
   const visited = {};
-  const queue = [{ x: fromX, y: fromY, budget, wallsUsed: 0 }];
+  const queue = [{ x: fromX, y: fromY, budget, wallsUsed: 0, dir: facing ?? null }];
   const tilesSet = new Set();
   const budgetAtTile = {};
   while (queue.length > 0) {
     queue.sort((a, b) => b.budget - a.budget);
-    const { x, y, budget: bgt, wallsUsed } = queue.shift();
-    const visitKey = `${x},${y},${wallsUsed}`;
+    const { x, y, budget: bgt, wallsUsed, dir } = queue.shift();
+    const dirKey = dir ? `${dir.dx},${dir.dy}` : 'n';
+    const visitKey = `${x},${y},${wallsUsed},${dirKey}`;
     if (visited[visitKey]) continue;
     visited[visitKey] = true;
     const isWall = grid[y]?.[x] === T.WALL;
@@ -179,14 +180,14 @@ function runMoveDijkstra(fromX, fromY, budget, hasZeles, wallPass, oneWallPass, 
       }
       const nWallsUsed = wallsUsed + (nIsWall ? 1 : 0);
       if (!wallPass && nWallsUsed > 1) continue;
-      const nVisitKey = `${nx},${ny},${nWallsUsed}`;
-      if (visited[nVisitKey]) continue;
       const hDiff = nIsWall ? 0 : ((heights[ny]?.[nx] ?? 0) - (heights[y]?.[x] ?? 0));
-      const stepCost = hasZeles
+      let stepCost = hasZeles
         ? (hDiff > 0 ? 1 : hDiff < 0 ? -2 : 1)
         : Math.max(0, 1 + hDiff);
+      // 180-degree turn costs 1 extra movement
+      if (dir && dir.dx === -dx && dir.dy === -dy) stepCost += 1;
       const newBgt = bgt - stepCost;
-      if (newBgt >= 0) queue.push({ x: nx, y: ny, budget: newBgt, wallsUsed: nWallsUsed });
+      if (newBgt >= 0) queue.push({ x: nx, y: ny, budget: newBgt, wallsUsed: nWallsUsed, dir: { dx, dy } });
     }
   }
   return { tiles: [...tilesSet], budgetAtTile };
@@ -394,7 +395,7 @@ export function useGameState(characters) {
 
       const hasZeles = cp.race?.passive === 'zeles';
       const hasFeuxFollets = cp.race?.passive === 'feux_follets';
-      const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, range, hasZeles, wallPass, hasFeuxFollets, grid, heights);
+      const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, range, cp.facing, hasZeles, wallPass, hasFeuxFollets, grid, heights);
       const otherBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
       setTilesBudget(budgetAtTile);
       setHighlightTiles(tiles.filter(t => !otherBases.has(t)));
@@ -421,7 +422,7 @@ export function useGameState(characters) {
       addLog(`🌙 ${cp.name} relance le dé : ${roll}${logSuffix} = ${range} cases.`);
       const hasZeles = false;
       const hasFeuxFollets = cp.race?.passive === 'feux_follets';
-      const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, range, hasZeles, wallPass, hasFeuxFollets, grid, heights);
+      const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, range, cp.facing, hasZeles, wallPass, hasFeuxFollets, grid, heights);
       const otherBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
       setTilesBudget(budgetAtTile);
       setHighlightTiles(tiles.filter(t => !otherBases.has(t)));
@@ -702,7 +703,7 @@ export function useGameState(characters) {
         // Passif Zélés : si aucun dégât reçu et budget restant > 0 → continue le déplacement
         if (hasZeles && damageTakenThisMove === 0 && budgetHere > 0) {
           const { tiles: contTiles, budgetAtTile: contBudget } =
-            runMoveDijkstra(finalX, finalY, budgetHere, true, false, false, grid, heights);
+            runMoveDijkstra(finalX, finalY, budgetHere, newFacing, true, false, false, grid, heights);
           const zelOtherBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
           const filteredCont = contTiles.filter(t => !zelOtherBases.has(t));
           if (filteredCont.length > 0) {
