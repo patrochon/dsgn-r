@@ -14,8 +14,18 @@ const C = {
 
 const R = { COMMON: 'common', UNCOMMON: 'uncommon', RARE: 'rare', LEGENDARY: 'legendary' };
 
+const EQUIPPABLE_TYPES = new Set(['attack', 'defense', 'magic_attack', 'passive', 'legendary']);
+
+function goldValue(rarity, effectType, bonus) {
+  if (rarity === 'legendary') return 6;
+  if (rarity === 'rare')      return (effectType === 'passive' || bonus >= 5) ? 5 : 4;
+  if (rarity === 'uncommon')  return bonus >= 5 ? 3 : 2;
+  return bonus >= 3 ? 2 : 1; // common
+}
+
 function card(id, name, icon, cat, rarity, effectType, bonus, desc, special = null, magieCost = 0) {
-  return { id, name, icon, category: cat.key, catColor: cat.color, catLabel: cat.label, rarity, effect: { type: effectType, bonus, special, magieCost }, desc };
+  const gv = EQUIPPABLE_TYPES.has(effectType) ? goldValue(rarity, effectType, bonus) : null;
+  return { id, name, icon, category: cat.key, catColor: cat.color, catLabel: cat.label, rarity, effect: { type: effectType, bonus, special, magieCost }, desc, goldValue: gv };
 }
 
 // ─── DÉPLACEMENT (12) ─────────────────────────────────────────────────────────

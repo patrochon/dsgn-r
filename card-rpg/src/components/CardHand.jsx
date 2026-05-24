@@ -83,21 +83,35 @@ export default function CardHand({ hand, selected, onSelect, disabled }) {
               {card.name}
             </div>
 
-            {/* Bonus badge */}
-            {card.effect.bonus > 0 && (
-              <div style={{
-                fontSize: 10,
-                background: catColor + '22',
-                border: `1px solid ${catColor}44`,
-                borderRadius: 4,
-                padding: '1px 5px',
-                color: catColor,
-                fontWeight: 700,
-                marginTop: 'auto',
-              }}>
-                +{card.effect.bonus}
-              </div>
-            )}
+            {/* Bonus badge + gold value */}
+            <div style={{ marginTop: 'auto', display: 'flex', gap: 3, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+              {card.effect.bonus > 0 && (
+                <div style={{
+                  fontSize: 10,
+                  background: catColor + '22',
+                  border: `1px solid ${catColor}44`,
+                  borderRadius: 4,
+                  padding: '1px 5px',
+                  color: catColor,
+                  fontWeight: 700,
+                }}>
+                  +{card.effect.bonus}
+                </div>
+              )}
+              {card.goldValue != null && (
+                <div style={{
+                  fontSize: 9,
+                  background: '#2a2000',
+                  border: '1px solid #554400',
+                  borderRadius: 4,
+                  padding: '1px 4px',
+                  color: '#ffd700',
+                  fontWeight: 700,
+                }}>
+                  💰{card.goldValue}
+                </div>
+              )}
+            </div>
           </div>
         );
       })}
