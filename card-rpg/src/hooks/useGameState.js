@@ -431,7 +431,8 @@ export function useGameState(characters) {
   // Complete the move
   const moveToTile = useCallback((tx, ty) => {
     if (phase !== 'choosing_move' && phase !== 'choosing_attack'
-      && phase !== 'longs_bras_passive' && phase !== 'choosing_portal') return;
+      && phase !== 'longs_bras_passive' && phase !== 'choosing_portal'
+      && phase !== 'bum_throw') return;
 
     if (phase === 'choosing_move') {
       const key = `${tx},${ty}`;
@@ -827,6 +828,8 @@ export function useGameState(characters) {
       setPhase('player_turn');
     } else if (phase === 'choosing_attack') {
       attackTile(tx, ty);
+    } else if (phase === 'bum_throw') {
+      throwWeapon(tx, ty);
     }
   }, [phase, highlightTiles, tilesBudget, hasMoved, currentIdx, selectedCard, currentPlayer, enemies, traps, chests, players, grid, heights]);
 
@@ -860,6 +863,75 @@ export function useGameState(characters) {
     setPhase('choosing_attack');
     addLog(`${cp.name} choisit une cible...`);
   }, [actionsLeft, currentIdx, players, grid, enemies, selectedCard]);
+
+  // Bum passive: throw a physical weapon card at a player within range 2 (free targeting)
+  const startBumThrow = useCallback(() => {
+    if (actionsLeft < 1 || !selectedCard || selectedCard.effect.type !== 'attack') return;
+    const cp = players[currentIdx];
+    if (cp.cls?.passive !== 'bum') return;
+    const tiles = [];
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        if (Math.abs(dx) + Math.abs(dy) > 2 || (dx === 0 && dy === 0)) continue;
+        const nx = cp.x + dx, ny = cp.y + dy;
+        if (nx < 0 || ny < 0 || ny >= grid.length || nx >= grid[0].length) continue;
+        if (grid[ny][nx] === T.WALL) continue;
+        if (players.some((p, i) => i !== currentIdx && p.isAlive && p.x === nx && p.y === ny))
+          tiles.push(`${nx},${ny}`);
+      }
+    }
+    if (tiles.length === 0) { addLog(`🧣 Pas de cible à portée pour lancer l'arme.`); return; }
+    setHighlightTiles(tiles);
+    setPhase('bum_throw');
+    addLog(`🧣 ${cp.name} prépare son lancer — choisissez une cible.`);
+  }, [actionsLeft, selectedCard, currentIdx, players, grid]);
+
+  // Bum throw — roll damage, destroy card
+  const throwWeapon = useCallback((tx, ty) => {
+    if (phase !== 'bum_throw') return;
+    const key = `${tx},${ty}`;
+    if (!highlightTiles.includes(key)) return;
+    setHighlightTiles([]);
+    setPhase('rolling_attack');
+    const cp = players[currentIdx];
+    const card = selectedCard;
+    const targetPlayerIdx = players.findIndex((p, i) => i !== currentIdx && p.isAlive && p.x === tx && p.y === ty);
+    if (targetPlayerIdx < 0) { setPhase('player_turn'); return; }
+    animateRoll((roll) => {
+      const target = players[targetPlayerIdx];
+      const rawDmg = roll + (card?.effect?.bonus ?? 0) + cp.stats.force;
+      const defense = Math.floor(target.stats.force / 3);
+      const actualDmg = physDmg(Math.max(1, rawDmg - defense), target);
+      addLog(`🧣 ${cp.name} lance ${card?.icon ?? '🗡️'} ${card?.name ?? 'une arme'} sur ${target.name} : dé=${roll}, dégâts=${actualDmg}`);
+      setPlayers(prev => {
+        const next = [...prev];
+        let t = { ...next[targetPlayerIdx] };
+        t.hp = Math.max(0, t.hp - actualDmg);
+        if (t.hp <= 0) {
+          if (t.stats.destin > 0) {
+            const newDeck = shuffleDeck([...FULL_DECK]);
+            const livesLeft = t.stats.destin - 1;
+            t = { ...t, hp: t.maxHp, x: t.baseX, y: t.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], stats: { ...t.stats, destin: livesLeft } };
+            addLog(`✨ ${next[targetPlayerIdx].name} renaît à sa base ! (${livesLeft} vie(s) restante(s))`);
+          } else {
+            t.isAlive = false;
+            addLog(`💀 ${t.name} est définitivement éliminé !`);
+          }
+        }
+        next[targetPlayerIdx] = t;
+        // Destroy the weapon card (removed from game, not discarded)
+        let thrower = { ...next[currentIdx] };
+        thrower.hand = thrower.hand.filter(c => c !== card);
+        next[currentIdx] = thrower;
+        const alive = next.filter(p => p.isAlive);
+        if (alive.length === 1) { setWinner(alive[0]); setPhase('win'); }
+        else setPhase('player_turn');
+        return next;
+      });
+      setSelectedCard(null);
+      setActionsLeft(prev => prev - 1);
+    });
+  }, [phase, highlightTiles, currentIdx, players, selectedCard]);
 
   // Attack a tile
   const attackTile = useCallback((tx, ty) => {
@@ -1064,22 +1136,79 @@ export function useGameState(characters) {
 
   // End turn — advance to next living player
   const endTurn = useCallback(() => {
+    // Compute all end-of-turn player updates in one pass
+    let updPlayers = [...players];
+
     // Passif Cailloux : immobile ce tour → immunité physique jusqu'au prochain tour
-    if (!hasMoved && players[currentIdx]?.race?.passive === 'cailloux') {
-      setPlayers(prev => {
-        const next = [...prev];
-        next[currentIdx] = { ...next[currentIdx], physicalImmune: true };
-        return next;
-      });
-      addLog(`🪨 ${players[currentIdx].name} reste immobile — immunité physique activée !`);
+    if (!hasMoved && updPlayers[currentIdx]?.race?.passive === 'cailloux') {
+      updPlayers[currentIdx] = { ...updPlayers[currentIdx], physicalImmune: true };
+      addLog(`🪨 ${updPlayers[currentIdx].name} reste immobile — immunité physique activée !`);
     }
+
+    // Passif Bum : pousse l'adversaire sur la même case vers une case adjacente
+    if (updPlayers[currentIdx]?.cls?.passive === 'bum') {
+      const bum = updPlayers[currentIdx];
+      const victimIdx = updPlayers.findIndex((p, i) => i !== currentIdx && p.isAlive && p.x === bum.x && p.y === bum.y);
+      if (victimIdx >= 0) {
+        const victim = updPlayers[victimIdx];
+        const facing = bum.facing;
+        const dirsToTry = facing
+          ? [[facing.dx, facing.dy], [-1,0],[1,0],[0,-1],[0,1]]
+          : [[-1,0],[1,0],[0,-1],[0,1]];
+        let pushX = null, pushY = null;
+        for (const [dx, dy] of dirsToTry) {
+          const nx = bum.x + dx, ny = bum.y + dy;
+          if (nx < 0 || ny < 0 || ny >= grid.length || nx >= grid[0].length) continue;
+          if (grid[ny][nx] === T.WALL) continue;
+          pushX = nx; pushY = ny; break;
+        }
+        if (pushX !== null) {
+          const destKey = `${pushX},${pushY}`;
+          addLog(`🧣 ${bum.name} pousse ${victim.name} vers (${pushX}, ${pushY}) !`);
+          const trapThere = traps[destKey];
+          let trapDmg = 0;
+          if (trapThere) {
+            const roll = rollDie();
+            addLog(`🪤 ${victim.name} atterrit sur ${trapThere.icon} ${trapThere.name} !`);
+            setTraps(prev => { const n = { ...prev }; delete n[destKey]; return n; });
+            if (trapThere.effect === 'damage' || trapThere.effect === 'damage_action' || trapThere.effect === 'damage_discard')
+              trapDmg = physDmg(roll + trapThere.value, victim);
+            if (trapDmg > 0) addLog(`💥 ${trapThere.desc} — -${trapDmg} PV à ${victim.name}`);
+          }
+          let newVictim = { ...victim, x: pushX, y: pushY, hp: Math.max(0, victim.hp - trapDmg) };
+          if (newVictim.hp <= 0) {
+            if (newVictim.stats.destin > 0) {
+              const newDeck = shuffleDeck([...FULL_DECK]);
+              newVictim = { ...newVictim, hp: newVictim.maxHp, x: newVictim.baseX, y: newVictim.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], stats: { ...newVictim.stats, destin: newVictim.stats.destin - 1 } };
+              addLog(`✨ ${victim.name} renaît à sa base ! (${newVictim.stats.destin} vie(s) restante(s))`);
+            } else {
+              newVictim = { ...newVictim, isAlive: false, hp: 0 };
+              addLog(`💀 ${victim.name} est définitivement éliminé !`);
+            }
+          }
+          updPlayers = updPlayers.map((p, i) => i === victimIdx ? newVictim : p);
+          // Win check after push
+          const alive = updPlayers.filter(p => p.isAlive);
+          if (alive.length === 1) {
+            setPlayers(updPlayers);
+            setWinner(alive[0]); setPhase('win');
+            setActionsLeft(0); setHasMoved(false); setSelectedCard(null); setHighlightTiles([]);
+            return;
+          }
+        } else {
+          addLog(`🧣 Pas de case libre pour pousser ${victim.name}.`);
+        }
+      }
+    }
+
+    setPlayers(updPlayers);
 
     let next = currentIdx;
     let attempts = 0;
     do {
-      next = (next + 1) % players.length;
+      next = (next + 1) % updPlayers.length;
       attempts++;
-    } while (!players[next].isAlive && attempts < players.length);
+    } while (!updPlayers[next].isAlive && attempts < updPlayers.length);
 
     setCurrentIdx(next);
     setActionsLeft(0);
@@ -1087,8 +1216,8 @@ export function useGameState(characters) {
     setSelectedCard(null);
     setHighlightTiles([]);
     setPhase('draw');
-    addLog(`--- Tour de ${players[next].name} ---`);
-  }, [currentIdx, players, hasMoved]);
+    addLog(`--- Tour de ${updPlayers[next].name} ---`);
+  }, [currentIdx, players, hasMoved, traps, grid]);
 
   const skipPassive = useCallback(() => {
     setHighlightTiles([]);
@@ -1138,6 +1267,8 @@ export function useGameState(characters) {
     moveToTile,
     showAttackTargets,
     attackTile,
+    startBumThrow,
+    throwWeapon,
     skipPassive,
     skipPortalChoice,
     useItem,

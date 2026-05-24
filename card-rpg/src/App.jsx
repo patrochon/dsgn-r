@@ -128,6 +128,7 @@ function Game({ characters, onRestart }) {
               : g.phase === 'choosing_attack' ? '⚔️ Choisissez une cible'
               : g.phase === 'longs_bras_passive' ? '🦾 Passif — case adjacente'
               : g.phase === 'choosing_portal' ? '🎩 Choisissez votre portail de sortie'
+              : g.phase === 'bum_throw' ? '🧣 Choisissez une cible à atteindre'
               : g.phase}
           </span>
         </div>
@@ -212,6 +213,15 @@ function Game({ characters, onRestart }) {
                 hint={!hasMagie ? `Magie insuffisante — requis : ${magieCost}, actuel : ${cp?.stats?.magie ?? 0}` : undefined}
               />
             )}
+            {cp?.cls?.passive === 'bum' && g.selectedCard?.effect?.type === 'attack' && (
+              <Btn
+                label={`🧣 Lancer ${g.selectedCard.icon} (1 action)`}
+                onClick={g.startBumThrow}
+                disabled={!canAttack}
+                primary={canAttack}
+                hint="Lancer cette arme sur un joueur à 2 cases — la carte est détruite"
+              />
+            )}
             <Btn label="⏭️ Fin de tour" onClick={g.endTurn} />
           </>)}
           {g.phase === 'choosing_move' && (<>
@@ -222,6 +232,9 @@ function Game({ characters, onRestart }) {
           </>)}
           {g.phase === 'choosing_attack' && (
             <div style={{ color: '#ff6644', fontSize: 13, padding: '8px 0' }}>⚔️ Cliquez une cible surlignée pour attaquer</div>
+          )}
+          {g.phase === 'bum_throw' && (
+            <div style={{ color: '#ffaa44', fontSize: 13, padding: '8px 0' }}>🧣 Cliquez un joueur surlighté pour lancer l'arme (carte détruite)</div>
           )}
           {g.phase === 'longs_bras_passive' && (<>
             <div style={{ color: '#aaffcc', fontSize: 13, padding: '8px 0' }}>🦾 Cliquez une case adjacente surlignée pour activer son effet (gratuit)</div>

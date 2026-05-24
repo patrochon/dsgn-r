@@ -57,7 +57,8 @@ export const CLASSES = [
     name: 'Le Bum',
     icon: '🧣',
     flavor: 'Maître de la débrouillardise. Il trouve toujours une sortie — ou une combine.',
-    bonuses: { richesse: 3, deplacement: 2 },
+    bonuses: { force: 1, vie: 3 },
+    passive: 'bum',
   },
   {
     id: 'fou',
