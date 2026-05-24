@@ -73,7 +73,8 @@ export const CLASSES = [
     name: "L'Alchimiste",
     icon: '⚗️',
     flavor: 'Il transforme la matière et les corps. Ses potions guérissent... ou détruisent.',
-    bonuses: { magie: 3, vie: 2 },
+    bonuses: { richesse: 2 },
+    passive: 'alchimiste',
   },
   {
     id: 'messager',

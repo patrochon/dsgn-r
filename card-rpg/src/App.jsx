@@ -215,6 +215,15 @@ function Game({ characters, onRestart }) {
                 hint={!hasMagie ? `Magie insuffisante — requis : ${magieCost}, actuel : ${cp?.stats?.magie ?? 0}` : undefined}
               />
             )}
+            {cp?.cls?.passive === 'alchimiste' && (
+              <Btn
+                label={`⚗️ Se soigner (${cp.stats.magie ?? 0} PV, 1 action)`}
+                onClick={g.alchimisteHeal}
+                disabled={!canAttack}
+                primary={canAttack}
+                hint="Récupère des PV égaux à la stat Magie"
+              />
+            )}
             {cp?.cls?.passive === 'fou' && cp?.lastScroll && (
               <Btn
                 label={`🃏 Sort du Fou : ${cp.lastScroll.icon} ${cp.lastScroll.name} (1 action)`}

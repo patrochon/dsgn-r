@@ -1214,6 +1214,24 @@ export function useGameState(characters) {
     setActionsLeft(prev => prev - 1);
   }, [phase, highlightTiles, currentIdx, players, enemies]);
 
+  // Alchimiste passive: spend 1 action to heal HP equal to magie stat
+  const alchimisteHeal = useCallback(() => {
+    if (actionsLeft < 1) return;
+    const cp = players[currentIdx];
+    if (cp.cls?.passive !== 'alchimiste') return;
+    const healAmt = cp.stats.magie ?? 0;
+    if (healAmt <= 0) { addLog(`⚗️ Pas de Magie pour se soigner.`); return; }
+    setPlayers(prev => {
+      const next = [...prev];
+      const p = { ...next[currentIdx] };
+      p.hp = Math.min(p.maxHp, p.hp + healAmt);
+      next[currentIdx] = p;
+      return next;
+    });
+    addLog(`⚗️ ${cp.name} utilise sa Magie pour se soigner de ${healAmt} PV !`);
+    setActionsLeft(prev => prev - 1);
+  }, [actionsLeft, currentIdx, players]);
+
   // End turn — advance to next living player
   const endTurn = useCallback(() => {
     // Compute all end-of-turn player updates in one pass
@@ -1277,6 +1295,79 @@ export function useGameState(characters) {
           }
         } else {
           addLog(`🧣 Pas de case libre pour pousser ${victim.name}.`);
+        }
+      }
+    }
+
+    // Passif Alchimiste : achète une potion (vente forcée) et repousse l'adversaire
+    if (updPlayers[currentIdx]?.cls?.passive === 'alchimiste') {
+      const alchi = updPlayers[currentIdx];
+      const victimIdx = updPlayers.findIndex((p, i) => i !== currentIdx && p.isAlive && p.x === alchi.x && p.y === alchi.y);
+      if (victimIdx >= 0) {
+        const victim = updPlayers[victimIdx];
+        // Buy a random potion from victim (forced sale)
+        const victimPotions = victim.hand.filter(c => c.category === 'potion');
+        if (alchi.gold >= 1 && victimPotions.length > 0) {
+          const card = victimPotions[Math.floor(Math.random() * victimPotions.length)];
+          addLog(`⚗️ ${alchi.name} achète ${card.icon} ${card.name} à ${victim.name} pour 1 pièce d'or (vente forcée) !`);
+          updPlayers = updPlayers.map((p, i) => {
+            if (i === currentIdx) return { ...p, gold: p.gold - 1, hand: [...p.hand, card] };
+            if (i === victimIdx) return { ...p, gold: p.gold + 1, hand: p.hand.filter(c2 => c2 !== card) };
+            return p;
+          });
+        } else if (victimPotions.length === 0) {
+          addLog(`⚗️ ${victim.name} n'a aucune potion à vendre.`);
+        } else {
+          addLog(`⚗️ ${alchi.name} n'a pas assez d'or pour acheter (requis : 1).`);
+        }
+        // Push victim one tile
+        const alchiNow = updPlayers[currentIdx];
+        const facing = alchiNow.facing;
+        const dirsToTry = facing
+          ? [[facing.dx, facing.dy], [-1,0],[1,0],[0,-1],[0,1]]
+          : [[-1,0],[1,0],[0,-1],[0,1]];
+        let pushX = null, pushY = null;
+        for (const [dx, dy] of dirsToTry) {
+          const nx = alchiNow.x + dx, ny = alchiNow.y + dy;
+          if (nx < 0 || ny < 0 || ny >= grid.length || nx >= grid[0].length) continue;
+          if (grid[ny][nx] === T.WALL) continue;
+          pushX = nx; pushY = ny; break;
+        }
+        if (pushX !== null) {
+          const victimNow = updPlayers[victimIdx];
+          const destKey = `${pushX},${pushY}`;
+          addLog(`⚗️ ${alchiNow.name} repousse ${victimNow.name} en (${pushX}, ${pushY}) !`);
+          const trapThere = traps[destKey];
+          let trapDmg = 0;
+          if (trapThere) {
+            const roll = rollDie();
+            addLog(`🪤 ${victimNow.name} atterrit sur ${trapThere.icon} ${trapThere.name} !`);
+            setTraps(prev => { const n = { ...prev }; delete n[destKey]; return n; });
+            if (trapThere.effect === 'damage' || trapThere.effect === 'damage_action' || trapThere.effect === 'damage_discard')
+              trapDmg = physDmg(roll + trapThere.value, victimNow);
+            if (trapDmg > 0) addLog(`💥 ${trapThere.desc} — -${trapDmg} PV à ${victimNow.name}`);
+          }
+          let newVictim = { ...victimNow, x: pushX, y: pushY, hp: Math.max(0, victimNow.hp - trapDmg) };
+          if (newVictim.hp <= 0) {
+            if (newVictim.stats.destin > 0) {
+              const newDeck = shuffleDeck([...FULL_DECK]);
+              newVictim = { ...newVictim, hp: newVictim.maxHp, x: newVictim.baseX, y: newVictim.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], stats: { ...newVictim.stats, destin: newVictim.stats.destin - 1 } };
+              addLog(`✨ ${victimNow.name} renaît à sa base ! (${newVictim.stats.destin} vie(s) restante(s))`);
+            } else {
+              newVictim = { ...newVictim, isAlive: false, hp: 0 };
+              addLog(`💀 ${victimNow.name} est définitivement éliminé !`);
+            }
+          }
+          updPlayers = updPlayers.map((p, i) => i === victimIdx ? newVictim : p);
+          const alive = updPlayers.filter(p => p.isAlive);
+          if (alive.length === 1) {
+            setPlayers(updPlayers);
+            setWinner(alive[0]); setPhase('win');
+            setActionsLeft(0); setHasMoved(false); setSelectedCard(null); setHighlightTiles([]);
+            return;
+          }
+        } else {
+          addLog(`⚗️ Pas de case libre pour repousser ${updPlayers[victimIdx].name}.`);
         }
       }
     }
@@ -1397,6 +1488,7 @@ export function useGameState(characters) {
     startFouAttack,
     fouAttack,
     confirmFouPortal,
+    alchimisteHeal,
     skipPassive,
     skipPortalChoice,
     useItem,
