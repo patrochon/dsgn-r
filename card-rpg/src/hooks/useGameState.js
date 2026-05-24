@@ -145,6 +145,37 @@ function generateInitialTiles(mapData) {
   return { enemies, traps, chests };
 }
 
+// Dijkstra movement reachability — returns { tiles: string[], budgetAtTile: {key: number} }
+// hasZeles: uphill costs 1 (not 2), downhill grants +2 budget
+function runMoveDijkstra(fromX, fromY, budget, hasZeles, wallPass, grid, heights) {
+  const visited = {};
+  const queue = [{ x: fromX, y: fromY, budget }];
+  const tiles = [];
+  const budgetAtTile = {};
+  while (queue.length > 0) {
+    queue.sort((a, b) => b.budget - a.budget);
+    const { x, y, budget: bgt } = queue.shift();
+    const key = `${x},${y}`;
+    if (visited[key]) continue;
+    visited[key] = true;
+    if (!(x === fromX && y === fromY)) { tiles.push(key); budgetAtTile[key] = bgt; }
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || ny >= grid.length || nx >= grid[0].length) continue;
+      if (!wallPass && grid[ny][nx] === T.WALL) continue;
+      const nkey = `${nx},${ny}`;
+      if (visited[nkey]) continue;
+      const hDiff = (heights[ny]?.[nx] ?? 0) - (heights[y]?.[x] ?? 0);
+      const stepCost = hasZeles
+        ? (hDiff > 0 ? 1 : hDiff < 0 ? -2 : 1)   // uphill: no extra; downhill: +2 refund
+        : Math.max(0, 1 + hDiff);
+      const newBgt = bgt - stepCost;
+      if (newBgt >= 0) queue.push({ x: nx, y: ny, budget: newBgt });
+    }
+  }
+  return { tiles, budgetAtTile };
+}
+
 // Apply Cailloux passive: -1 per hit, immune if physicalImmune
 function physDmg(rawDmg, target) {
   if (target?.physicalImmune) return 0;
@@ -195,6 +226,7 @@ export function useGameState(characters) {
   const [actionsLeft, setActionsLeft] = useState(0);
   const [hasMoved, setHasMoved] = useState(false);
   const [phase, setPhase] = useState('draw');
+  const [tilesBudget, setTilesBudget] = useState({});
   const [diceResult, setDiceResult] = useState(null);
   const [rolling, setRolling] = useState(false);
   const [highlightTiles, setHighlightTiles] = useState([]);
@@ -332,45 +364,31 @@ export function useGameState(characters) {
 
       addLog(`🎲 ${currentPlayer.name} lance le dé : ${roll}${logSuffix} = ${range} cases.${card?.effect?.type === 'move' ? ` [${card.name}]` : ''}`);
 
-      // Dijkstra — each step costs max(0, 1 + heightDiff)
-      // uphill (+1 height) costs 2, downhill (-1) costs 0, same level costs 1
-      const visited = {};
-      const queue = [{ x: cp.x, y: cp.y, budget: range }];
-      const tiles = [];
-      while (queue.length > 0) {
-        queue.sort((a, b) => b.budget - a.budget);
-        const { x, y, budget } = queue.shift();
-        const key = `${x},${y}`;
-        if (visited[key]) continue;
-        visited[key] = true;
-        if (!(x === cp.x && y === cp.y)) tiles.push(key);
-        for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-          const nx = x + dx, ny = y + dy;
-          if (nx < 0 || ny < 0 || ny >= grid.length || nx >= grid[0].length) continue;
-          if (!wallPass && grid[ny][nx] === T.WALL) continue;
-          const nkey = `${nx},${ny}`;
-          if (visited[nkey]) continue;
-          const hDiff = (heights[ny]?.[nx] ?? 0) - (heights[y]?.[x] ?? 0);
-          const stepCost = Math.max(0, 1 + hDiff);
-          const newBudget = budget - stepCost;
-          if (newBudget >= 0) queue.push({ x: nx, y: ny, budget: newBudget });
-        }
-      }
+      const hasZeles = cp.race?.passive === 'zeles';
+      const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, range, hasZeles, wallPass, grid, heights);
+      setTilesBudget(budgetAtTile);
       setHighlightTiles(tiles);
       setPhase('choosing_move');
     });
-  }, [actionsLeft, hasMoved, selectedCard, currentIdx, players, grid, heights]);
+  }, [actionsLeft, hasMoved, selectedCard, currentIdx, players, grid, heights, setTilesBudget]);
 
   // Complete the move
   const moveToTile = useCallback((tx, ty) => {
-    if (phase !== 'choosing_move' && phase !== 'choosing_attack') return;
+    if (phase !== 'choosing_move' && phase !== 'choosing_attack'
+      && phase !== 'longs_bras_passive' && phase !== 'choosing_portal') return;
 
     if (phase === 'choosing_move') {
       const key = `${tx},${ty}`;
       if (!highlightTiles.includes(key)) return;
       setHighlightTiles([]);
-      setHasMoved(true);
-      setActionsLeft(prev => prev - 1);
+      const isContinuation = hasMoved; // Zélés mid-move continuation
+      if (!isContinuation) {
+        setHasMoved(true);
+        setActionsLeft(prev => prev - 1);
+      }
+      const budgetHere = tilesBudget[key] ?? 0;
+      const hasZeles = players[currentIdx]?.race?.passive === 'zeles';
+      let damageTakenThisMove = 0;
 
       // Collect all teleport tiles on the map
       const teleportTiles = [];
@@ -515,6 +533,7 @@ export function useGameState(characters) {
           }
           return np;
         });
+        damageTakenThisMove += dmgTaken;
         setPlayers(nextPlayers);
         if (won) {
           if (monsterThere.pile !== 1) addLog(`✅ ${monsterThere.name} vaincu (-${dmgTaken} PV, +${loot} carte(s))`);
@@ -538,6 +557,7 @@ export function useGameState(characters) {
         if (trapThere.effect === 'damage_discard') { rawDmg = roll + trapThere.value; discardCard = true; }
         if (trapThere.effect === 'lose_actions')   { loseActions = trapThere.value; }
         const dmg = physDmg(rawDmg, cp);
+        damageTakenThisMove += dmg;
 
         if (cp.physicalImmune && rawDmg > 0) addLog(`🪨 Immunité physique — dégâts du piège annulés !`);
         if (loseActions > 0) setActionsLeft(prev => Math.max(0, prev - loseActions));
@@ -584,9 +604,21 @@ export function useGameState(characters) {
       }
 
       if (!turnEnded) {
+        // Passif Zélés : si aucun dégât reçu et budget restant > 0 → continue le déplacement
+        if (hasZeles && damageTakenThisMove === 0 && budgetHere > 0) {
+          const { tiles: contTiles, budgetAtTile: contBudget } =
+            runMoveDijkstra(finalX, finalY, budgetHere, true, false, grid, heights);
+          if (contTiles.length > 0) {
+            setTilesBudget(contBudget);
+            setHighlightTiles(contTiles);
+            setPhase('choosing_move');
+            addLog(`⚡ Zélés continue son déplacement (${budgetHere} pts restants) !`);
+            return;
+          }
+        }
         // Passif Longs Bras : après déplacement, propose d'activer une case adjacente
-        const hasPassive = players[currentIdx]?.race?.passive === 'longs_bras';
-        if (hasPassive) {
+        const hasLongsBras = players[currentIdx]?.race?.passive === 'longs_bras';
+        if (hasLongsBras) {
           const adjKeys = [[-1,0],[1,0],[0,-1],[0,1]].map(([dx,dy]) => `${finalX+dx},${finalY+dy}`);
           const adjTargets = adjKeys.filter(k => enemies[k] || traps[k] || chests[k]);
           if (adjTargets.length > 0) {
@@ -688,7 +720,7 @@ export function useGameState(characters) {
     } else if (phase === 'choosing_attack') {
       attackTile(tx, ty);
     }
-  }, [phase, highlightTiles, currentIdx, selectedCard, currentPlayer, enemies, traps, chests, players]);
+  }, [phase, highlightTiles, tilesBudget, hasMoved, currentIdx, selectedCard, currentPlayer, enemies, traps, chests, players, grid, heights]);
 
   // Show attack targets (adjacent players and enemies)
   const showAttackTargets = useCallback(() => {

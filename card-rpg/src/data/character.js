@@ -30,7 +30,8 @@ export const RACES = [
     name: 'Les Zélés',
     icon: '⚡',
     flavor: 'Débordants d\'énergie. Ils courent plus vite que leur propre ombre.',
-    bonuses: { deplacement: 3, magie: 2 },
+    bonuses: { deplacement: 2, chance: 1 },
+    passive: 'zeles',
   },
   {
     id: 'feux_follets',
