@@ -13,7 +13,7 @@ function rollDie() {
 }
 
 function buildPlayer(charData, index, mapData) {
-  const stats = charData.stats ?? { force: 3, magie: 2, vie: 5, deplacement: 3, richesse: 1, destin: 1 };
+  const stats = charData.stats ?? { force: 1, magie: 1, vie: 6, deplacement: 0, richesse: 1, destin: 1 };
   const maxHp = 20 + stats.vie * 2;
   const start = mapData.playerStarts[index] ?? mapData.playerStarts[0];
   const deck = shuffleDeck([...FULL_DECK]);

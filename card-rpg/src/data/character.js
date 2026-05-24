@@ -187,7 +187,7 @@ export const SPECS = [
 ];
 
 export const BASE_STATS = {
-  force: 2, magie: 2, vie: 4, deplacement: 3, richesse: 1, destin: 1, portee: 1,
+  force: 1, magie: 1, vie: 6, deplacement: 0, richesse: 1, destin: 1, portee: 1,
 };
 
 export function computeStats(race, cls, spec) {
