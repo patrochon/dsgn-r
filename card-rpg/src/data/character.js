@@ -46,7 +46,8 @@ export const RACES = [
     name: 'Les Anciens',
     icon: '🌙',
     flavor: 'Ils ont vu des ères entières s\'effondrer. Leur destin transcende le temps.',
-    bonuses: { destin: 3, magie: 2 },
+    bonuses: { destin: 2, magie: 1 },
+    passive: 'anciens',
   },
 ];
 

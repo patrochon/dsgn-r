@@ -37,6 +37,8 @@ function buildPlayer(charData, index, mapData) {
     isAlive: true,
     physicalImmune: false,
     facing: null,
+    magicAbsorbAvailable: true,
+    forcedImmobile: false,
     color: PLAYER_COLORS[index] ?? '#ffffff',
   };
 }
@@ -239,6 +241,7 @@ export function useGameState(characters) {
   const [hasMoved, setHasMoved] = useState(false);
   const [phase, setPhase] = useState('draw');
   const [tilesBudget, setTilesBudget] = useState({});
+  const [moveRerolled, setMoveRerolled] = useState(false);
   const [diceResult, setDiceResult] = useState(null);
   const [rolling, setRolling] = useState(false);
   const [highlightTiles, setHighlightTiles] = useState([]);
@@ -269,22 +272,23 @@ export function useGameState(characters) {
 
   // Draw cards up to HAND_LIMIT for current player, set actionsLeft, reset hasMoved
   const drawCards = useCallback(() => {
+    const cp = players[currentIdx];
+    const wasForcedImmobile = cp?.race?.passive === 'anciens' && cp?.forcedImmobile;
     setPlayers(prev => {
       const next = [...prev];
       const p = { ...next[currentIdx] };
-      if (p.physicalImmune) {
-        addLog(`🪨 ${p.name} est immunisé aux dégâts physiques ce tour.`);
-      }
-      // Clear immunity at start of own turn (it was granted end of previous turn)
+      if (p.physicalImmune) addLog(`🪨 ${p.name} est immunisé aux dégâts physiques ce tour.`);
       p.physicalImmune = false;
+      // Anciens: reset absorb, clear forced immobile flag
+      if (p.race?.passive === 'anciens') {
+        p.magicAbsorbAvailable = true;
+        p.forcedImmobile = false;
+      }
       const needed = HAND_LIMIT - p.hand.length;
       if (needed > 0) {
         let deck = [...p.deck];
         let discard = [...p.discard];
-        if (deck.length < needed) {
-          deck = [...deck, ...shuffleDeck(discard)];
-          discard = [];
-        }
+        if (deck.length < needed) { deck = [...deck, ...shuffleDeck(discard)]; discard = []; }
         const drawn = deck.splice(0, needed);
         p.hand = [...p.hand, ...drawn];
         p.deck = deck;
@@ -294,8 +298,14 @@ export function useGameState(characters) {
       next[currentIdx] = p;
       return next;
     });
-    setActionsLeft(players[currentIdx]?.stats?.deplacement ?? 3);
-    setHasMoved(false);
+    setMoveRerolled(false);
+    setActionsLeft(cp?.stats?.deplacement ?? 3);
+    if (wasForcedImmobile) {
+      setHasMoved(true);
+      addLog(`🌙 ${cp.name} reste immobile ce tour (prix de l'absorption magique).`);
+    } else {
+      setHasMoved(false);
+    }
     setPhase('player_turn');
   }, [currentIdx, players]);
 
@@ -384,6 +394,32 @@ export function useGameState(characters) {
       setPhase('choosing_move');
     });
   }, [actionsLeft, hasMoved, selectedCard, currentIdx, players, grid, heights, setTilesBudget]);
+
+  // Anciens passive: reroll movement once per turn (no action cost)
+  const rerollMove = useCallback(() => {
+    if (moveRerolled || players[currentIdx]?.race?.passive !== 'anciens') return;
+    setMoveRerolled(true);
+    const card = selectedCard;
+    const special = (card?.effect?.type === 'move') ? (card.effect.special ?? null) : null;
+    const bonus   = (card?.effect?.type === 'move') ? (card.effect.bonus  ?? 0)    : 0;
+    setPhase('rolling_move');
+    animateRoll((roll) => {
+      const cp = players[currentIdx];
+      let range = roll + bonus;
+      let logSuffix = bonus !== 0 ? ` +${bonus}` : '';
+      let wallPass = false;
+      if (special === 'double_roll')  { range = roll * 2; logSuffix = ' ×2'; }
+      else if (special === 'fixed_move') { range = bonus; logSuffix = ` (fixe ${range})`; }
+      if (special === 'wall_pass') wallPass = true;
+      addLog(`🌙 ${cp.name} relance le dé : ${roll}${logSuffix} = ${range} cases.`);
+      const hasZeles = false;
+      const hasFeuxFollets = cp.race?.passive === 'feux_follets';
+      const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, range, hasZeles, wallPass, hasFeuxFollets, grid, heights);
+      setTilesBudget(budgetAtTile);
+      setHighlightTiles(tiles);
+      setPhase('choosing_move');
+    });
+  }, [moveRerolled, currentIdx, players, selectedCard, grid, heights]);
 
   // Complete the move
   const moveToTile = useCallback((tx, ty) => {
@@ -797,6 +833,18 @@ export function useGameState(characters) {
 
       if (targetPlayerIdx >= 0) {
         const target = players[targetPlayerIdx];
+        // Passif Anciens : absorbe une source de dégâts magiques par tour
+        if (isMagic && target.race?.passive === 'anciens' && target.magicAbsorbAvailable) {
+          setPlayers(prev => {
+            const next = [...prev];
+            next[targetPlayerIdx] = { ...next[targetPlayerIdx], magicAbsorbAvailable: false, forcedImmobile: true };
+            return next;
+          });
+          addLog(`🌙 ${target.name} absorbe les dégâts magiques ! (restera immobile au prochain déplacement)`);
+          setActionsLeft(prev => prev - 1);
+          setPhase('player_turn');
+          return;
+        }
         // Passif Feux Follets : ne peut pas être attaqué de dos
         if (target.race?.passive === 'feux_follets' && target.facing) {
           const relDx = cp.x - target.x;
@@ -1016,6 +1064,8 @@ export function useGameState(characters) {
     drawCards,
     equipCard,
     startMove,
+    rerollMove,
+    moveRerolled,
     moveToTile,
     showAttackTargets,
     attackTile,

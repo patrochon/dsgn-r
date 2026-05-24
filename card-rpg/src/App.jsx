@@ -211,9 +211,12 @@ function Game({ characters, onRestart }) {
             )}
             <Btn label="⏭️ Fin de tour" onClick={g.endTurn} />
           </>)}
-          {g.phase === 'choosing_move' && (
+          {g.phase === 'choosing_move' && (<>
             <div style={{ color: '#5ab4ff', fontSize: 13, padding: '8px 0' }}>🗺️ Cliquez une case bleue pour vous déplacer</div>
-          )}
+            {cp?.race?.passive === 'anciens' && !g.moveRerolled && (
+              <Btn label="🌙 Relancer le dé" onClick={g.rerollMove} primary />
+            )}
+          </>)}
           {g.phase === 'choosing_attack' && (
             <div style={{ color: '#ff6644', fontSize: 13, padding: '8px 0' }}>⚔️ Cliquez une cible surlignée pour attaquer</div>
           )}
