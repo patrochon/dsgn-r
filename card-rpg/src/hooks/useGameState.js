@@ -34,6 +34,8 @@ function buildPlayer(charData, index, mapData) {
     gold: 0,
     lastScroll: null,
     readyScroll: null,
+    equippedWeapon: null,
+    equippedArmor: null,
     hand: deck.splice(0, 6),
     deck,
     discard: [],
@@ -84,6 +86,40 @@ function applyStatDeltas(player, deltas) {
       p.stats[stat] += val;
     }
   }
+  return p;
+}
+
+// Derive stat deltas for any equippable card (mirrors equipCard logic)
+function getCardDeltas(card, stats) {
+  const special = card.effect.special ?? '';
+  let deltas = parseStatSpecial(special);
+  if (deltas.length === 0) deltas = parsePermSpecial(special);
+  if (deltas.length === 0 && card.effect.bonus > 0) {
+    if (card.effect.type === 'magic_attack') {
+      deltas = [{ stat: 'magie', val: card.effect.bonus }, { stat: 'force', val: Math.floor(card.effect.bonus / 2) }];
+    } else if (card.effect.type === 'attack' || card.effect.type === 'defense') {
+      deltas = [{ stat: 'force', val: card.effect.bonus }];
+    } else if (card.effect.type === 'legendary' && special.includes('all+3')) {
+      deltas = Object.keys(stats).map(s => ({ stat: s, val: 3 }));
+    }
+  }
+  return deltas;
+}
+
+// Remove an equipped card: reverse its stat bonuses and pull it from inventory
+function unequipCard(p, card) {
+  const deltas = getCardDeltas(card, p.stats);
+  p = applyStatDeltas(p, deltas.map(d => ({ stat: d.stat, val: -d.val })));
+  if (card.effect.type === 'legendary') {
+    const special = card.effect.special ?? '';
+    if (special.includes('perm:vie+10') || special.includes('vie+10')) {
+      p.maxHp = Math.max(p.hp, p.maxHp - 20);
+    }
+    if (special.includes('force+5') && !deltas.find(d => d.stat === 'force')) {
+      p.stats = { ...p.stats, force: Math.max(0, (p.stats.force ?? 0) - 5) };
+    }
+  }
+  p.inventory = p.inventory.filter(c => c !== card);
   return p;
 }
 
@@ -318,37 +354,34 @@ export function useGameState(characters) {
     setPhase('player_turn');
   }, [currentIdx, players]);
 
-  // Equip card — FREE, applies stat bonuses, moves to inventory + discard
+  // Equip card — FREE, applies stat bonuses, one weapon + one armor slot
   const equipCard = useCallback((card) => {
     if (!card || !isEquippable(card)) return false;
+    const isWeapon = card.effect.type === 'attack' || card.effect.type === 'magic_attack';
+    const isArmor  = card.effect.type === 'defense';
     setPlayers(prev => {
       const next = [...prev];
       let p = { ...next[currentIdx], stats: { ...next[currentIdx].stats } };
-      // Apply stat bonuses from effect.special (stat:... or perm:...)
-      const special = card.effect.special ?? '';
-      let deltas = parseStatSpecial(special);
-      if (deltas.length === 0) deltas = parsePermSpecial(special);
 
-      // For attack/defense/magic_attack with bonus, apply the bonus to force or magie
-      if (deltas.length === 0 && card.effect.bonus > 0) {
-        if (card.effect.type === 'magic_attack') {
-          deltas = [{ stat: 'magie', val: card.effect.bonus }, { stat: 'force', val: Math.floor(card.effect.bonus / 2) }];
-        } else if (card.effect.type === 'attack') {
-          deltas = [{ stat: 'force', val: card.effect.bonus }];
-        } else if (card.effect.type === 'defense') {
-          deltas = [{ stat: 'force', val: card.effect.bonus }];
-        } else if (card.effect.type === 'legendary' && special.includes('all+3')) {
-          deltas = Object.keys(p.stats).map(s => ({ stat: s, val: 3 }));
-        }
+      // Unequip previous card in the same slot
+      if (isWeapon && p.equippedWeapon) {
+        addLog(`↩ ${p.name} retire ${p.equippedWeapon.icon} ${p.equippedWeapon.name}.`);
+        p = unequipCard(p, p.equippedWeapon);
+        p.equippedWeapon = null;
+      }
+      if (isArmor && p.equippedArmor) {
+        addLog(`↩ ${p.name} retire ${p.equippedArmor.icon} ${p.equippedArmor.name}.`);
+        p = unequipCard(p, p.equippedArmor);
+        p.equippedArmor = null;
       }
 
+      // Apply new card's deltas
+      const deltas = getCardDeltas(card, p.stats);
       p = applyStatDeltas(p, deltas);
 
       // Special legendary bonuses
       if (card.effect.type === 'legendary') {
-        if (special.includes('all+3') && deltas.length === 0) {
-          p = applyStatDeltas(p, Object.keys(p.stats).map(s => ({ stat: s, val: 3 })));
-        }
+        const special = card.effect.special ?? '';
         if (special.includes('perm:vie+10') || special.includes('vie+10')) {
           p.maxHp += 20;
           p.hp = Math.min(p.maxHp, p.hp + 20);
@@ -361,6 +394,8 @@ export function useGameState(characters) {
       p.hand = p.hand.filter(c => c !== card);
       p.discard = [...p.discard, card];
       p.inventory = [...p.inventory, card];
+      if (isWeapon) p.equippedWeapon = card;
+      if (isArmor)  p.equippedArmor  = card;
       next[currentIdx] = p;
       return next;
     });
@@ -593,7 +628,7 @@ export function useGameState(characters) {
           if (!won) {
             if (np.stats.destin > 0) {
               const newDeck = shuffleDeck([...FULL_DECK]);
-              np = { ...np, hp: np.maxHp, x: np.baseX, y: np.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], readyScroll: null, facing: null, stats: { ...np.stats, destin: np.stats.destin - 1 } };
+              np = { ...np, hp: np.maxHp, x: np.baseX, y: np.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, facing: null, stats: { ...np.stats, destin: np.stats.destin - 1 } };
             } else {
               np.isAlive = false; np.hp = 0;
             }
@@ -650,7 +685,7 @@ export function useGameState(characters) {
             trapFatal = true;
             if (np.stats.destin > 0) {
               const newDeck = shuffleDeck([...FULL_DECK]);
-              np = { ...np, hp: np.maxHp, x: np.baseX, y: np.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], readyScroll: null, facing: null, stats: { ...np.stats, destin: np.stats.destin - 1 } };
+              np = { ...np, hp: np.maxHp, x: np.baseX, y: np.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, facing: null, stats: { ...np.stats, destin: np.stats.destin - 1 } };
             } else {
               np.isAlive = false; np.hp = 0;
             }
@@ -765,7 +800,7 @@ export function useGameState(characters) {
           if (!won) {
             if (np.stats.destin > 0) {
               const newDeck = shuffleDeck([...FULL_DECK]);
-              np = { ...np, hp: np.maxHp, x: np.baseX, y: np.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], readyScroll: null, facing: null, stats: { ...np.stats, destin: np.stats.destin - 1 } };
+              np = { ...np, hp: np.maxHp, x: np.baseX, y: np.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, facing: null, stats: { ...np.stats, destin: np.stats.destin - 1 } };
             } else {
               np.isAlive = false; np.hp = 0;
             }
@@ -919,7 +954,7 @@ export function useGameState(characters) {
           if (t.stats.destin > 0) {
             const newDeck = shuffleDeck([...FULL_DECK]);
             const livesLeft = t.stats.destin - 1;
-            t = { ...t, hp: t.maxHp, x: t.baseX, y: t.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], readyScroll: null, facing: null, stats: { ...t.stats, destin: livesLeft } };
+            t = { ...t, hp: t.maxHp, x: t.baseX, y: t.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, facing: null, stats: { ...t.stats, destin: livesLeft } };
             addLog(`✨ ${next[targetPlayerIdx].name} renaît à sa base ! (${livesLeft} vie(s) restante(s))`);
           } else {
             t.isAlive = false;
@@ -1008,7 +1043,7 @@ export function useGameState(characters) {
             if (t.stats.destin > 0) {
               const newDeck = shuffleDeck([...FULL_DECK]);
               const livesLeft = t.stats.destin - 1;
-              t = { ...t, hp: t.maxHp, x: t.baseX, y: t.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], readyScroll: null, facing: null, stats: { ...t.stats, destin: livesLeft } };
+              t = { ...t, hp: t.maxHp, x: t.baseX, y: t.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, facing: null, stats: { ...t.stats, destin: livesLeft } };
               addLog(`✨ ${next[targetPlayerIdx].name} renaît à sa base ! (${livesLeft} vie(s) restante(s))`);
             } else {
               t.isAlive = false;
@@ -1206,7 +1241,7 @@ export function useGameState(characters) {
           if (t.stats.destin > 0) {
             const newDeck = shuffleDeck([...FULL_DECK]);
             const livesLeft = t.stats.destin - 1;
-            t = { ...t, hp: t.maxHp, x: t.baseX, y: t.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], readyScroll: null, facing: null, stats: { ...t.stats, destin: livesLeft } };
+            t = { ...t, hp: t.maxHp, x: t.baseX, y: t.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, facing: null, stats: { ...t.stats, destin: livesLeft } };
             addLog(`✨ ${next[targetPlayerIdx].name} renaît à sa base ! (${livesLeft} vie(s) restante(s))`);
           } else {
             t.isAlive = false;
