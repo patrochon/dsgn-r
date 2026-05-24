@@ -335,10 +335,15 @@ export function useGameState(characters) {
         let discard = [...p.discard];
         if (deck.length < needed) { deck = [...deck, ...shuffleDeck(discard)]; discard = []; }
         const drawn = deck.splice(0, needed);
-        p.hand = [...p.hand, ...drawn];
+        // Potion limit: max 2 potions in hand
+        const potionsInHand = p.hand.filter(c => c.category === 'potion').length;
+        const kept   = drawn.filter(c => c.category !== 'potion' || potionsInHand < 2);
+        const tooMany = drawn.filter(c => c.category === 'potion' && potionsInHand >= 2);
+        p.hand = [...p.hand, ...kept];
         p.deck = deck;
-        p.discard = discard;
-        addLog(`${p.name} tire ${drawn.length} carte(s).`);
+        p.discard = [...discard, ...tooMany];
+        if (kept.length > 0)   addLog(`${p.name} tire ${kept.map(c => c.icon).join('')}.`);
+        if (tooMany.length > 0) addLog(`🧪 ${p.name} défausse ${tooMany.map(c => c.icon).join('')} (limite 2 potions en main).`);
       }
       next[currentIdx] = p;
       return next;
@@ -354,11 +359,22 @@ export function useGameState(characters) {
     setPhase('player_turn');
   }, [currentIdx, players]);
 
-  // Equip card — FREE, applies stat bonuses, one weapon + one armor slot
+  // Equip card — FREE, applies stat bonuses, one weapon + one armor slot, max 2 magic items
   const equipCard = useCallback((card) => {
     if (!card || !isEquippable(card)) return false;
-    const isWeapon = card.effect.type === 'attack' || card.effect.type === 'magic_attack';
-    const isArmor  = card.effect.type === 'defense';
+    const isWeapon    = card.effect.type === 'attack' || card.effect.type === 'magic_attack';
+    const isArmor     = card.effect.type === 'defense';
+    const isMagicItem = card.effect.type === 'passive' || card.effect.type === 'legendary';
+
+    // Magic item slot check (max 2)
+    if (isMagicItem) {
+      const cp = players[currentIdx];
+      const magicCount = cp.inventory.filter(c => c.effect.type === 'passive' || c.effect.type === 'legendary').length;
+      if (magicCount >= 2) {
+        addLog(`❌ ${cp.name} ne peut pas porter plus de 2 objets magiques.`);
+        return false;
+      }
+    }
     setPlayers(prev => {
       const next = [...prev];
       let p = { ...next[currentIdx], stats: { ...next[currentIdx].stats } };
