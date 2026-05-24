@@ -14,18 +14,29 @@ const C = {
 
 const R = { COMMON: 'common', UNCOMMON: 'uncommon', RARE: 'rare', LEGENDARY: 'legendary' };
 
-const EQUIPPABLE_TYPES = new Set(['attack', 'defense', 'magic_attack', 'passive', 'legendary']);
-
-function goldValue(rarity, effectType, bonus) {
+function goldValue(rarity, effectType, bonus, magieCost) {
   if (rarity === 'legendary') return 6;
-  if (rarity === 'rare')      return (effectType === 'passive' || bonus >= 5) ? 5 : 4;
-  if (rarity === 'uncommon')  return bonus >= 5 ? 3 : 2;
+  // Scrolls: magieCost is the clearest power indicator
+  if (effectType === 'magic') {
+    if (magieCost >= 6) return 6;
+    if (magieCost >= 4) return 4;
+    if (magieCost >= 3) return 3;
+    return 2;
+  }
+  // Movement cards: rarity only (bonus = extra steps, low ceiling)
+  if (effectType === 'move') {
+    if (rarity === 'rare')     return 4;
+    if (rarity === 'uncommon') return 2;
+    return 1;
+  }
+  // Equippable + potions: rarity × bonus
+  if (rarity === 'rare')     return (effectType === 'passive' || bonus >= 5) ? 5 : 4;
+  if (rarity === 'uncommon') return bonus >= 5 ? 3 : 2;
   return bonus >= 3 ? 2 : 1; // common
 }
 
 function card(id, name, icon, cat, rarity, effectType, bonus, desc, special = null, magieCost = 0) {
-  const gv = EQUIPPABLE_TYPES.has(effectType) ? goldValue(rarity, effectType, bonus) : null;
-  return { id, name, icon, category: cat.key, catColor: cat.color, catLabel: cat.label, rarity, effect: { type: effectType, bonus, special, magieCost }, desc, goldValue: gv };
+  return { id, name, icon, category: cat.key, catColor: cat.color, catLabel: cat.label, rarity, effect: { type: effectType, bonus, special, magieCost }, desc, goldValue: goldValue(rarity, effectType, bonus, magieCost) };
 }
 
 // ─── DÉPLACEMENT (12) ─────────────────────────────────────────────────────────
