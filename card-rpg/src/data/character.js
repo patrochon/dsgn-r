@@ -190,14 +190,6 @@ export const BASE_STATS = {
   force: 1, magie: 1, vie: 6, deplacement: 0, richesse: 1, destin: 1, portee: 1,
 };
 
-export function getSpecs() {
-  try {
-    const s = localStorage.getItem('detopia_custom_specs');
-    if (s) return JSON.parse(s);
-  } catch {}
-  return SPECS;
-}
-
 export function computeStats(race, cls, spec) {
   const stats = { ...BASE_STATS };
   for (const src of [race?.bonuses, cls?.bonuses, spec?.bonuses]) {
