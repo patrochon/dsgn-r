@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { RACES, CLASSES, SPECS, BASE_STATS, computeStats } from './data/character';
+import { RACES, CLASSES, getSpecs, BASE_STATS, computeStats } from './data/character';
 
 const STAT_META = [
   { key: 'force',       icon: '⚔️',  label: 'Force',       color: '#ff7755' },
@@ -106,7 +106,7 @@ export default function CharacterCreation({ onComplete, playerIndex = 0, totalPl
 
   const selections = [race, cls, spec];
   const setters = [setRace, setCls, setSpec];
-  const pools = [RACES, CLASSES, SPECS];
+  const pools = [RACES, CLASSES, getSpecs()];
   const cols = [3, 3, 4]; // grid columns per step
 
   return (
