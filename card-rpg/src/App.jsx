@@ -16,7 +16,7 @@ function PlayerCountSelect({ onSelect }) {
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       fontFamily: "'Segoe UI', system-ui, sans-serif", color: '#eee', gap: 32,
     }}>
-      <h1 style={{ margin: 0, fontSize: 26, color: '#88aaff', letterSpacing: 3 }}>⚔️ CARD DUNGEON RPG</h1>
+      <h1 style={{ margin: 0, fontSize: 26, color: '#88aaff', letterSpacing: 3 }}>⚔️ DÉTOPIA</h1>
       <p style={{ color: '#555', margin: 0 }}>Dernier survivant gagne</p>
       <div>
         <div style={{ textAlign: 'center', color: '#888', fontSize: 13, marginBottom: 16 }}>Nombre de joueurs</div>
@@ -107,7 +107,7 @@ function Game({ characters, onRestart }) {
 
       {/* ── Header ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
-        <h1 style={{ margin: 0, fontSize: 17, color: '#88aaff', letterSpacing: 2 }}>⚔️ CARD DUNGEON RPG</h1>
+        <h1 style={{ margin: 0, fontSize: 17, color: '#88aaff', letterSpacing: 2 }}>⚔️ DÉTOPIA</h1>
 
         {/* Current player indicator */}
         <div style={{

@@ -100,7 +100,7 @@ export default function MapPreview() {
       color: '#eee',
     }}>
       <h1 style={{ textAlign: 'center', color: '#88aaff', letterSpacing: 3, fontSize: 22, marginBottom: 8 }}>
-        ⚔️ CARD DUNGEON RPG — Propositions de Cartes Multi-Joueurs
+        ⚔️ DÉTOPIA — Propositions de Cartes Multi-Joueurs
       </h1>
       <p style={{ textAlign: 'center', color: '#555', marginBottom: 40, fontSize: 13 }}>
         6 joueurs simultanés — cartes symétriques — confrontation directe
