@@ -22,7 +22,8 @@ export const RACES = [
     name: 'Les Cailloux',
     icon: '🪨',
     flavor: 'Lents, massifs, imperturbables. Ils encaissent tout et restent debout.',
-    bonuses: { vie: 3, force: 2 },
+    bonuses: { vie: 6, destin: 1 },
+    passive: 'cailloux',
   },
   {
     id: 'zeles',

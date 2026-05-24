@@ -35,6 +35,7 @@ function buildPlayer(charData, index, mapData) {
     deck,
     discard: [],
     isAlive: true,
+    physicalImmune: false,
     color: PLAYER_COLORS[index] ?? '#ffffff',
   };
 }
@@ -144,6 +145,13 @@ function generateInitialTiles(mapData) {
   return { enemies, traps, chests };
 }
 
+// Apply Cailloux passive: -1 per hit, immune if physicalImmune
+function physDmg(rawDmg, target) {
+  if (target?.physicalImmune) return 0;
+  const reduction = target?.race?.passive === 'cailloux' ? 1 : 0;
+  return Math.max(0, rawDmg - reduction);
+}
+
 // Generate organic height map (0 = flat, 1 = elevated, 2 = high ground)
 function generateHeights(grid) {
   const rows = grid.length;
@@ -220,6 +228,11 @@ export function useGameState(characters) {
     setPlayers(prev => {
       const next = [...prev];
       const p = { ...next[currentIdx] };
+      if (p.physicalImmune) {
+        addLog(`🪨 ${p.name} est immunisé aux dégâts physiques ce tour.`);
+      }
+      // Clear immunity at start of own turn (it was granted end of previous turn)
+      p.physicalImmune = false;
       const needed = HAND_LIMIT - p.hand.length;
       if (needed > 0) {
         let deck = [...p.deck];
@@ -468,8 +481,9 @@ export function useGameState(characters) {
         const pDmg = Math.max(1, roll + cp.stats.force + Math.floor(cp.stats.chance / 2) - monsterThere.defense);
         const mDmg = Math.max(1, monsterThere.attack - Math.floor(cp.stats.force / 3));
         const rounds = Math.ceil(monsterThere.maxHp / pDmg);
-        const dmgTaken = Math.max(0, (rounds - 1) * mDmg);
-        const won = cp.hp - dmgTaken > 0;
+        const rawDmgTaken = Math.max(0, (rounds - 1) * mDmg);
+        const dmgTaken = physDmg(rawDmgTaken, cp);
+        const won = cp.physicalImmune || cp.hp - dmgTaken > 0;
         const loot = won ? (monsterThere.loot ?? 1) : 0;
 
         addLog(`⚔️ ${cp.name} affronte ${monsterThere.icon} ${monsterThere.name} (pile ${monsterThere.pile}) ! (dé:${roll})`);
@@ -518,12 +532,14 @@ export function useGameState(characters) {
         addLog(`🪤 ${cp.name} déclenche ${trapThere.icon} ${trapThere.name} !`);
         setTraps(prev => { const n = { ...prev }; delete n[destKey]; return n; });
 
-        let dmg = 0, loseActions = 0, discardCard = false;
-        if (trapThere.effect === 'damage')         { dmg = roll + trapThere.value; }
-        if (trapThere.effect === 'damage_action')  { dmg = roll + trapThere.value; loseActions = 1; }
-        if (trapThere.effect === 'damage_discard') { dmg = roll + trapThere.value; discardCard = true; }
+        let rawDmg = 0, loseActions = 0, discardCard = false;
+        if (trapThere.effect === 'damage')         { rawDmg = roll + trapThere.value; }
+        if (trapThere.effect === 'damage_action')  { rawDmg = roll + trapThere.value; loseActions = 1; }
+        if (trapThere.effect === 'damage_discard') { rawDmg = roll + trapThere.value; discardCard = true; }
         if (trapThere.effect === 'lose_actions')   { loseActions = trapThere.value; }
+        const dmg = physDmg(rawDmg, cp);
 
+        if (cp.physicalImmune && rawDmg > 0) addLog(`🪨 Immunité physique — dégâts du piège annulés !`);
         if (loseActions > 0) setActionsLeft(prev => Math.max(0, prev - loseActions));
 
         const nextPlayers = players.map((p, i) => {
@@ -594,8 +610,8 @@ export function useGameState(characters) {
         const pDmg = Math.max(1, roll + cp.stats.force + Math.floor(cp.stats.chance / 2) - m.defense);
         const mDmg = Math.max(1, m.attack - Math.floor(cp.stats.force / 3));
         const rounds = Math.ceil(m.maxHp / pDmg);
-        const dmgTaken = mDmg * rounds;
-        const won = pDmg * rounds >= m.maxHp;
+        const dmgTaken = physDmg(mDmg * rounds, cp);
+        const won = cp.physicalImmune || pDmg * rounds >= m.maxHp;
         addLog(`🦾 ${cp.name} frappe ${m.icon} ${m.name} depuis la case adjacente !`);
         if (won) {
           if (m.pile === 1) {
@@ -733,7 +749,12 @@ export function useGameState(characters) {
       if (targetPlayerIdx >= 0) {
         const target = players[targetPlayerIdx];
         const defense = Math.floor(target.stats.force / 3);
-        const actualDmg = Math.max(1, dmg - defense);
+        const isMagicAtk = card?.effect?.type === 'magic_attack';
+        const rawActualDmg = Math.max(1, dmg - defense);
+        const actualDmg = isMagicAtk ? rawActualDmg : physDmg(rawActualDmg, target);
+        if (!isMagicAtk && target.physicalImmune) {
+          addLog(`🪨 ${target.name} est immunisé aux dégâts physiques — attaque annulée !`);
+        }
         addLog(`${cp.name} attaque ${target.name} : dé=${roll}, dégâts=${actualDmg}`);
         setPlayers(prev => {
           const next = [...prev];
@@ -865,6 +886,16 @@ export function useGameState(characters) {
 
   // End turn — advance to next living player
   const endTurn = useCallback(() => {
+    // Passif Cailloux : immobile ce tour → immunité physique jusqu'au prochain tour
+    if (!hasMoved && players[currentIdx]?.race?.passive === 'cailloux') {
+      setPlayers(prev => {
+        const next = [...prev];
+        next[currentIdx] = { ...next[currentIdx], physicalImmune: true };
+        return next;
+      });
+      addLog(`🪨 ${players[currentIdx].name} reste immobile — immunité physique activée !`);
+    }
+
     let next = currentIdx;
     let attempts = 0;
     do {
@@ -879,7 +910,7 @@ export function useGameState(characters) {
     setHighlightTiles([]);
     setPhase('draw');
     addLog(`--- Tour de ${players[next].name} ---`);
-  }, [currentIdx, players]);
+  }, [currentIdx, players, hasMoved]);
 
   const skipPassive = useCallback(() => {
     setHighlightTiles([]);
