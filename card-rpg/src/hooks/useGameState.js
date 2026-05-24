@@ -5,7 +5,7 @@ import { T } from '../data/map';
 import { MONSTER_PILE_1, MONSTER_PILE_2, MONSTER_PILE_3, shuffleMonsters } from '../data/monsters';
 import { TRAPS } from '../data/traps';
 
-const HAND_LIMIT = 5;
+const HAND_LIMIT = 6;
 const PLAYER_COLORS = ['#ff4444', '#44aaff', '#44ff88', '#ffcc00', '#ff88ff', '#ff8844'];
 
 function rollDie() {
@@ -31,7 +31,7 @@ function buildPlayer(charData, index, mapData) {
     maxHp,
     stats: { ...stats },
     inventory: [],
-    hand: [],
+    hand: deck.splice(0, 6),
     deck,
     discard: [],
     isAlive: true,
