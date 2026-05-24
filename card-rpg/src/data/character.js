@@ -38,7 +38,8 @@ export const RACES = [
     name: 'Les Feux Follets',
     icon: '🔥',
     flavor: 'Insaisissables et capricieux. La chance les suit comme une flamme dans la nuit.',
-    bonuses: { chance: 3, magie: 2 },
+    bonuses: { chance: 2, deplacement: 1 },
+    passive: 'feux_follets',
   },
   {
     id: 'anciens',

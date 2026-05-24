@@ -36,6 +36,7 @@ function buildPlayer(charData, index, mapData) {
     discard: [],
     isAlive: true,
     physicalImmune: false,
+    facing: null,
     color: PLAYER_COLORS[index] ?? '#ffffff',
   };
 }
@@ -146,34 +147,45 @@ function generateInitialTiles(mapData) {
 }
 
 // Dijkstra movement reachability — returns { tiles: string[], budgetAtTile: {key: number} }
-// hasZeles: uphill costs 1 (not 2), downhill grants +2 budget
-function runMoveDijkstra(fromX, fromY, budget, hasZeles, wallPass, grid, heights) {
+// hasZeles   : uphill costs 1 (not 2), downhill grants +2 budget
+// wallPass   : traverse all walls freely
+// oneWallPass: traverse at most one wall (Feux Follets passive)
+function runMoveDijkstra(fromX, fromY, budget, hasZeles, wallPass, oneWallPass, grid, heights) {
   const visited = {};
-  const queue = [{ x: fromX, y: fromY, budget }];
-  const tiles = [];
+  const queue = [{ x: fromX, y: fromY, budget, wallsUsed: 0 }];
+  const tilesSet = new Set();
   const budgetAtTile = {};
   while (queue.length > 0) {
     queue.sort((a, b) => b.budget - a.budget);
-    const { x, y, budget: bgt } = queue.shift();
-    const key = `${x},${y}`;
-    if (visited[key]) continue;
-    visited[key] = true;
-    if (!(x === fromX && y === fromY)) { tiles.push(key); budgetAtTile[key] = bgt; }
+    const { x, y, budget: bgt, wallsUsed } = queue.shift();
+    const visitKey = `${x},${y},${wallsUsed}`;
+    if (visited[visitKey]) continue;
+    visited[visitKey] = true;
+    const isWall = grid[y]?.[x] === T.WALL;
+    if (!(x === fromX && y === fromY) && !isWall) {
+      if ((budgetAtTile[`${x},${y}`] ?? -1) < bgt) budgetAtTile[`${x},${y}`] = bgt;
+      tilesSet.add(`${x},${y}`);
+    }
     for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
       const nx = x + dx, ny = y + dy;
       if (nx < 0 || ny < 0 || ny >= grid.length || nx >= grid[0].length) continue;
-      if (!wallPass && grid[ny][nx] === T.WALL) continue;
-      const nkey = `${nx},${ny}`;
-      if (visited[nkey]) continue;
-      const hDiff = (heights[ny]?.[nx] ?? 0) - (heights[y]?.[x] ?? 0);
+      const nIsWall = grid[ny][nx] === T.WALL;
+      if (nIsWall) {
+        if (!wallPass && !(oneWallPass && wallsUsed === 0)) continue;
+      }
+      const nWallsUsed = wallsUsed + (nIsWall ? 1 : 0);
+      if (!wallPass && nWallsUsed > 1) continue;
+      const nVisitKey = `${nx},${ny},${nWallsUsed}`;
+      if (visited[nVisitKey]) continue;
+      const hDiff = nIsWall ? 0 : ((heights[ny]?.[nx] ?? 0) - (heights[y]?.[x] ?? 0));
       const stepCost = hasZeles
-        ? (hDiff > 0 ? 1 : hDiff < 0 ? -2 : 1)   // uphill: no extra; downhill: +2 refund
+        ? (hDiff > 0 ? 1 : hDiff < 0 ? -2 : 1)
         : Math.max(0, 1 + hDiff);
       const newBgt = bgt - stepCost;
-      if (newBgt >= 0) queue.push({ x: nx, y: ny, budget: newBgt });
+      if (newBgt >= 0) queue.push({ x: nx, y: ny, budget: newBgt, wallsUsed: nWallsUsed });
     }
   }
-  return { tiles, budgetAtTile };
+  return { tiles: [...tilesSet], budgetAtTile };
 }
 
 // Apply Cailloux passive: -1 per hit, immune if physicalImmune
@@ -365,7 +377,8 @@ export function useGameState(characters) {
       addLog(`🎲 ${currentPlayer.name} lance le dé : ${roll}${logSuffix} = ${range} cases.${card?.effect?.type === 'move' ? ` [${card.name}]` : ''}`);
 
       const hasZeles = cp.race?.passive === 'zeles';
-      const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, range, hasZeles, wallPass, grid, heights);
+      const hasFeuxFollets = cp.race?.passive === 'feux_follets';
+      const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, range, hasZeles, wallPass, hasFeuxFollets, grid, heights);
       setTilesBudget(budgetAtTile);
       setHighlightTiles(tiles);
       setPhase('choosing_move');
@@ -435,9 +448,13 @@ export function useGameState(characters) {
         teleported = true;
       }
 
+      // Update position + facing direction (from clicked tile relative to start)
+      const moveDirX = tx !== cp.x ? Math.sign(tx - cp.x) : 0;
+      const moveDirY = tx === cp.x ? Math.sign(ty - cp.y) : 0;
+      const newFacing = (moveDirX !== 0 || moveDirY !== 0) ? { dx: moveDirX, dy: moveDirY } : cp.facing;
       setPlayers(prev => {
         const next = [...prev];
-        next[currentIdx] = { ...next[currentIdx], x: finalX, y: finalY };
+        next[currentIdx] = { ...next[currentIdx], x: finalX, y: finalY, facing: newFacing };
         return next;
       });
       // Discard move card if selected
@@ -607,7 +624,7 @@ export function useGameState(characters) {
         // Passif Zélés : si aucun dégât reçu et budget restant > 0 → continue le déplacement
         if (hasZeles && damageTakenThisMove === 0 && budgetHere > 0) {
           const { tiles: contTiles, budgetAtTile: contBudget } =
-            runMoveDijkstra(finalX, finalY, budgetHere, true, false, grid, heights);
+            runMoveDijkstra(finalX, finalY, budgetHere, true, false, false, grid, heights);
           if (contTiles.length > 0) {
             setTilesBudget(contBudget);
             setHighlightTiles(contTiles);
@@ -780,6 +797,18 @@ export function useGameState(characters) {
 
       if (targetPlayerIdx >= 0) {
         const target = players[targetPlayerIdx];
+        // Passif Feux Follets : ne peut pas être attaqué de dos
+        if (target.race?.passive === 'feux_follets' && target.facing) {
+          const relDx = cp.x - target.x;
+          const relDy = cp.y - target.y;
+          const dot = target.facing.dx * relDx + target.facing.dy * relDy;
+          if (dot < 0) {
+            addLog(`🔥 ${target.name} est insaisissable — attaque de dos impossible !`);
+            setActionsLeft(prev => prev - 1);
+            setPhase('player_turn');
+            return;
+          }
+        }
         const defense = Math.floor(target.stats.force / 3);
         const isMagicAtk = card?.effect?.type === 'magic_attack';
         const rawActualDmg = Math.max(1, dmg - defense);
