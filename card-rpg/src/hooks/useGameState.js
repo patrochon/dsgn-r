@@ -32,6 +32,7 @@ function buildPlayer(charData, index, mapData) {
     stats: { ...stats },
     inventory: [],
     gold: 0,
+    lastScroll: null,
     hand: deck.splice(0, 6),
     deck,
     discard: [],
@@ -432,7 +433,7 @@ export function useGameState(characters) {
   const moveToTile = useCallback((tx, ty) => {
     if (phase !== 'choosing_move' && phase !== 'choosing_attack'
       && phase !== 'longs_bras_passive' && phase !== 'choosing_portal'
-      && phase !== 'bum_throw') return;
+      && phase !== 'bum_throw' && phase !== 'fou_attack' && phase !== 'fou_portal') return;
 
     if (phase === 'choosing_move') {
       const key = `${tx},${ty}`;
@@ -830,6 +831,10 @@ export function useGameState(characters) {
       attackTile(tx, ty);
     } else if (phase === 'bum_throw') {
       throwWeapon(tx, ty);
+    } else if (phase === 'fou_attack') {
+      fouAttack(tx, ty);
+    } else if (phase === 'fou_portal') {
+      confirmFouPortal(tx, ty);
     }
   }, [phase, highlightTiles, tilesBudget, hasMoved, currentIdx, selectedCard, currentPlayer, enemies, traps, chests, players, grid, heights]);
 
@@ -1122,6 +1127,7 @@ export function useGameState(characters) {
         const p = { ...next[currentIdx] };
         p.hand = p.hand.filter(c => c !== card);
         p.discard = [...p.discard, card];
+        p.lastScroll = card; // Fou passive: remember last scroll
         next[currentIdx] = p;
         return next;
       });
@@ -1133,6 +1139,80 @@ export function useGameState(characters) {
     if (!isFreeScroll) setActionsLeft(prev => prev - 1);
     else addLog(`🎩 Passif Chapeaux : parchemin utilisé sans coût d'action.`);
   }, [selectedCard, currentIdx, players]);
+
+  // Fou passive: replay last scroll's damage on a valid target (1 action)
+  const startFouAttack = useCallback(() => {
+    if (actionsLeft < 1) return;
+    const cp = players[currentIdx];
+    if (cp.cls?.passive !== 'fou' || !cp.lastScroll) return;
+    let range = cp.stats.portee ?? 1;
+    const tiles = [];
+    for (let dy = -range; dy <= range; dy++) {
+      for (let dx = -range; dx <= range; dx++) {
+        if (Math.abs(dx) + Math.abs(dy) > range || (dx === 0 && dy === 0)) continue;
+        const nx = cp.x + dx, ny = cp.y + dy;
+        if (nx < 0 || ny < 0 || ny >= grid.length || nx >= grid[0].length) continue;
+        if (grid[ny][nx] === T.WALL) continue;
+        const hasTarget = players.some((p, i) => i !== currentIdx && p.isAlive && p.x === nx && p.y === ny)
+          || enemies[`${nx},${ny}`];
+        if (hasTarget) tiles.push(`${nx},${ny}`);
+      }
+    }
+    if (tiles.length === 0) { addLog(`🃏 Pas de cible à portée pour le sort du Fou.`); return; }
+    setHighlightTiles(tiles);
+    setPhase('fou_attack');
+    addLog(`🃏 ${cp.name} canalise ${cp.lastScroll.icon} ${cp.lastScroll.name} — choisissez une cible.`);
+  }, [actionsLeft, currentIdx, players, grid, enemies]);
+
+  // Fou attack — apply last scroll's damage to the target
+  const fouAttack = useCallback((tx, ty) => {
+    if (phase !== 'fou_attack') return;
+    const key = `${tx},${ty}`;
+    if (!highlightTiles.includes(key)) return;
+    setHighlightTiles([]);
+    setPhase('rolling_attack');
+    const cp = players[currentIdx];
+    const scroll = cp.lastScroll;
+    const dmg = scroll?.effect?.bonus ?? 0;
+    const targetPlayerIdx = players.findIndex((p, i) => i !== currentIdx && p.isAlive && p.x === tx && p.y === ty);
+    const targetEnemy = enemies[key];
+    addLog(`🃏 ${cp.name} rejoue ${scroll?.icon ?? '✨'} ${scroll?.name ?? 'un sort'} — ${dmg} dégâts magiques !`);
+    if (targetPlayerIdx >= 0) {
+      setPlayers(prev => {
+        const next = [...prev];
+        let t = { ...next[targetPlayerIdx] };
+        t.hp = Math.max(0, t.hp - dmg);
+        if (t.hp <= 0) {
+          if (t.stats.destin > 0) {
+            const newDeck = shuffleDeck([...FULL_DECK]);
+            const livesLeft = t.stats.destin - 1;
+            t = { ...t, hp: t.maxHp, x: t.baseX, y: t.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], stats: { ...t.stats, destin: livesLeft } };
+            addLog(`✨ ${next[targetPlayerIdx].name} renaît à sa base ! (${livesLeft} vie(s) restante(s))`);
+          } else {
+            t.isAlive = false;
+            addLog(`💀 ${t.name} est définitivement éliminé !`);
+          }
+        }
+        next[targetPlayerIdx] = t;
+        const alive = next.filter(p => p.isAlive);
+        if (alive.length === 1) { setWinner(alive[0]); setPhase('win'); }
+        else setPhase('player_turn');
+        return next;
+      });
+    } else if (targetEnemy) {
+      const newHp = targetEnemy.hp - dmg;
+      if (newHp <= 0) {
+        addLog(`✅ ${targetEnemy.name} est vaincu !`);
+        setEnemies(prev => { const n = { ...prev }; delete n[key]; return n; });
+      } else {
+        setEnemies(prev => ({ ...prev, [key]: { ...targetEnemy, hp: newHp } }));
+      }
+      setPhase('player_turn');
+    } else {
+      setPhase('player_turn');
+    }
+    setActionsLeft(prev => prev - 1);
+  }, [phase, highlightTiles, currentIdx, players, enemies]);
 
   // End turn — advance to next living player
   const endTurn = useCallback(() => {
@@ -1201,6 +1281,28 @@ export function useGameState(characters) {
       }
     }
 
+    // Passif Fou : se téléporte à un portail de son choix si fin de tour sur la case d'un adversaire
+    if (updPlayers[currentIdx]?.cls?.passive === 'fou') {
+      const fou = updPlayers[currentIdx];
+      const onOpponent = updPlayers.some((p, i) => i !== currentIdx && p.isAlive && p.x === fou.x && p.y === fou.y);
+      if (onOpponent) {
+        const portals = [];
+        for (let y = 0; y < grid.length; y++) {
+          for (let x = 0; x < grid[0].length; x++) {
+            if (grid[y][x] === T.TELEPORT) portals.push({ x, y });
+          }
+        }
+        if (portals.length > 0) {
+          setPlayers(updPlayers);
+          setHighlightTiles(portals.map(p => `${p.x},${p.y}`));
+          setPhase('fou_portal');
+          addLog(`🃏 ${fou.name} termine son tour sur un adversaire — choisissez un portail de sortie !`);
+          setActionsLeft(0); setHasMoved(false); setSelectedCard(null);
+          return; // Wait for portal choice before advancing turn
+        }
+      }
+    }
+
     setPlayers(updPlayers);
 
     let next = currentIdx;
@@ -1239,6 +1341,29 @@ export function useGameState(characters) {
     setPhase('player_turn');
   }, [highlightTiles, currentIdx]);
 
+  // Fou portal selection at end of turn — then advance to next player
+  const confirmFouPortal = useCallback((tx, ty) => {
+    if (phase !== 'fou_portal') return;
+    const key = `${tx},${ty}`;
+    if (!highlightTiles.includes(key)) return;
+    setHighlightTiles([]);
+    setPlayers(prev => {
+      const next = [...prev];
+      next[currentIdx] = { ...next[currentIdx], x: tx, y: ty };
+      return next;
+    });
+    addLog(`🃏 ${players[currentIdx].name} se téléporte au portail (${tx}, ${ty}) !`);
+    let next = currentIdx;
+    let attempts = 0;
+    do {
+      next = (next + 1) % players.length;
+      attempts++;
+    } while (!players[next].isAlive && attempts < players.length);
+    setCurrentIdx(next);
+    setPhase('draw');
+    addLog(`--- Tour de ${players[next].name} ---`);
+  }, [phase, highlightTiles, currentIdx, players]);
+
   return {
     players,
     currentIdx,
@@ -1269,6 +1394,9 @@ export function useGameState(characters) {
     attackTile,
     startBumThrow,
     throwWeapon,
+    startFouAttack,
+    fouAttack,
+    confirmFouPortal,
     skipPassive,
     skipPortalChoice,
     useItem,

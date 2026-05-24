@@ -65,7 +65,8 @@ export const CLASSES = [
     name: 'Le Fou',
     icon: '🃏',
     flavor: 'Imprévisible et redoutable. Ses décisions insensées deviennent des coups de génie.',
-    bonuses: { magie: 2, richesse: 2, destin: 1 },
+    bonuses: { magie: 2 },
+    passive: 'fou',
   },
   {
     id: 'alchimiste',
