@@ -228,7 +228,7 @@ function Game({ characters, onRestart }) {
           hand={cp?.hand ?? []}
           selected={g.selectedCard}
           onSelect={card => g.setSelectedCard(g.selectedCard === card ? null : card)}
-          disabled={!['player_turn', 'draw'].includes(g.phase)}
+          disabled={g.phase !== 'player_turn'}
         />
       </div>
 
