@@ -6,7 +6,7 @@ const STAT_META = [
   { key: 'magie',       icon: '✨',  label: 'Magie',       color: '#aa77ff' },
   { key: 'vie',         icon: '❤️',  label: 'Vie',         color: '#ff4466' },
   { key: 'deplacement', icon: '👢',  label: 'Déplacement', color: '#55ccff' },
-  { key: 'chance',      icon: '🍀',  label: 'Chance',      color: '#88ff44' },
+  { key: 'richesse',    icon: '💰',  label: 'Richesse',    color: '#88ff44' },
   { key: 'destin',      icon: '🌟',  label: 'Destin',      color: '#ffcc22' },
 ];
 

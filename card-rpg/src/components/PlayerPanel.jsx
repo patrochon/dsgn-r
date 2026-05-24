@@ -3,7 +3,7 @@ const STAT_META = [
   { key: 'magie',       icon: '✨',  label: 'Magie',       color: '#aa77ff', desc: 'Sorts & amplification des soins' },
   { key: 'vie',         icon: '❤️',  label: 'Vie',         color: '#ff4466', desc: 'Points de vie maximum' },
   { key: 'deplacement', icon: '👢',  label: 'Déplacement', color: '#55ccff', desc: 'Cases parcourues par tour' },
-  { key: 'chance',      icon: '🍀',  label: 'Chance',      color: '#88ff44', desc: 'Bonus aux jets de dé' },
+  { key: 'richesse',    icon: '💰',  label: 'Richesse',    color: '#88ff44', desc: 'Or reçu par tour & bonus aux combats' },
   { key: 'destin',      icon: '🌟',  label: 'Destin',      color: '#ffcc22', desc: 'Effets critiques & bonus de destin' },
 ];
 
@@ -35,6 +35,13 @@ export default function PlayerPanel({ player }) {
             width: `${hpPct * 100}%`, height: '100%', borderRadius: 4, transition: 'width 0.3s',
           }} />
         </div>
+      </div>
+
+      {/* Gold */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+        <span style={{ fontSize: 14 }}>💰</span>
+        <span style={{ fontSize: 11, color: '#888' }}>Or</span>
+        <span style={{ fontSize: 15, fontWeight: 800, color: '#ffd700', marginLeft: 'auto' }}>{player.gold ?? 0}</span>
       </div>
 
       {/* XP bar — only shown in single-player mode */}

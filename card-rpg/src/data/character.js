@@ -1,4 +1,4 @@
-// Stat bonuses: { force, magie, vie, deplacement, chance, destin }
+// Stat bonuses: { force, magie, vie, deplacement, richesse, destin }
 
 export const RACES = [
   {
@@ -14,7 +14,7 @@ export const RACES = [
     name: 'Les Chapeaux',
     icon: '🎩',
     flavor: 'Nul ne sait ce qui se cache sous leurs bords. Leur destin est écrit dans l\'ombre.',
-    bonuses: { magie: 2, chance: 1 },
+    bonuses: { magie: 2, richesse: 1 },
     passive: 'chapeaux',
   },
   {
@@ -30,15 +30,15 @@ export const RACES = [
     name: 'Les Zélés',
     icon: '⚡',
     flavor: 'Débordants d\'énergie. Ils courent plus vite que leur propre ombre.',
-    bonuses: { deplacement: 2, chance: 1 },
+    bonuses: { deplacement: 2, richesse: 1 },
     passive: 'zeles',
   },
   {
     id: 'feux_follets',
     name: 'Les Feux Follets',
     icon: '🔥',
-    flavor: 'Insaisissables et capricieux. La chance les suit comme une flamme dans la nuit.',
-    bonuses: { chance: 2, deplacement: 1 },
+    flavor: 'Insaisissables et capricieux. La richesse les suit comme une flamme dans la nuit.',
+    bonuses: { richesse: 2, deplacement: 1 },
     passive: 'feux_follets',
   },
   {
@@ -57,14 +57,14 @@ export const CLASSES = [
     name: 'Le Bum',
     icon: '🧣',
     flavor: 'Maître de la débrouillardise. Il trouve toujours une sortie — ou une combine.',
-    bonuses: { chance: 3, deplacement: 2 },
+    bonuses: { richesse: 3, deplacement: 2 },
   },
   {
     id: 'fou',
     name: 'Le Fou',
     icon: '🃏',
     flavor: 'Imprévisible et redoutable. Ses décisions insensées deviennent des coups de génie.',
-    bonuses: { magie: 2, chance: 2, destin: 1 },
+    bonuses: { magie: 2, richesse: 2, destin: 1 },
   },
   {
     id: 'alchimiste',
@@ -78,7 +78,7 @@ export const CLASSES = [
     name: 'Le Messager',
     icon: '📨',
     flavor: 'Plus rapide que la rumeur. Il traverse les zones de combat sans même être vu.',
-    bonuses: { deplacement: 3, chance: 2 },
+    bonuses: { deplacement: 3, richesse: 2 },
   },
   {
     id: 'cravate',
@@ -109,7 +109,7 @@ export const SPECS = [
     name: 'Cantrip',
     icon: '✦',
     flavor: 'Petits sorts, grands effets. Les détails font la différence.',
-    bonuses: { magie: 2, chance: 1 },
+    bonuses: { magie: 2, richesse: 1 },
   },
   {
     id: 'rcr',
@@ -158,7 +158,7 @@ export const SPECS = [
     name: 'Scout',
     icon: '🔭',
     flavor: 'Toujours en avance. Il connaît le terrain avant même d\'y poser le pied.',
-    bonuses: { deplacement: 2, chance: 1 },
+    bonuses: { deplacement: 2, richesse: 1 },
   },
   {
     id: 'medication',
@@ -184,7 +184,7 @@ export const SPECS = [
 ];
 
 export const BASE_STATS = {
-  force: 2, magie: 2, vie: 4, deplacement: 3, chance: 1, destin: 1, portee: 1,
+  force: 2, magie: 2, vie: 4, deplacement: 3, richesse: 1, destin: 1, portee: 1,
 };
 
 export function computeStats(race, cls, spec) {

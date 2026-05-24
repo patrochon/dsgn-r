@@ -57,11 +57,11 @@ export const ITEMS = [
   { id: 'potion',  name: 'Potion de soin',   icon: '🧪', stat: 'hp',          bonus: 10 },
   { id: 'ring',    name: 'Anneau magique',   icon: '💍', stat: 'magie',       bonus: 3 },
   { id: 'helm',    name: 'Casque en fer',    icon: '⛑️', stat: 'vie',         bonus: 2 },
-  { id: 'bow',     name: 'Arc elfique',      icon: '🏹', stat: 'chance',      bonus: 2 },
+  { id: 'bow',     name: 'Arc elfique',      icon: '🏹', stat: 'richesse',      bonus: 2 },
   { id: 'amulet',  name: 'Amulette du Destin', icon: '📿', stat: 'destin',    bonus: 3 },
   { id: 'dagger',  name: 'Dague empoisonnée', icon: '🗡️', stat: 'force',     bonus: 3 },
   { id: 'staff',   name: 'Bâton de cristal', icon: '🔮', stat: 'magie',      bonus: 4 },
-  { id: 'cloak',   name: 'Cape de l\'ombre', icon: '🌑', stat: 'chance',     bonus: 3 },
+  { id: 'cloak',   name: 'Cape de l\'ombre', icon: '🌑', stat: 'richesse',     bonus: 3 },
   { id: 'tome',    name: 'Tome interdit',    icon: '📖', stat: 'destin',     bonus: 4 },
 ];
 

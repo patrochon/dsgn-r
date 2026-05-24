@@ -13,7 +13,7 @@ function rollDie() {
 }
 
 function buildPlayer(charData, index, mapData) {
-  const stats = charData.stats ?? { force: 3, magie: 2, vie: 5, deplacement: 3, chance: 1, destin: 1 };
+  const stats = charData.stats ?? { force: 3, magie: 2, vie: 5, deplacement: 3, richesse: 1, destin: 1 };
   const maxHp = 20 + stats.vie * 2;
   const start = mapData.playerStarts[index] ?? mapData.playerStarts[0];
   const deck = shuffleDeck([...FULL_DECK]);
@@ -31,6 +31,7 @@ function buildPlayer(charData, index, mapData) {
     maxHp,
     stats: { ...stats },
     inventory: [],
+    gold: 0,
     hand: deck.splice(0, 6),
     deck,
     discard: [],
@@ -279,6 +280,10 @@ export function useGameState(characters) {
       const p = { ...next[currentIdx] };
       if (p.physicalImmune) addLog(`🪨 ${p.name} est immunisé aux dégâts physiques ce tour.`);
       p.physicalImmune = false;
+      // Gold income: receive richesse stat in gold each turn
+      const income = p.stats?.richesse ?? 1;
+      p.gold = (p.gold ?? 0) + income;
+      addLog(`💰 ${p.name} reçoit ${income} pièce(s) d'or (Richesse: ${p.stats?.richesse ?? 1}). Total: ${p.gold}`);
       // Anciens: reset absorb, clear forced immobile flag
       if (p.race?.passive === 'anciens') {
         p.magicAbsorbAvailable = true;
@@ -549,7 +554,7 @@ export function useGameState(characters) {
       const monsterThere = enemies[destKey];
       if (monsterThere && !turnEnded) {
         const roll = rollDie();
-        const pDmg = Math.max(1, roll + cp.stats.force + Math.floor(cp.stats.chance / 2) - monsterThere.defense);
+        const pDmg = Math.max(1, roll + cp.stats.force + Math.floor(cp.stats.richesse / 2) - monsterThere.defense);
         const mDmg = Math.max(1, monsterThere.attack - Math.floor(cp.stats.force / 3));
         const rounds = Math.ceil(monsterThere.maxHp / pDmg);
         const rawDmgTaken = Math.max(0, (rounds - 1) * mDmg);
@@ -692,7 +697,7 @@ export function useGameState(characters) {
       if (enemies[key]) {
         const m = enemies[key];
         const roll = rollDie();
-        const pDmg = Math.max(1, roll + cp.stats.force + Math.floor(cp.stats.chance / 2) - m.defense);
+        const pDmg = Math.max(1, roll + cp.stats.force + Math.floor(cp.stats.richesse / 2) - m.defense);
         const mDmg = Math.max(1, m.attack - Math.floor(cp.stats.force / 3));
         const rounds = Math.ceil(m.maxHp / pDmg);
         const dmgTaken = physDmg(mDmg * rounds, cp);
@@ -820,7 +825,7 @@ export function useGameState(characters) {
     const targetEnemy = enemies[key];
 
     animateRoll((roll) => {
-      const chanceBonus = Math.floor(cp.stats.chance / 2);
+      const chanceBonus = Math.floor(cp.stats.richesse / 2);
       const effectiveRoll = Math.min(6, roll + chanceBonus);
       const isMagic = card?.effect?.type === 'magic_attack';
       const baseStat = isMagic ? cp.stats.magie : cp.stats.force;

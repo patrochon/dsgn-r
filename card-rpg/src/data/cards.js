@@ -39,7 +39,7 @@ const ARMOR_CARDS = [
   card('vetes_matelasses', 'Vêtements matelassés', '🧥', C.ARMOR, R.COMMON,   'defense', 1, '+1 Force, +2 Vie.', 'stat:vie+2,force+1'),
   card('gambison',         'Gambison',             '🦺', C.ARMOR, R.COMMON,   'defense', 2, '+2 Force, +1 Déplacement.', 'stat:force+2,deplacement+1'),
   card('cuir_tanne',       'Cuir tanné',           '🥾', C.ARMOR, R.COMMON,   'defense', 2, '+2 Force. Léger, sans malus.', 'stat:force+2'),
-  card('cape_resistance',  'Cape de résistance',   '🧣', C.ARMOR, R.COMMON,   'defense', 1, '+1 Force, +1 Chance.', 'stat:force+1,chance+1'),
+  card('cape_resistance',  'Cape de résistance',   '🧣', C.ARMOR, R.COMMON,   'defense', 1, '+1 Force, +1 Richesse.', 'stat:force+1,richesse+1'),
   card('haubert',          'Haubert de mailles',   '⛓️', C.ARMOR, R.COMMON,   'defense', 3, '+3 Force. -1 Déplacement.', 'stat:force+3,deplacement-1'),
   card('jambières',        'Jambières d\'acier',   '🦿', C.ARMOR, R.COMMON,   'defense', 2, '+1 Force, +1 Vie.', 'stat:force+1,vie+1'),
   card('gantelets',        'Gantelets de combat',  '🥊', C.ARMOR, R.COMMON,   'defense', 2, '+2 Force en attaque corps-à-corps.', 'stat:force+2'),
@@ -53,12 +53,12 @@ const ARMOR_CARDS = [
   card('pavois',           'Pavois',               '🔷', C.ARMOR, R.RARE,    'defense', 4, '+4 Force, +2 Vie. Bloque 2 dégâts/tour. -2 Déplacement.', 'stat:force+4,vie+2,block2,deplacement-2'),
   card('armure_plaques',   'Armure de plaques',    '⚙️', C.ARMOR, R.RARE,    'defense', 6, '+6 Force. -3 Déplacement. Immunité aux dégâts < 3.', 'stat:force+6,deplacement-3,immune_low'),
   card('amulette_prot',    'Amulette de protection','🪬', C.ARMOR, R.RARE,    'defense', 0, '+2 Vie, +2 Destin. Réduit les dégâts magiques de moitié.', 'stat:vie+2,destin+2,resist_magic'),
-  card('anneau_defense',   'Anneau de défense',    '💠', C.ARMOR, R.RARE,    'defense', 0, '+2 Force, +1 Chance, +1 Vie. Jamais de critique adverse.', 'stat:force+2,chance+1,vie+1,no_crit'),
+  card('anneau_defense',   'Anneau de défense',    '💠', C.ARMOR, R.RARE,    'defense', 0, '+2 Force, +1 Richesse, +1 Vie. Jamais de critique adverse.', 'stat:force+2,richesse+1,vie+1,no_crit'),
 ];
 
 // ─── ARMEMENT NON MAGIQUE (12) ────────────────────────────────────────────────
 const WEAPON_CARDS = [
-  card('dague',       'Dague',              '🗡️', C.WEAPON, R.COMMON,   'attack', 2, '+2 Force, +1 Chance. Légère — attaque deux fois si dé = 6.', 'double_on_6'),
+  card('dague',       'Dague',              '🗡️', C.WEAPON, R.COMMON,   'attack', 2, '+2 Force, +1 Richesse. Légère — attaque deux fois si dé = 6.', 'double_on_6'),
   card('epee_courte', 'Épée courte',        '⚔️', C.WEAPON, R.COMMON,   'attack', 3, '+3 Force. Équilibrée, aucun malus.'),
   card('hache_main',  'Hache de main',      '🪓', C.WEAPON, R.COMMON,   'attack', 3, '+3 Force. Lance-la : attaque à 2 cases de distance.', 'throw'),
   card('baton_combat','Bâton de combat',    '🏑', C.WEAPON, R.COMMON,   'attack', 2, '+2 Force, +1 Magie. Peut parer les attaques (dé ≥ 4).', 'parry'),
@@ -68,8 +68,8 @@ const WEAPON_CARDS = [
   card('arc_court',   'Arc court',          '🏹', C.WEAPON, R.UNCOMMON, 'attack', 3, '+3 Force. Portée 4 cases. Pas d\'effet si ennemi adjacent.', 'range4'),
   card('fléau',       'Fléau d\'armes',     '⛓️', C.WEAPON, R.UNCOMMON, 'attack', 4, '+4 Force. Ignore toute l\'armure ennemie si dé ≥ 5.', 'armor_break'),
   card('marteau',     'Marteau de guerre',  '🔨', C.WEAPON, R.UNCOMMON, 'attack', 5, '+5 Force. -2 Déplacement. Étourdit l\'ennemi sur dé 6 (passe son tour).', 'stun_6'),
-  card('arc_long',    'Arc long',           '🎯', C.WEAPON, R.RARE,    'attack', 4, '+4 Force. Portée 6 cases. +1 Chance. Visée : +2 Force si immobile.', 'range6,aim'),
-  card('arbalete',    'Arbalète',           '🔰', C.WEAPON, R.RARE,    'attack', 5, '+5 Force, +1 Chance. Perce l\'armure. Un tour sur deux.', 'armor_pierce_all,slow'),
+  card('arc_long',    'Arc long',           '🎯', C.WEAPON, R.RARE,    'attack', 4, '+4 Force. Portée 6 cases. +1 Richesse. Visée : +2 Force si immobile.', 'range6,aim'),
+  card('arbalete',    'Arbalète',           '🔰', C.WEAPON, R.RARE,    'attack', 5, '+5 Force, +1 Richesse. Perce l\'armure. Un tour sur deux.', 'armor_pierce_all,slow'),
 ];
 
 // ─── ARMEMENT MAGIQUE (6) ─────────────────────────────────────────────────────
@@ -90,7 +90,7 @@ const POTION_CARDS = [
   card('force_brew',   'Potion de Force',         '💪', C.POTION, R.COMMON,   'buff', 3,  '+3 Force pendant 1 combat.', 'buff:force+3,duration:combat'),
   card('celerite',     'Potion de Célérité',      '⚡', C.POTION, R.COMMON,   'buff', 3,  '+3 Déplacement pendant 1 tour.', 'buff:deplacement+3,duration:turn'),
   card('resistance',   'Potion de Résistance',    '🛡️', C.POTION, R.UNCOMMON, 'buff', 4,  '+4 Force défensive pendant 1 combat.', 'buff:defense+4,duration:combat'),
-  card('chance_brew',  'Potion de Chance',        '🍀', C.POTION, R.UNCOMMON, 'buff', 3,  '+3 Chance pendant 3 tours.', 'buff:chance+3,duration:3turns'),
+  card('chance_brew',  'Potion de Richesse',       '🍀', C.POTION, R.UNCOMMON, 'buff', 3,  '+3 Richesse pendant 3 tours.', 'buff:richesse+3,duration:3turns'),
   card('antidote',     'Antidote',                '🌿', C.POTION, R.COMMON,   'cure', 0,  'Annule poison, malédiction ou ralentissement.', 'cure_all'),
   card('magie_brew',   'Potion de Magie',         '🔮', C.POTION, R.UNCOMMON, 'buff', 5,  '+5 Magie. Lance immédiatement un sort aléatoire.', 'buff:magie+5,cast_random'),
   card('elixir_vie',   'Élixir de Vie',           '❤️', C.POTION, R.RARE,    'buff', 0,  '+5 Vie permanent (augmente le HP max).', 'perm:vie+5'),
@@ -107,17 +107,17 @@ const SCROLL_CARDS = [
   card('soin_masse',   'Soin de masse',        '✨', C.SCROLL, R.UNCOMMON, 'magic', 15, 'Restaure 15 HP. Si dé = 6, restaure tous les HP.', 'aoe_heal'),
   card('malediction',  'Malédiction',          '🧿', C.SCROLL, R.UNCOMMON, 'magic', 0,  'Réduit toutes les stats ennemies de 2 pendant 3 tours.', 'debuff_all'),
   card('bouclier_mag', 'Bouclier Magique',     '🔵', C.SCROLL, R.RARE,    'magic', 0,  'Absorbe les 10 prochains dégâts reçus.', 'shield10'),
-  card('vision',       'Vision prophétique',   '👁️', C.SCROLL, R.RARE,    'magic', 0,  'Révèle toute la carte. +2 Chance pour ce tour.', 'reveal_map'),
+  card('vision',       'Vision prophétique',   '👁️', C.SCROLL, R.RARE,    'magic', 0,  'Révèle toute la carte. +2 Richesse pour ce tour.', 'reveal_map'),
   card('resurrection', 'Résurrection',         '💀', C.SCROLL, R.LEGENDARY,'magic', 0,  'Si tu tombes à 0 HP ce tour, reviens à 50% HP. Usage unique.', 'revive_50'),
 ];
 
 // ─── OBJETS RARES (6) ─────────────────────────────────────────────────────────
 const RARE_CARDS = [
   card('pierre_ancetre','Pierre de l\'Ancêtre', '🪨', C.RARE, R.RARE, 'passive', 0, '+3 Destin, +2 Magie permanent. Les dés < 2 comptent comme 2.', 'perm:destin+3,magie+2,min_roll2'),
-  card('anneau_chaos',  'Anneau du Chaos',      '💫', C.RARE, R.RARE, 'passive', 0, '+4 Chance permanent. À chaque tour : effet aléatoire (bonus ou malus).', 'perm:chance+4,chaos_effect'),
+  card('anneau_chaos',  'Anneau du Chaos',      '💫', C.RARE, R.RARE, 'passive', 0, '+4 Richesse permanent. À chaque tour : effet aléatoire (bonus ou malus).', 'perm:richesse+4,chaos_effect'),
   card('bottes_fantome','Bottes du Fantôme',    '👻', C.RARE, R.RARE, 'passive', 0, '+4 Déplacement permanent. Traverse les murs à volonté.', 'perm:deplacement+4,wall_walk'),
   card('cape_invis',    'Cape d\'Invisibilité', '🌫️', C.RARE, R.RARE, 'passive', 0, 'Évite automatiquement 1 combat par tour (choix du joueur).', 'perm:avoid_combat'),
-  card('orbe_vision',   'Orbe de Vision',       '🔭', C.RARE, R.RARE, 'passive', 0, 'Voit les ennemis et items à travers les murs. +2 Chance.', 'perm:chance+2,see_through'),
+  card('orbe_vision',   'Orbe de Vision',       '🔭', C.RARE, R.RARE, 'passive', 0, 'Voit les ennemis et items à travers les murs. +2 Richesse.', 'perm:richesse+2,see_through'),
   card('grimoire',      'Grimoire interdit',    '📖', C.RARE, R.RARE, 'passive', 0, '+5 Magie permanent. Apprend 2 sorts : lance un sort gratuit par combat.', 'perm:magie+5,free_spell'),
 ];
 
