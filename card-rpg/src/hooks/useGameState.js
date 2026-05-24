@@ -272,12 +272,28 @@ export function useGameState(characters) {
     if (actionsLeft < 1 || hasMoved) return;
     setPhase('rolling_move');
     const card = selectedCard;
+    const special = (card?.effect?.type === 'move') ? (card.effect.special ?? null) : null;
+    const bonus   = (card?.effect?.type === 'move') ? (card.effect.bonus  ?? 0)    : 0;
+
     animateRoll((roll) => {
-      const moveBonus = (card?.effect?.type === 'move') ? (card.effect.bonus ?? 0) : 0;
-      const range = roll + moveBonus;
-      addLog(`${currentPlayer.name} lance le dé : ${roll}${moveBonus > 0 ? ` +${moveBonus}` : ''} = ${range} cases.`);
-      const tiles = [];
       const cp = players[currentIdx];
+      let range = roll + bonus;
+      let logSuffix = bonus !== 0 ? ` +${bonus}` : '';
+      let wallPass = false;
+
+      // Apply card special effects that modify the die result
+      if (special === 'double_roll') {
+        range = roll * 2;
+        logSuffix = ' ×2';
+      } else if (special === 'fixed_move') {
+        range = bonus; // bonus holds the fixed distance (6 for ailes_vent)
+        logSuffix = ` (fixe ${range})`;
+      }
+      if (special === 'wall_pass') wallPass = true;
+
+      addLog(`🎲 ${currentPlayer.name} lance le dé : ${roll}${logSuffix} = ${range} cases.${card?.effect?.type === 'move' ? ` [${card.name}]` : ''}`);
+
+      const tiles = [];
       for (let dy = -range; dy <= range; dy++) {
         for (let dx = -range; dx <= range; dx++) {
           if (Math.abs(dx) + Math.abs(dy) > range) continue;
@@ -285,7 +301,7 @@ export function useGameState(characters) {
           const nx = cp.x + dx;
           const ny = cp.y + dy;
           if (nx < 0 || ny < 0 || ny >= grid.length || nx >= grid[0].length) continue;
-          if (grid[ny][nx] === T.WALL) continue;
+          if (!wallPass && grid[ny][nx] === T.WALL) continue;
           tiles.push(`${nx},${ny}`);
         }
       }
