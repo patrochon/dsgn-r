@@ -89,12 +89,15 @@ function Game({ characters, onRestart }) {
 
   // Helpers
   const isEquippable = cardType && ['defense', 'attack', 'magic_attack', 'passive', 'legendary'].includes(cardType);
-  const isUsable = cardType && ['heal', 'buff', 'cure', 'magic'].includes(cardType);
+  const isUsable = cardType && ['heal', 'buff', 'cure'].includes(cardType);
+  const isScroll = cardType === 'magic';
   const canAttack = g.actionsLeft >= 1 && g.phase === 'player_turn';
   const canMove = g.actionsLeft >= 1 && !g.hasMoved && g.phase === 'player_turn';
   const magieCost = g.selectedCard?.effect?.magieCost ?? 0;
   const hasMagie = magieCost === 0 || (cp?.stats?.magie ?? 0) >= magieCost;
   const canUse = g.phase === 'player_turn' && isUsable && hasMagie; // card use is free
+  const canMaterialize = g.phase === 'player_turn' && isScroll && hasMagie;
+  const canCastReady = g.actionsLeft >= 1 && g.phase === 'player_turn' && !!cp?.readyScroll;
 
   const clickable = g.phase === 'choosing_move' || g.phase === 'choosing_attack';
 
@@ -223,11 +226,31 @@ function Game({ characters, onRestart }) {
             )}
             {isUsable && (
               <Btn
-                label={`🧪 Utiliser ${g.selectedCard?.icon ?? ''}${magieCost > 0 ? ` ✨${magieCost}` : ''} (1 action)`}
+                label={`🧪 Utiliser ${g.selectedCard?.icon ?? ''}${magieCost > 0 ? ` ✨${magieCost}` : ''} (gratuit)`}
                 onClick={g.useItem}
                 disabled={!canUse}
                 primary={canUse}
                 hint={!hasMagie ? `Magie insuffisante — requis : ${magieCost}, actuel : ${cp?.stats?.magie ?? 0}` : undefined}
+              />
+            )}
+            {isScroll && (
+              <Btn
+                label={cp?.race?.passive === 'chapeaux'
+                  ? `🎩 Lancer ${g.selectedCard?.icon ?? ''}${magieCost > 0 ? ` ✨${magieCost}` : ''} (Chapeaux)`
+                  : `📜 Matérialiser ${g.selectedCard?.icon ?? ''}${magieCost > 0 ? ` ✨${magieCost}` : ''}`}
+                onClick={g.useItem}
+                disabled={!canMaterialize}
+                primary={canMaterialize}
+                hint={!hasMagie ? `Magie insuffisante — requis : ${magieCost}` : cp?.race?.passive === 'chapeaux' ? 'Effet immédiat' : 'Prêt à lancer au prochain tour'}
+              />
+            )}
+            {cp?.readyScroll && (
+              <Btn
+                label={`📜 Lancer ${cp.readyScroll.icon} ${cp.readyScroll.name} (1 action)`}
+                onClick={g.castReadyScroll}
+                disabled={!canCastReady}
+                primary={canCastReady}
+                hint={`${cp.readyScroll.effect.bonus} dégâts magiques — matérialisé au tour précédent`}
               />
             )}
             {cp?.cls?.passive === 'alchimiste' && (

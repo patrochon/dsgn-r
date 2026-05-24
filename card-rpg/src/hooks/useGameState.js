@@ -33,6 +33,7 @@ function buildPlayer(charData, index, mapData) {
     inventory: [],
     gold: 0,
     lastScroll: null,
+    readyScroll: null,
     hand: deck.splice(0, 6),
     deck,
     discard: [],
@@ -592,7 +593,7 @@ export function useGameState(characters) {
           if (!won) {
             if (np.stats.destin > 0) {
               const newDeck = shuffleDeck([...FULL_DECK]);
-              np = { ...np, hp: np.maxHp, x: np.baseX, y: np.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], stats: { ...np.stats, destin: np.stats.destin - 1 } };
+              np = { ...np, hp: np.maxHp, x: np.baseX, y: np.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], readyScroll: null, facing: null, stats: { ...np.stats, destin: np.stats.destin - 1 } };
             } else {
               np.isAlive = false; np.hp = 0;
             }
@@ -649,7 +650,7 @@ export function useGameState(characters) {
             trapFatal = true;
             if (np.stats.destin > 0) {
               const newDeck = shuffleDeck([...FULL_DECK]);
-              np = { ...np, hp: np.maxHp, x: np.baseX, y: np.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], stats: { ...np.stats, destin: np.stats.destin - 1 } };
+              np = { ...np, hp: np.maxHp, x: np.baseX, y: np.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], readyScroll: null, facing: null, stats: { ...np.stats, destin: np.stats.destin - 1 } };
             } else {
               np.isAlive = false; np.hp = 0;
             }
@@ -764,7 +765,7 @@ export function useGameState(characters) {
           if (!won) {
             if (np.stats.destin > 0) {
               const newDeck = shuffleDeck([...FULL_DECK]);
-              np = { ...np, hp: np.maxHp, x: np.baseX, y: np.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], stats: { ...np.stats, destin: np.stats.destin - 1 } };
+              np = { ...np, hp: np.maxHp, x: np.baseX, y: np.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], readyScroll: null, facing: null, stats: { ...np.stats, destin: np.stats.destin - 1 } };
             } else {
               np.isAlive = false; np.hp = 0;
             }
@@ -918,7 +919,7 @@ export function useGameState(characters) {
           if (t.stats.destin > 0) {
             const newDeck = shuffleDeck([...FULL_DECK]);
             const livesLeft = t.stats.destin - 1;
-            t = { ...t, hp: t.maxHp, x: t.baseX, y: t.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], stats: { ...t.stats, destin: livesLeft } };
+            t = { ...t, hp: t.maxHp, x: t.baseX, y: t.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], readyScroll: null, facing: null, stats: { ...t.stats, destin: livesLeft } };
             addLog(`✨ ${next[targetPlayerIdx].name} renaît à sa base ! (${livesLeft} vie(s) restante(s))`);
           } else {
             t.isAlive = false;
@@ -1007,7 +1008,7 @@ export function useGameState(characters) {
             if (t.stats.destin > 0) {
               const newDeck = shuffleDeck([...FULL_DECK]);
               const livesLeft = t.stats.destin - 1;
-              t = { ...t, hp: t.maxHp, x: t.baseX, y: t.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], stats: { ...t.stats, destin: livesLeft } };
+              t = { ...t, hp: t.maxHp, x: t.baseX, y: t.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], readyScroll: null, facing: null, stats: { ...t.stats, destin: livesLeft } };
               addLog(`✨ ${next[targetPlayerIdx].name} renaît à sa base ! (${livesLeft} vie(s) restante(s))`);
             } else {
               t.isAlive = false;
@@ -1122,17 +1123,37 @@ export function useGameState(characters) {
       });
       addLog(`${cp.name} utilise ${card.icon} ${card.name} : effets négatifs annulés.`);
     } else if (card.effect.type === 'magic') {
-      const dmg = card.effect.bonus;
-      addLog(`${cp.name} lance ${card.icon} ${card.name} : ${dmg} dégâts magiques !`);
-      setPlayers(prev => {
-        const next = [...prev];
-        const p = { ...next[currentIdx] };
-        p.hand = p.hand.filter(c => c !== card);
-        p.discard = [...p.discard, card];
-        p.lastScroll = card; // Fou passive: remember last scroll
-        next[currentIdx] = p;
-        return next;
-      });
+      const isChapeaux = cp.race?.passive === 'chapeaux';
+      if (isChapeaux) {
+        // Chapeaux: cast immediately
+        addLog(`🎩 ${cp.name} lance immédiatement ${card.icon} ${card.name} : ${card.effect.bonus} dégâts magiques !`);
+        setPlayers(prev => {
+          const next = [...prev];
+          const p = { ...next[currentIdx] };
+          p.hand = p.hand.filter(c => c !== card);
+          p.discard = [...p.discard, card];
+          p.lastScroll = card;
+          next[currentIdx] = p;
+          return next;
+        });
+      } else {
+        // Materialize: scroll leaves hand, sits ready — effect fires next turn
+        if (cp.readyScroll) {
+          addLog(`📜 ${cp.name} remplace ${cp.readyScroll.icon} ${cp.readyScroll.name} par ${card.icon} ${card.name} (le précédent est défaussé).`);
+        } else {
+          addLog(`📜 ${cp.name} matérialise ${card.icon} ${card.name} — prêt à lancer le tour prochain.`);
+        }
+        setPlayers(prev => {
+          const next = [...prev];
+          const p = { ...next[currentIdx] };
+          p.hand = p.hand.filter(c => c !== card);
+          // Previous ready scroll goes to discard if replaced
+          if (p.readyScroll) p.discard = [...p.discard, p.readyScroll];
+          p.readyScroll = card;
+          next[currentIdx] = p;
+          return next;
+        });
+      }
     }
 
     setSelectedCard(null);
@@ -1185,7 +1206,7 @@ export function useGameState(characters) {
           if (t.stats.destin > 0) {
             const newDeck = shuffleDeck([...FULL_DECK]);
             const livesLeft = t.stats.destin - 1;
-            t = { ...t, hp: t.maxHp, x: t.baseX, y: t.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], stats: { ...t.stats, destin: livesLeft } };
+            t = { ...t, hp: t.maxHp, x: t.baseX, y: t.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], readyScroll: null, facing: null, stats: { ...t.stats, destin: livesLeft } };
             addLog(`✨ ${next[targetPlayerIdx].name} renaît à sa base ! (${livesLeft} vie(s) restante(s))`);
           } else {
             t.isAlive = false;
@@ -1228,6 +1249,25 @@ export function useGameState(characters) {
       return next;
     });
     addLog(`⚗️ ${cp.name} utilise sa Magie pour se soigner de ${healAmt} PV !`);
+    setActionsLeft(prev => prev - 1);
+  }, [actionsLeft, currentIdx, players]);
+
+  // Cast the materialized scroll (costs 1 action, available next turn after materializing)
+  const castReadyScroll = useCallback(() => {
+    if (actionsLeft < 1) return;
+    const cp = players[currentIdx];
+    if (!cp.readyScroll) return;
+    const card = cp.readyScroll;
+    addLog(`📜 ${cp.name} lance ${card.icon} ${card.name} : ${card.effect.bonus} dégâts magiques !`);
+    setPlayers(prev => {
+      const next = [...prev];
+      const p = { ...next[currentIdx] };
+      p.readyScroll = null;
+      p.discard = [...p.discard, card];
+      p.lastScroll = card;
+      next[currentIdx] = p;
+      return next;
+    });
     setActionsLeft(prev => prev - 1);
   }, [actionsLeft, currentIdx, players]);
 
@@ -1488,6 +1528,7 @@ export function useGameState(characters) {
     fouAttack,
     confirmFouPortal,
     alchimisteHeal,
+    castReadyScroll,
     skipPassive,
     skipPortalChoice,
     useItem,
