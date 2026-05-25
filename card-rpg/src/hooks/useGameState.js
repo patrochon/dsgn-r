@@ -48,6 +48,7 @@ function buildPlayer(charData, index, mapData) {
     premierSoinUsed: false,
     forcedImmobileNextTurn: false,
     weaponJustSwapped: false,
+    armorJustSwapped: false,
     color: PLAYER_COLORS[index] ?? '#ffffff',
   };
 }
@@ -376,6 +377,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
         if (tooMany.length > 0) addLog(`🧪 ${p.name} défausse ${tooMany.map(c => c.icon).join('')} (limite 2 potions en main).`);
       }
       p.weaponJustSwapped = false;
+      p.armorJustSwapped = false;
       next[currentIdx] = p;
       return next;
     });
@@ -423,9 +425,12 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
         p.weaponJustSwapped = false;
       }
       if (isArmor && p.equippedArmor) {
-        addLog(`↩ ${p.name} retire ${p.equippedArmor.icon} ${p.equippedArmor.name}.`);
+        addLog(`↩ ${p.name} retire ${p.equippedArmor.icon} ${p.equippedArmor.name} (défaussé).`);
         p = unequipCard(p, p.equippedArmor);
         p.equippedArmor = null;
+        p.armorJustSwapped = true;
+      } else if (isArmor) {
+        p.armorJustSwapped = false;
       }
 
       // Apply new card's deltas
@@ -452,8 +457,10 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       next[currentIdx] = p;
       return next;
     });
-    const swapped = players[currentIdx]?.equippedWeapon != null && (card.effect.type === 'attack' || card.effect.type === 'magic_attack');
-    addLog(`${currentPlayer.name} équipe ${card.icon} ${card.name} (gratuit).${swapped ? ` Ne peut attaquer qu'au prochain tour.` : ''}`);
+    const weaponSwapped = players[currentIdx]?.equippedWeapon != null && (card.effect.type === 'attack' || card.effect.type === 'magic_attack');
+    const armorSwapped  = players[currentIdx]?.equippedArmor != null && card.effect.type === 'defense';
+    const swapNote = weaponSwapped ? ` Ne peut attaquer qu'au prochain tour.` : armorSwapped ? ` Protection inactive jusqu'au prochain tour.` : '';
+    addLog(`${currentPlayer.name} équipe ${card.icon} ${card.name} (gratuit).${swapNote}`);
     setSelectedCard(null);
     return true;
   }, [currentIdx, currentPlayer, players]);
@@ -1308,7 +1315,9 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
             return;
           }
         }
-        const defense = Math.floor(target.stats.force / 3);
+        const armorPenalty = (target.armorJustSwapped && target.equippedArmor) ? (target.equippedArmor.effect.bonus ?? 0) : 0;
+        const defense = Math.floor((target.stats.force - armorPenalty) / 3);
+        if (armorPenalty > 0) addLog(`🛡️ ${target.name} vient de changer d'armure — protection inactive ce tour.`);
         const isMagicAtk = card?.effect?.type === 'magic_attack';
         const rawActualDmg = Math.max(1, dmg - defense);
         const actualDmg = isMagicAtk ? rawActualDmg : physDmg(rawActualDmg, target);
