@@ -15,6 +15,7 @@ function rollDie() {
 function buildPlayer(charData, index, mapData) {
   const stats = charData.stats ?? { force: 1, magie: 1, vie: 6, deplacement: 0, richesse: 1, destin: 1 };
   const maxHp = 20 + stats.vie * 2;
+  const finalMaxHp = (charData.spec?.passive === 'imperissable') ? maxHp * 2 : maxHp;
   const start = mapData.playerStarts[index] ?? mapData.playerStarts[0];
   const deck = shuffleDeck([...FULL_DECK]);
   return {
@@ -27,8 +28,8 @@ function buildPlayer(charData, index, mapData) {
     y: start.y,
     baseX: start.x,
     baseY: start.y,
-    hp: maxHp,
-    maxHp,
+    hp: finalMaxHp,
+    maxHp: finalMaxHp,
     stats: { ...stats },
     inventory: [],
     gold: 0,
@@ -44,6 +45,8 @@ function buildPlayer(charData, index, mapData) {
     facing: null,
     magicAbsorbAvailable: true,
     forcedImmobile: false,
+    premierSoinUsed: false,
+    forcedImmobileNextTurn: false,
     color: PLAYER_COLORS[index] ?? '#ffffff',
   };
 }
@@ -230,15 +233,18 @@ function runMoveDijkstra(fromX, fromY, budget, facing, hasZeles, wallPass, oneWa
   return { tiles: [...tilesSet], budgetAtTile };
 }
 
-// Apply Cailloux passive: -1 per hit, immune if physicalImmune
-function physDmg(rawDmg, target) {
+// Apply Cailloux passive: -1 per hit, immune if physicalImmune; imperissable immune to AOE
+function physDmg(rawDmg, target, isAoe = false) {
   if (target?.physicalImmune) return 0;
+  if (isAoe && target?.spec?.passive === 'imperissable') return 0;
   const reduction = target?.race?.passive === 'cailloux' ? 1 : 0;
   return Math.max(0, rawDmg - reduction);
 }
 
 // Initiative: monster goes first if its attack > player's (force + magie)
+// Secrétariat passive: always goes first (monster never has initiative)
 function monsterGoesFirst(player, monster) {
+  if (player.spec?.passive === 'secretariat') return false;
   return monster.attack > ((player.stats?.force ?? 0) + (player.stats?.magie ?? 0));
 }
 
@@ -314,6 +320,10 @@ export function useGameState(characters) {
   const [log, setLog] = useState(['Bienvenue dans la partie multijoueur !', 'Joueur 1 commence — tirez vos cartes.']);
   const [winner, setWinner] = useState(null);
   const [pendingMessager, setPendingMessager] = useState(null);
+  const [pendingAutodefense, setPendingAutodefense] = useState(null);
+  const [pendingVoodoo, setPendingVoodoo] = useState(null);
+  const [pendingNde, setPendingNde] = useState(null);
+  const [pendingVoyageAstral, setPendingVoyageAstral] = useState(null);
 
   const treasurePileRef = useRef({
     1: shuffleDeck(FULL_DECK.filter(c => c.rarity === 'common')),
@@ -360,11 +370,13 @@ export function useGameState(characters) {
   const drawCards = useCallback(() => {
     const cp = players[currentIdx];
     const wasForcedImmobile = cp?.race?.passive === 'anciens' && cp?.forcedImmobile;
+    const wasForcedImmobileJJ = cp?.forcedImmobileNextTurn === true;
     setPlayers(prev => {
       const next = [...prev];
       const p = { ...next[currentIdx] };
       if (p.physicalImmune) addLog(`🪨 ${p.name} est immunisé aux dégâts physiques ce tour.`);
       p.physicalImmune = false;
+      p.forcedImmobileNextTurn = false;
       // Gold income: receive richesse stat in gold each turn
       const income = p.stats?.richesse ?? 1;
       p.gold = (p.gold ?? 0) + income;
@@ -399,6 +411,9 @@ export function useGameState(characters) {
     if (wasForcedImmobile) {
       setHasMoved(true);
       addLog(`🌙 ${cp.name} reste immobile ce tour (prix de l'absorption magique).`);
+    } else if (wasForcedImmobileJJ) {
+      setHasMoved(true);
+      addLog(`🥋 ${cp.name} est immobilisé ce tour (Jiu Jitsu) !`);
     } else {
       setHasMoved(false);
     }
@@ -533,7 +548,8 @@ export function useGameState(characters) {
   const moveToTile = useCallback((tx, ty) => {
     if (phase !== 'choosing_move' && phase !== 'choosing_attack'
       && phase !== 'longs_bras_passive' && phase !== 'choosing_portal'
-      && phase !== 'bum_throw' && phase !== 'fou_attack' && phase !== 'fou_portal') return;
+      && phase !== 'bum_throw' && phase !== 'fou_attack' && phase !== 'fou_portal'
+      && phase !== 'voyage_astral_select' && phase !== 'voyage_astral_move') return;
 
     if (phase === 'choosing_move') {
       const key = `${tx},${ty}`;
@@ -623,20 +639,21 @@ export function useGameState(characters) {
         addLog(`${currentPlayer.name} se déplace en (${tx}, ${ty}).`);
       }
 
-      // Shop: draw 3 bonus cards on landing
-      if (grid[finalY][finalX] === T.SHOP) {
+      // Shop: draw 3 bonus cards on landing (4 for couponing, 0 for pacte)
+      if (grid[finalY][finalX] === T.SHOP && cp.spec?.passive !== 'pacte') {
+        const shopCards = cp.spec?.passive === 'couponing' ? 4 : 3;
         setPlayers(prev => {
           const next = [...prev];
           const p = { ...next[currentIdx] };
           let deck = [...p.deck];
           let discard = [...p.discard];
-          if (deck.length < 3) { deck = [...deck, ...shuffleDeck(discard)]; discard = []; }
-          const drawn = deck.splice(0, 3);
+          if (deck.length < shopCards) { deck = [...deck, ...shuffleDeck(discard)]; discard = []; }
+          const drawn = deck.splice(0, shopCards);
           p.hand = [...p.hand, ...drawn];
           p.deck = deck;
           p.discard = discard;
           next[currentIdx] = p;
-          addLog(`🏪 ${p.name} visite le magasin et pioche 3 cartes !`);
+          addLog(`🏪 ${p.name} visite le magasin et pioche ${shopCards} cartes !${shopCards === 4 ? ' 🏷️ Couponing !' : ''}`);
           return next;
         });
       }
@@ -667,6 +684,30 @@ export function useGameState(characters) {
           addLog(`📨 ${cp.name} tombe sur ${monsterThere.icon} ${monsterThere.name} — combattre ou passer ?`);
           return;
         }
+        // Pacte: auto-kill monster
+        if (cp.spec?.passive === 'pacte') {
+          const goldReward = monsterThere.attack ?? 1;
+          const treasureCard = drawFromTreasurePile(monsterThere.pile);
+          addLog(`📜 ${cp.name} (Pacte) élimine ${monsterThere.icon} ${monsterThere.name} automatiquement ! +${goldReward}💰${treasureCard ? ` + ${treasureCard.icon}` : ''}`);
+          if (monsterThere.pile === 1) {
+            const p2 = MONSTER_PILE_2[Math.floor(Math.random() * MONSTER_PILE_2.length)];
+            setEnemies(prev => ({ ...prev, [destKey]: { ...p2, hp: p2.maxHp } }));
+          } else if (monsterThere.pile === 2) {
+            const p3 = MONSTER_PILE_3[Math.floor(Math.random() * MONSTER_PILE_3.length)];
+            setEnemies(prev => ({ ...prev, [destKey]: { ...p3, hp: p3.maxHp } }));
+          } else {
+            setEnemies(prev => { const n = { ...prev }; delete n[destKey]; return n; });
+          }
+          setPlayers(prev => {
+            const next = [...prev];
+            let np = { ...next[currentIdx] };
+            np.gold = (np.gold ?? 0) + goldReward;
+            if (treasureCard) np.hand = [...np.hand, treasureCard];
+            next[currentIdx] = np;
+            return next;
+          });
+          // fall through — don't return, continue to check traps/chests
+        } else {
         const roll = rollDie();
         const pDmg = Math.max(1, roll + cp.stats.force + Math.floor(cp.stats.richesse / 2) - monsterThere.defense);
         const mDmg = Math.max(1, monsterThere.attack - Math.floor(cp.stats.force / 3));
@@ -702,9 +743,17 @@ export function useGameState(characters) {
           if (i !== currentIdx) return p;
           let np = { ...p, hp: Math.max(0, p.hp - dmgTaken) };
           if (!won) {
-            if (np.stats.destin > 0) {
+            if (np.hp <= 0 && np.spec?.passive === 'premier_soin' && !np.premierSoinUsed) {
+              const reviveHp = rollDie();
+              np = { ...np, hp: reviveHp, premierSoinUsed: true };
+              addLog(`🩹 Premier Soin : ${np.name} réssucite avec ${reviveHp} PV !`);
+            } else if (np.stats.destin > 0) {
+              const keepGold = np.spec?.passive === 'nde' ? np.gold : 0;
+              const keepHand = np.spec?.passive === 'nde' ? [...np.hand] : [];
+              const reviveHp = np.spec?.passive === 'nde' ? rollDie() : np.maxHp;
               const newDeck = shuffleDeck([...FULL_DECK]);
-              np = { ...np, hp: np.maxHp, x: np.baseX, y: np.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, facing: null, stats: { ...np.stats, destin: np.stats.destin - 1 } };
+              if (np.spec?.passive === 'nde') addLog(`💀 NDE : ${np.name} renaît avec ${reviveHp} PV, conserve or et main !`);
+              np = { ...np, hp: reviveHp, x: np.baseX, y: np.baseY, gold: keepGold, hand: keepHand, deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, facing: null, stats: { ...np.stats, destin: np.stats.destin - 1 } };
             } else {
               np.isAlive = false; np.hp = 0;
             }
@@ -730,11 +779,15 @@ export function useGameState(characters) {
           addLog(`💀 ${cp.name} est définitivement tué par ${monsterThere.name} !`);
           turnEnded = handleDeath(nextPlayers);
         }
+        } // end else (not pacte)
       }
 
       // — Trap —
       const trapThere = traps[destKey];
       if (trapThere && !turnEnded) {
+        if (cp.spec?.passive === 'ectomorphe') {
+          addLog(`👻 ${cp.name} (Ectomorphe) passe à travers ${trapThere.icon} ${trapThere.name} sans le déclencher !`);
+        } else {
         const roll = rollDie();
         addLog(`🪤 ${cp.name} déclenche ${trapThere.icon} ${trapThere.name} !`);
         setTraps(prev => { const n = { ...prev }; delete n[destKey]; return n; });
@@ -756,9 +809,18 @@ export function useGameState(characters) {
           let np = { ...p, hp: Math.max(0, p.hp - dmg) };
           if (np.hp <= 0) {
             trapFatal = true;
-            if (np.stats.destin > 0) {
+            if (np.spec?.passive === 'premier_soin' && !np.premierSoinUsed) {
+              const reviveHp = rollDie();
+              np = { ...np, hp: reviveHp, premierSoinUsed: true };
+              addLog(`🩹 Premier Soin : ${np.name} réssucite avec ${reviveHp} PV !`);
+              trapFatal = false;
+            } else if (np.stats.destin > 0) {
+              const keepGold = np.spec?.passive === 'nde' ? np.gold : 0;
+              const keepHand = np.spec?.passive === 'nde' ? [...np.hand] : [];
+              const reviveHp = np.spec?.passive === 'nde' ? rollDie() : np.maxHp;
               const newDeck = shuffleDeck([...FULL_DECK]);
-              np = { ...np, hp: np.maxHp, x: np.baseX, y: np.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, facing: null, stats: { ...np.stats, destin: np.stats.destin - 1 } };
+              if (np.spec?.passive === 'nde') addLog(`💀 NDE : ${np.name} renaît avec ${reviveHp} PV, conserve or et main !`);
+              np = { ...np, hp: reviveHp, x: np.baseX, y: np.baseY, gold: keepGold, hand: keepHand, deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, facing: null, stats: { ...np.stats, destin: np.stats.destin - 1 } };
             } else {
               np.isAlive = false; np.hp = 0;
             }
@@ -789,6 +851,7 @@ export function useGameState(characters) {
             turnEnded = handleDeath(nextPlayers);
           }
         }
+        } // end else (not ectomorphe)
       }
 
       // — Chest —
@@ -810,6 +873,72 @@ export function useGameState(characters) {
       }
 
       if (!turnEnded) {
+        // Jiu Jutsu: check if movement triggers jiu_jutsu
+        {
+          const jjOther = players.find((p, i) => {
+            if (!p.isAlive || !p.facing || i === currentIdx) return false;
+            if (p.spec?.passive === 'jiu_jutse') {
+              return (p.x - p.facing.dx === finalX && p.y - p.facing.dy === finalY);
+            }
+            if (cp.spec?.passive === 'jiu_jutse') {
+              return (p.x + p.facing.dx === finalX && p.y + p.facing.dy === finalY);
+            }
+            return false;
+          });
+          if (jjOther) {
+            const jjOtherIdx = players.indexOf(jjOther);
+            const [jjIdx, advIdx] = cp.spec?.passive === 'jiu_jutse' ? [currentIdx, jjOtherIdx] : [jjOtherIdx, currentIdx];
+            const jjP = players[jjIdx];
+            const advP = players[advIdx];
+            const [jjNewX, jjNewY] = [advP.x, advP.y];
+            const [advNewX, advNewY] = [jjP.x, jjP.y];
+            const jiuDmg = physDmg(advP.stats.force ?? 1, advP);
+            addLog(`🥋 Jiu Jitsu ! ${jjP.name} et ${advP.name} échangent de place — ${advP.name} subit ${jiuDmg} dégâts !`);
+            setPlayers(prev => {
+              const next = [...prev];
+              next[jjIdx] = { ...next[jjIdx], x: jjNewX, y: jjNewY };
+              let adv = { ...next[advIdx], x: advNewX, y: advNewY, forcedImmobileNextTurn: true };
+              adv.hp = Math.max(0, adv.hp - jiuDmg);
+              if (adv.hp <= 0) {
+                if (adv.spec?.passive === 'premier_soin' && !adv.premierSoinUsed) {
+                  const reviveHp = rollDie();
+                  adv = { ...adv, hp: reviveHp, premierSoinUsed: true };
+                  addLog(`🩹 Premier Soin : ${adv.name} réssucite avec ${reviveHp} PV !`);
+                } else if (adv.stats.destin > 0) {
+                  const keepGold = adv.spec?.passive === 'nde' ? adv.gold : 0;
+                  const keepHand = adv.spec?.passive === 'nde' ? [...adv.hand] : [];
+                  const reviveHp = adv.spec?.passive === 'nde' ? rollDie() : adv.maxHp;
+                  const newDeck = shuffleDeck([...FULL_DECK]);
+                  adv = { ...adv, hp: reviveHp, x: adv.baseX, y: adv.baseY, gold: keepGold, hand: keepHand, deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, facing: null, stats: { ...adv.stats, destin: adv.stats.destin - 1 } };
+                } else {
+                  adv.isAlive = false; adv.hp = 0;
+                }
+              }
+              next[advIdx] = adv;
+              return next;
+            });
+            // Check if trap at adversary's new position
+            const advNewKey = `${advNewX},${advNewY}`;
+            if (traps[advNewKey]) {
+              const trap = traps[advNewKey];
+              const trapRoll = rollDie();
+              addLog(`🪤 ${advP.name} atterrit sur ${trap.icon} ${trap.name} !`);
+              setTraps(prev => { const n = { ...prev }; delete n[advNewKey]; return n; });
+              let trapDmg = 0;
+              if (trap.effect === 'damage' || trap.effect === 'damage_action' || trap.effect === 'damage_discard') trapDmg = trapRoll + trap.value;
+              if (trapDmg > 0) {
+                setPlayers(prev => {
+                  const next = [...prev];
+                  const p = { ...next[advIdx] };
+                  p.hp = Math.max(0, p.hp - trapDmg);
+                  next[advIdx] = p;
+                  return next;
+                });
+                addLog(`💥 ${trap.name} : -${trapDmg} PV à ${advP.name}`);
+              }
+            }
+          }
+        }
         // Passif Messager : échange de carte lors d'un croisement en ligne droite
         if (players[currentIdx]?.cls?.passive === 'messager' && !teleported) {
           const crossedIdxs = getCrossedPlayers(startX, startY, finalX, finalY, players, currentIdx);
@@ -889,9 +1018,17 @@ export function useGameState(characters) {
           if (i !== currentIdx) return p;
           let np = { ...p, hp: Math.max(0, p.hp - dmgTaken) };
           if (!won) {
-            if (np.stats.destin > 0) {
+            if (np.hp <= 0 && np.spec?.passive === 'premier_soin' && !np.premierSoinUsed) {
+              const reviveHp = rollDie();
+              np = { ...np, hp: reviveHp, premierSoinUsed: true };
+              addLog(`🩹 Premier Soin : ${np.name} réssucite avec ${reviveHp} PV !`);
+            } else if (np.stats.destin > 0) {
+              const keepGold = np.spec?.passive === 'nde' ? np.gold : 0;
+              const keepHand = np.spec?.passive === 'nde' ? [...np.hand] : [];
+              const reviveHp = np.spec?.passive === 'nde' ? rollDie() : np.maxHp;
               const newDeck = shuffleDeck([...FULL_DECK]);
-              np = { ...np, hp: np.maxHp, x: np.baseX, y: np.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, facing: null, stats: { ...np.stats, destin: np.stats.destin - 1 } };
+              if (np.spec?.passive === 'nde') addLog(`💀 NDE : ${np.name} renaît avec ${reviveHp} PV, conserve or et main !`);
+              np = { ...np, hp: reviveHp, x: np.baseX, y: np.baseY, gold: keepGold, hand: keepHand, deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, facing: null, stats: { ...np.stats, destin: np.stats.destin - 1 } };
             } else {
               np.isAlive = false; np.hp = 0;
             }
@@ -960,6 +1097,45 @@ export function useGameState(characters) {
         });
       }
       setPhase('player_turn');
+    } else if (phase === 'voyage_astral_select') {
+      const key = `${tx},${ty}`;
+      if (!highlightTiles.includes(key) || !enemies[key]) return;
+      setPendingVoyageAstral({ monsterKey: key });
+      const mx = tx, my = ty;
+      const destTiles = [];
+      for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+        let nx = mx + dx, ny = my + dy;
+        while (nx >= 0 && ny >= 0 && ny < grid.length && nx < grid[0].length && grid[ny][nx] !== T.WALL) {
+          if (!enemies[`${nx},${ny}`]) destTiles.push(`${nx},${ny}`);
+          else break;
+          nx += dx; ny += dy;
+        }
+      }
+      if (destTiles.length === 0) {
+        addLog(`🌌 Aucune destination possible pour ce monstre.`);
+        setHighlightTiles(Object.keys(enemies));
+        return;
+      }
+      setHighlightTiles(destTiles);
+      setPhase('voyage_astral_move');
+      addLog(`🌌 Choisissez la destination du monstre.`);
+    } else if (phase === 'voyage_astral_move') {
+      const destKey = `${tx},${ty}`;
+      if (!highlightTiles.includes(destKey)) return;
+      setHighlightTiles([]);
+      const { monsterKey } = pendingVoyageAstral;
+      const monster = enemies[monsterKey];
+      setPendingVoyageAstral(null);
+      setEnemies(prev => {
+        const n = { ...prev };
+        delete n[monsterKey];
+        n[destKey] = monster;
+        return n;
+      });
+      addLog(`🌌 ${currentPlayer.name} déplace ${monster.icon} ${monster.name} vers (${tx}, ${ty}).`);
+      setHasMoved(true);
+      setActionsLeft(prev => prev - 1);
+      setPhase('player_turn');
     } else if (phase === 'choosing_attack') {
       attackTile(tx, ty);
     } else if (phase === 'bum_throw') {
@@ -969,7 +1145,7 @@ export function useGameState(characters) {
     } else if (phase === 'fou_portal') {
       confirmFouPortal(tx, ty);
     }
-  }, [phase, highlightTiles, tilesBudget, hasMoved, currentIdx, selectedCard, currentPlayer, enemies, traps, chests, players, grid, heights]);
+  }, [phase, highlightTiles, tilesBudget, hasMoved, currentIdx, selectedCard, currentPlayer, enemies, traps, chests, players, grid, heights, pendingVoyageAstral]);
 
   // Map range string → numeric radius (for circular targeting)
   const RANGE_NUMS = { melee: 1, back: 1, r2: 2, r4: 4, r6: 6, aoe1: 1, aoe2: 2 };
@@ -1114,12 +1290,29 @@ export function useGameState(characters) {
       const chanceBonus = Math.floor(cp.stats.richesse / 2);
       const effectiveRoll = Math.min(6, roll + chanceBonus);
       const isMagic = card?.effect?.type === 'magic_attack';
-      const baseStat = isMagic ? cp.stats.magie : cp.stats.force;
+      // Coeur Noir: reduce attacker's magie to 1 if adjacent to a coeur_noir player
+      let effectiveMagie = cp.stats.magie;
+      if (isMagic) {
+        const nearCoeurNoir = players.some((p, i) => i !== currentIdx && p.isAlive && p.spec?.passive === 'coeur_noir' && Math.abs(cp.x - p.x) + Math.abs(cp.y - p.y) <= 1);
+        if (nearCoeurNoir) {
+          effectiveMagie = Math.min(effectiveMagie, 1);
+          addLog(`🖤 Cœur Noir réduit la Magie de ${cp.name} à 1 !`);
+        }
+      }
+      const baseStat = isMagic ? effectiveMagie : cp.stats.force;
       let dmg = effectiveRoll + baseStat + Math.floor(cp.stats.destin / 3);
       if (card) {
         dmg += card.effect.bonus ?? 0;
         if (card.effect.special === 'crit_5_6' && effectiveRoll >= 5) dmg = Math.floor(dmg * 1.5);
         if (card.effect.special === 'double_on_6' && effectiveRoll === 6) dmg *= 2;
+      }
+      // Imperissable: AOE immunity
+      const isAoeAtk = card?.effect?.range === 'aoe1' || card?.effect?.range === 'aoe2';
+      if (isAoeAtk && targetPlayerIdx >= 0 && players[targetPlayerIdx]?.spec?.passive === 'imperissable') {
+        addLog(`💎 ${players[targetPlayerIdx].name} est immunisé aux dégâts de zone !`);
+        setActionsLeft(prev => prev - 1);
+        setPhase('player_turn');
+        return;
       }
 
       if (targetPlayerIdx >= 0) {
@@ -1155,21 +1348,60 @@ export function useGameState(characters) {
         if (!isMagicAtk && target.physicalImmune) {
           addLog(`🪨 ${target.name} est immunisé aux dégâts physiques — attaque annulée !`);
         }
+        // Voodoo reflect: defender can redirect damage if they have enough gold
+        if (!isMagicAtk && target.spec?.passive === 'voodoo' && target.gold >= actualDmg) {
+          setPendingVoodoo({ defenderIdx: targetPlayerIdx, attackerIdx: currentIdx, damage: actualDmg });
+          setPhase('voodoo_reflect');
+          addLog(`🧿 ${target.name} (Voodoo) peut renvoyer ${actualDmg} dégâts en dépensant ${actualDmg}💰 !`);
+          setActionsLeft(prev => prev - 1);
+          return;
+        }
         addLog(`${cp.name} attaque ${target.name} : dé=${roll}, dégâts=${actualDmg}`);
         setPlayers(prev => {
           const next = [...prev];
           let t = { ...next[targetPlayerIdx] };
           t.hp = Math.max(0, t.hp - actualDmg);
           if (t.hp <= 0) {
-            if (t.stats.destin > 0) {
+            if (t.spec?.passive === 'premier_soin' && !t.premierSoinUsed) {
+              const reviveHp = rollDie();
+              t = { ...t, hp: reviveHp, premierSoinUsed: true };
+              addLog(`🩹 Premier Soin : ${t.name} réssucite avec ${reviveHp} PV !`);
+            } else if (t.stats.destin > 0) {
+              const keepGold = t.spec?.passive === 'nde' ? t.gold : 0;
+              const keepHand = t.spec?.passive === 'nde' ? [...t.hand] : [];
+              const reviveHp = t.spec?.passive === 'nde' ? rollDie() : t.maxHp;
               const newDeck = shuffleDeck([...FULL_DECK]);
               const livesLeft = t.stats.destin - 1;
-              t = { ...t, hp: t.maxHp, x: t.baseX, y: t.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, facing: null, stats: { ...t.stats, destin: livesLeft } };
-              addLog(`✨ ${next[targetPlayerIdx].name} renaît à sa base ! (${livesLeft} vie(s) restante(s))`);
+              if (t.spec?.passive === 'nde') addLog(`💀 NDE : ${t.name} renaît avec ${reviveHp} PV, conserve or et main !`);
+              t = { ...t, hp: reviveHp, x: t.baseX, y: t.baseY, gold: keepGold, hand: keepHand, deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, facing: null, stats: { ...t.stats, destin: livesLeft } };
+              if (t.spec?.passive !== 'nde') addLog(`✨ ${next[targetPlayerIdx].name} renaît à sa base ! (${livesLeft} vie(s) restante(s))`);
             } else {
               t.isAlive = false;
               addLog(`💀 ${t.name} est définitivement éliminé !`);
             }
+          }
+          // Autodefense counter: if physical attack and target survived, counter-attack
+          if (!isMagicAtk && t.hp > 0 && t.spec?.passive === 'autodefense') {
+            const counterDmg = physDmg(Math.max(1, (t.stats.force ?? 1)), next[currentIdx]);
+            addLog(`🥊 ${t.name} (Autodéfense) contre-attaque : ${counterDmg} dégâts !`);
+            let attacker = { ...next[currentIdx] };
+            attacker.hp = Math.max(0, attacker.hp - counterDmg);
+            if (attacker.hp <= 0) {
+              if (attacker.spec?.passive === 'premier_soin' && !attacker.premierSoinUsed) {
+                const reviveHp = rollDie();
+                attacker = { ...attacker, hp: reviveHp, premierSoinUsed: true };
+                addLog(`🩹 Premier Soin : ${attacker.name} réssucite avec ${reviveHp} PV !`);
+              } else if (attacker.stats.destin > 0) {
+                const keepGold = attacker.spec?.passive === 'nde' ? attacker.gold : 0;
+                const keepHand = attacker.spec?.passive === 'nde' ? [...attacker.hand] : [];
+                const reviveHp = attacker.spec?.passive === 'nde' ? rollDie() : attacker.maxHp;
+                const newDeck = shuffleDeck([...FULL_DECK]);
+                attacker = { ...attacker, hp: reviveHp, x: attacker.baseX, y: attacker.baseY, gold: keepGold, hand: keepHand, deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, facing: null, stats: { ...attacker.stats, destin: attacker.stats.destin - 1 } };
+              } else {
+                attacker.isAlive = false; attacker.hp = 0;
+              }
+            }
+            next[currentIdx] = attacker;
           }
           next[targetPlayerIdx] = t;
           // Check win
@@ -1509,9 +1741,17 @@ export function useGameState(characters) {
       if (i !== currentIdx) return p;
       let np = { ...p, hp: Math.max(0, p.hp - dmgTaken) };
       if (!won) {
-        if (np.stats.destin > 0) {
+        if (np.hp <= 0 && np.spec?.passive === 'premier_soin' && !np.premierSoinUsed) {
+          const reviveHp = rollDie();
+          np = { ...np, hp: reviveHp, premierSoinUsed: true };
+          addLog(`🩹 Premier Soin : ${np.name} réssucite avec ${reviveHp} PV !`);
+        } else if (np.stats.destin > 0) {
+          const keepGold = np.spec?.passive === 'nde' ? np.gold : 0;
+          const keepHand = np.spec?.passive === 'nde' ? [...np.hand] : [];
+          const reviveHp = np.spec?.passive === 'nde' ? rollDie() : np.maxHp;
           const newDeck = shuffleDeck([...FULL_DECK]);
-          np = { ...np, hp: np.maxHp, x: np.baseX, y: np.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, facing: null, stats: { ...np.stats, destin: np.stats.destin - 1 } };
+          if (np.spec?.passive === 'nde') addLog(`💀 NDE : ${np.name} renaît avec ${reviveHp} PV, conserve or et main !`);
+          np = { ...np, hp: reviveHp, x: np.baseX, y: np.baseY, gold: keepGold, hand: keepHand, deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, facing: null, stats: { ...np.stats, destin: np.stats.destin - 1 } };
         } else {
           np.isAlive = false; np.hp = 0;
         }
@@ -1663,6 +1903,91 @@ export function useGameState(characters) {
     }
     setPhase('player_turn');
   }, [phase, pendingMessager, currentIdx, players, enemies, traps, chests, grid, heights]);
+
+  // Voodoo: defender spends gold equal to damage, attacker takes that damage instead
+  const voodooReflect = useCallback(() => {
+    if (phase !== 'voodoo_reflect') return;
+    const { defenderIdx, attackerIdx, damage } = pendingVoodoo;
+    setPendingVoodoo(null);
+    addLog(`🧿 ${players[defenderIdx].name} renvoie ${damage} dégâts à ${players[attackerIdx].name} !`);
+    setPlayers(prev => {
+      const next = [...prev];
+      const defender = { ...next[defenderIdx] };
+      let attacker = { ...next[attackerIdx] };
+      defender.gold = Math.max(0, defender.gold - damage);
+      attacker.hp = Math.max(0, attacker.hp - damage);
+      if (attacker.hp <= 0) {
+        if (attacker.spec?.passive === 'premier_soin' && !attacker.premierSoinUsed) {
+          const reviveHp = rollDie();
+          attacker = { ...attacker, hp: reviveHp, premierSoinUsed: true };
+          addLog(`🩹 Premier Soin : ${attacker.name} réssucite avec ${reviveHp} PV !`);
+        } else if (attacker.stats.destin > 0) {
+          const keepGold = attacker.spec?.passive === 'nde' ? attacker.gold : 0;
+          const keepHand = attacker.spec?.passive === 'nde' ? [...attacker.hand] : [];
+          const reviveHp = attacker.spec?.passive === 'nde' ? rollDie() : attacker.maxHp;
+          const newDeck = shuffleDeck([...FULL_DECK]);
+          attacker = { ...attacker, hp: reviveHp, x: attacker.baseX, y: attacker.baseY, gold: keepGold, hand: keepHand, deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, facing: null, stats: { ...attacker.stats, destin: attacker.stats.destin - 1 } };
+          addLog(`✨ ${players[attackerIdx].name} renaît à sa base !`);
+        } else {
+          attacker.isAlive = false; attacker.hp = 0;
+          addLog(`💀 ${players[attackerIdx].name} est éliminé !`);
+        }
+      }
+      next[attackerIdx] = attacker;
+      next[defenderIdx] = defender;
+      const alive = next.filter(p => p.isAlive);
+      if (alive.length === 1) { setWinner(alive[0]); setPhase('win'); }
+      else setPhase('player_turn');
+      return next;
+    });
+  }, [phase, pendingVoodoo, players]);
+
+  // Voodoo: take the damage normally
+  const voodooSkip = useCallback(() => {
+    if (phase !== 'voodoo_reflect') return;
+    const { defenderIdx, damage } = pendingVoodoo;
+    setPendingVoodoo(null);
+    addLog(`🧿 ${players[defenderIdx].name} absorbe les dégâts.`);
+    setPlayers(prev => {
+      const next = [...prev];
+      let defender = { ...next[defenderIdx] };
+      defender.hp = Math.max(0, defender.hp - damage);
+      if (defender.hp <= 0) {
+        if (defender.spec?.passive === 'premier_soin' && !defender.premierSoinUsed) {
+          const reviveHp = rollDie();
+          defender = { ...defender, hp: reviveHp, premierSoinUsed: true };
+          addLog(`🩹 Premier Soin : ${defender.name} réssucite avec ${reviveHp} PV !`);
+        } else if (defender.stats.destin > 0) {
+          const keepGold = defender.spec?.passive === 'nde' ? defender.gold : 0;
+          const keepHand = defender.spec?.passive === 'nde' ? [...defender.hand] : [];
+          const reviveHp = defender.spec?.passive === 'nde' ? rollDie() : defender.maxHp;
+          const newDeck = shuffleDeck([...FULL_DECK]);
+          defender = { ...defender, hp: reviveHp, x: defender.baseX, y: defender.baseY, gold: keepGold, hand: keepHand, deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, facing: null, stats: { ...defender.stats, destin: defender.stats.destin - 1 } };
+          addLog(`✨ ${players[defenderIdx].name} renaît à sa base !`);
+        } else {
+          defender.isAlive = false; defender.hp = 0;
+          addLog(`💀 ${players[defenderIdx].name} est éliminé !`);
+        }
+      }
+      next[defenderIdx] = defender;
+      const alive = next.filter(p => p.isAlive);
+      if (alive.length === 1) { setWinner(alive[0]); setPhase('win'); }
+      else setPhase('player_turn');
+      return next;
+    });
+  }, [phase, pendingVoodoo, players]);
+
+  // Voyage Astral: use move action to select and teleport a monster
+  const startVoyageAstral = useCallback(() => {
+    if (actionsLeft < 1 || hasMoved) return;
+    const cp = players[currentIdx];
+    if (cp.spec?.passive !== 'voyage_astral') return;
+    const monsterTiles = Object.keys(enemies);
+    if (monsterTiles.length === 0) { addLog(`🌌 Aucun monstre à déplacer.`); return; }
+    setHighlightTiles(monsterTiles);
+    setPhase('voyage_astral_select');
+    addLog(`🌌 ${cp.name} — Voyage Astral : choisissez un monstre à déplacer.`);
+  }, [actionsLeft, hasMoved, currentIdx, players, enemies]);
 
   // End turn — advance to next living player
   const endTurn = useCallback(() => {
@@ -1927,6 +2252,9 @@ export function useGameState(characters) {
     messagerAcceptExchange,
     messagerDeclineExchange,
     pendingMessager,
+    pendingAutodefense,
+    pendingVoodoo,
+    pendingVoyageAstral,
     skipPassive,
     skipPortalChoice,
     useItem,
@@ -1934,5 +2262,8 @@ export function useGameState(characters) {
     winner,
     isEquippable,
     isUsable,
+    voodooReflect,
+    voodooSkip,
+    startVoyageAstral,
   };
 }

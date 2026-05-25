@@ -151,6 +151,10 @@ function Game({ characters, onRestart }) {
               : g.phase === 'fou_portal' ? '🃏 Téléportation du Fou — choisissez un portail'
               : g.phase === 'messager_monster' ? '📨 Monstre — combattre ou passer ?'
               : g.phase === 'messager_exchange' ? '📨 Échange de carte'
+              : g.phase === 'autodefense_counter' ? '🥊 Autodéfense — contre-attaquer ?'
+              : g.phase === 'voodoo_reflect' ? '🧿 Voodoo — renvoyer les dégâts ?'
+              : g.phase === 'voyage_astral_select' ? '🌌 Voyage Astral — choisissez un monstre'
+              : g.phase === 'voyage_astral_move' ? '🌌 Voyage Astral — choisissez la destination'
               : g.phase}
           </span>
         </div>
@@ -177,7 +181,7 @@ function Game({ characters, onRestart }) {
             highlightTiles={g.highlightTiles}
             phase={g.phase}
             onTileClick={(x, y) => {
-              if (g.phase === 'choosing_move') g.moveToTile(x, y);
+              if (g.phase === 'choosing_move' || g.phase === 'voyage_astral_select' || g.phase === 'voyage_astral_move') g.moveToTile(x, y);
               else if (g.phase === 'choosing_attack') g.attackTile(x, y);
             }}
           />
@@ -282,6 +286,15 @@ function Game({ characters, onRestart }) {
                 hint="Lancer cette arme sur un joueur à 2 cases — la carte est détruite"
               />
             )}
+            {cp?.spec?.passive === 'voyage_astral' && !g.hasMoved && (
+              <Btn
+                label="🌌 Voyage Astral (déplacer monstre)"
+                onClick={g.startVoyageAstral}
+                disabled={!canMove}
+                primary={canMove}
+                hint="Déplace un monstre en ligne droite au lieu de vous déplacer"
+              />
+            )}
             <Btn label="⏭️ Fin de tour" onClick={g.endTurn} />
           </>)}
           {g.phase === 'choosing_move' && (<>
@@ -321,6 +334,26 @@ function Game({ characters, onRestart }) {
             <Btn label="🔄 Échanger (aléatoire)" onClick={g.messagerAcceptExchange} primary />
             <Btn label="❌ Refuser" onClick={g.messagerDeclineExchange} />
           </>)}
+          {g.phase === 'autodefense_counter' && (<>
+            <div style={{ color: '#ff8844', fontSize: 13, padding: '8px 0' }}>
+              🥊 {g.pendingAutodefense ? g.players[g.pendingAutodefense.defenderIdx]?.name : '...'} — Autodéfense : contre-attaquer ?
+            </div>
+            <Btn label="🥊 Contre-attaquer" onClick={g.autodefenseCounter} primary />
+            <Btn label="⏭️ Ignorer" onClick={g.autodefenseSkip} />
+          </>)}
+          {g.phase === 'voodoo_reflect' && (<>
+            <div style={{ color: '#aa55ff', fontSize: 13, padding: '8px 0' }}>
+              🧿 {g.pendingVoodoo ? g.players[g.pendingVoodoo.defenderIdx]?.name : '...'} — Renvoyer {g.pendingVoodoo?.damage ?? 0} dégâts ({g.pendingVoodoo?.damage ?? 0}💰) ?
+            </div>
+            <Btn label={`🧿 Renvoyer (${g.pendingVoodoo?.damage ?? 0}💰)`} onClick={g.voodooReflect} primary />
+            <Btn label="❌ Absorber" onClick={g.voodooSkip} />
+          </>)}
+          {g.phase === 'voyage_astral_select' && (
+            <div style={{ color: '#8855ff', fontSize: 13, padding: '8px 0' }}>🌌 Cliquez un monstre pour le déplacer</div>
+          )}
+          {g.phase === 'voyage_astral_move' && (
+            <div style={{ color: '#8855ff', fontSize: 13, padding: '8px 0' }}>🌌 Cliquez la destination (ligne droite)</div>
+          )}
           {g.phase === 'choosing_portal' && (<>
             <div style={{ color: '#cc88ff', fontSize: 13, padding: '8px 0' }}>🎩 Cliquez un portail surlighté pour choisir votre sortie</div>
             <Btn label="🎲 Sortie aléatoire" onClick={g.skipPortalChoice} />
