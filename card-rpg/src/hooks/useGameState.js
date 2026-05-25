@@ -1106,6 +1106,10 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
   // Show attack targets (adjacent players and enemies)
   const showAttackTargets = useCallback(() => {
     if (actionsLeft < 1) return;
+    if (!selectedCard || (selectedCard.effect.type !== 'attack' && selectedCard.effect.type !== 'magic_attack')) {
+      addLog(`⚔️ Impossible d'attaquer sans arme — sélectionnez une carte arme.`);
+      return;
+    }
     const cp = players[currentIdx];
     const cardRange = selectedCard?.effect?.range ?? null;
 

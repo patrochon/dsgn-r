@@ -91,7 +91,8 @@ function Game({ characters, onRestart }) {
   const isEquippable = cardType && ['defense', 'attack', 'magic_attack', 'passive', 'legendary'].includes(cardType);
   const isUsable = cardType && ['heal', 'buff', 'cure'].includes(cardType);
   const isScroll = cardType === 'magic';
-  const canAttack = g.actionsLeft >= 1 && g.phase === 'player_turn';
+  const canAttack = g.actionsLeft >= 1 && g.phase === 'player_turn'
+    && (cardType === 'attack' || cardType === 'magic_attack');
   const canMove = g.actionsLeft >= 1 && !g.hasMoved && g.phase === 'player_turn';
   const magieCost = g.selectedCard?.effect?.magieCost ?? 0;
   const hasMagie = magieCost === 0 || (cp?.stats?.magie ?? 0) >= magieCost;
@@ -221,6 +222,7 @@ function Game({ characters, onRestart }) {
               onClick={g.showAttackTargets}
               disabled={!canAttack}
               primary={canAttack}
+              hint={g.actionsLeft < 1 ? 'Plus d\'actions' : !(cardType === 'attack' || cardType === 'magic_attack') ? 'Sélectionnez une arme pour attaquer' : undefined}
             />
             {isEquippable && (
               <Btn
