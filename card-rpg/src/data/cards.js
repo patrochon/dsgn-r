@@ -21,6 +21,7 @@ const C = {
   SCROLL:     { key: 'parchemin',    color: '#ffcc44', label: 'Parchemin'     },
   RARE:       { key: 'objet_rare',   color: '#ff8844', label: 'Objet Rare'   },
   LEGENDARY:  { key: 'legendaire',   color: '#ffdd00', label: 'Légendaire'   },
+  BRELOQUE:   { key: 'breloque',     color: '#ccaa66', label: 'Breloque'     },
 };
 
 const R = { COMMON: 'common', UNCOMMON: 'uncommon', RARE: 'rare', LEGENDARY: 'legendary' };
@@ -158,6 +159,63 @@ const RARE_CARDS = [
   card('grimoire',      'Grimoire interdit',    '📖', C.RARE, R.RARE, 'passive', 0, '+5 Magie permanent. Lance un sort gratuit par combat (portée 2).',    'perm:magie+5,free_spell',            0, 'self'),
 ];
 
+// ─── BRELOQUES (12) — Communs synergiques ─────────────────────────────────────
+// Chaque breloque a un effet de base minuscule (+1 stat) mais un passif conditionnel
+// qui prend de l'ampleur quand combiné avec d'autres cartes.
+const BRELOQUE_CARDS = [
+  // ── Accumulation ────────────────────────────────────────────────────────────
+  card('friction',    'Pierre de Friction', '🔸', C.BRELOQUE, R.COMMON, 'passive', 1,
+    '+1 Force. Chaque dégât reçu accumule 1 friction (max 10). Ton prochain coup dépense toute la friction : +1 dégât par charge.',
+    'friction_stack', 0, 'self'),
+
+  card('bague_compte','Bague de Comptage',  '💍', C.BRELOQUE, R.COMMON, 'passive', 1,
+    '+1 Richesse. Pour chaque autre Breloque équipée : +1 Richesse supplémentaire.',
+    'richesse_per_breloque', 0, 'self'),
+
+  card('dent_chance', 'Dent Porte-Bonheur', '🦷', C.BRELOQUE, R.COMMON, 'passive', 1,
+    '+1 Destin. Les résultats de dé 1 comptent comme 2. (Se cumule avec la Pierre de l\'Ancêtre → minimum 3.)',
+    'min_roll2', 0, 'self'),
+
+  // ── Déclenchement conditionnel ───────────────────────────────────────────────
+  card('ecaille_rep', 'Écaille de Reptile', '🦎', C.BRELOQUE, R.COMMON, 'passive', 1,
+    '+1 Force. Si tu ne joues aucune carte ce tour, +2 Force à l\'attaque.',
+    'no_card_atk_bonus', 0, 'self'),
+
+  card('semelle',     'Semelle Clouée',     '👟', C.BRELOQUE, R.COMMON, 'passive', 1,
+    '+1 Déplacement. Si tu te déplaces de 4 cases ou plus en un tour, ta prochaine attaque ce tour gagne +3 Force.',
+    'momentum_attack', 0, 'self'),
+
+  card('grelot_eveil','Grelot d\'Éveil',   '🔔', C.BRELOQUE, R.COMMON, 'passive', 1,
+    '+1 Vie. Régénère 1 HP au début de chaque tour où tu n\'as subi aucun dégât au tour précédent.',
+    'regen_if_no_dmg', 0, 'self'),
+
+  // ── Chaîne de statuts (Poison → Amplification → Durée) ──────────────────────
+  card('croc_venin',  'Croc Empoisonné',   '🐍', C.BRELOQUE, R.COMMON, 'passive', 1,
+    '+1 Force. Tes attaques ont 20% de chance d\'empoisonner la cible (-1 HP/tour × 3 tours).',
+    'poison_on_hit20', 0, 'self'),
+
+  card('sel_guerre',  'Sel de Guerre',     '🧂', C.BRELOQUE, R.COMMON, 'passive', 1,
+    '+1 Force. Tes attaques infligent +3 dégâts supplémentaires aux cibles empoisonnées ou brûlées.',
+    'bonus_vs_status', 0, 'self'),
+
+  card('bougie_noire','Bougie Noire',      '🕯️', C.BRELOQUE, R.COMMON, 'passive', 1,
+    '+1 Magie. Tous tes effets actifs (buffs et débuffs) durent 1 tour de plus.',
+    'extend_effects', 0, 'self'),
+
+  // ── Amplificateurs ───────────────────────────────────────────────────────────
+  card('fil_soie',    'Fil de Soie',       '🧵', C.BRELOQUE, R.COMMON, 'passive', 1,
+    '+1 Déplacement. Chaque case que tu traverses piège le chemin. Le 1er ennemi qui y passe : -2 à son prochain jet de dé.',
+    'silk_thread', 0, 'self'),
+
+  card('galet_echo',  'Galet d\'Écho',    '🪨', C.BRELOQUE, R.COMMON, 'passive', 1,
+    '+1 Magie. Une fois par tour, rejoue la dernière carte utilisée au coût de 1 ✨ (au lieu de son coût normal).',
+    'echo_last_card', 0, 'self'),
+
+  card('plume_corp',  'Plume de Corbeau', '🪶', C.BRELOQUE, R.COMMON, 'passive', 1,
+    '+1 Magie. Chaque objet Rare ou Légendaire équipé voit tous ses bonus permanents augmentés de 1.',
+    'amplify_rare', 0, 'self'),
+];
+
 // ─── OBJETS LÉGENDAIRES (3) ───────────────────────────────────────────────────
 const LEGENDARY_CARDS = [
   card('couronne_rois', 'Couronne des Rois',   '👑', C.LEGENDARY, R.LEGENDARY, 'legendary', 0, 'Toutes les stats +3 permanent. Les ennemis proches ont 10% de chance de fuir.','perm:all+3,enemy_flee10',           0, 'aoe2'),
@@ -174,6 +232,7 @@ export const FULL_DECK = [
   ...SCROLL_CARDS,
   ...RARE_CARDS,
   ...LEGENDARY_CARDS,
+  ...BRELOQUE_CARDS,
 ];
 
 export const DECK_BY_CATEGORY = {
@@ -185,6 +244,7 @@ export const DECK_BY_CATEGORY = {
   parchemin:    SCROLL_CARDS,
   objet_rare:   RARE_CARDS,
   legendaire:   LEGENDARY_CARDS,
+  breloque:     BRELOQUE_CARDS,
 };
 
 export const RARITY_COLOR = {
