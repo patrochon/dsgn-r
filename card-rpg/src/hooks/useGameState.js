@@ -237,6 +237,11 @@ function physDmg(rawDmg, target) {
   return Math.max(0, rawDmg - reduction);
 }
 
+// Initiative: monster goes first if its attack > player's (force + magie)
+function monsterGoesFirst(player, monster) {
+  return monster.attack > ((player.stats?.force ?? 0) + (player.stats?.magie ?? 0));
+}
+
 // Generate organic height map (0 = flat, 1 = elevated, 2 = high ground)
 function generateHeights(grid) {
   const rows = grid.length;
@@ -616,12 +621,16 @@ export function useGameState(characters) {
         const pDmg = Math.max(1, roll + cp.stats.force + Math.floor(cp.stats.richesse / 2) - monsterThere.defense);
         const mDmg = Math.max(1, monsterThere.attack - Math.floor(cp.stats.force / 3));
         const rounds = Math.ceil(monsterThere.maxHp / pDmg);
-        const rawDmgTaken = Math.max(0, (rounds - 1) * mDmg);
+        const mFirst = monsterGoesFirst(cp, monsterThere);
+        const rawDmgTaken = mFirst ? rounds * mDmg : Math.max(0, (rounds - 1) * mDmg);
         const dmgTaken = physDmg(rawDmgTaken, cp);
         const won = cp.physicalImmune || cp.hp - dmgTaken > 0;
         const loot = won ? (monsterThere.loot ?? 1) : 0;
-
+        const playerPower = (cp.stats.force ?? 0) + (cp.stats.magie ?? 0);
         addLog(`⚔️ ${cp.name} affronte ${monsterThere.icon} ${monsterThere.name} (pile ${monsterThere.pile}) ! (dé:${roll})`);
+        addLog(mFirst
+          ? `⚠️ ${monsterThere.name} a l'initiative — ATK ${monsterThere.attack} > Force+Magie ${playerPower}`
+          : `⚡ ${cp.name} a l'initiative — Force+Magie ${playerPower} ≥ ATK ${monsterThere.attack}`);
         // Pile 1 vaincu → pile 2 ; pile 2 vaincu → pile 3 ; pile 3 vaincu → case libre
         if (won) {
           if (monsterThere.pile === 1) {
@@ -793,9 +802,15 @@ export function useGameState(characters) {
         const pDmg = Math.max(1, roll + cp.stats.force + Math.floor(cp.stats.richesse / 2) - m.defense);
         const mDmg = Math.max(1, m.attack - Math.floor(cp.stats.force / 3));
         const rounds = Math.ceil(m.maxHp / pDmg);
-        const dmgTaken = physDmg(mDmg * rounds, cp);
+        const mFirstLB = monsterGoesFirst(cp, m);
+        const rawLBDmg = mFirstLB ? rounds * mDmg : Math.max(0, (rounds - 1) * mDmg);
+        const dmgTaken = physDmg(rawLBDmg, cp);
         const won = cp.physicalImmune || pDmg * rounds >= m.maxHp;
+        const playerPowerLB = (cp.stats.force ?? 0) + (cp.stats.magie ?? 0);
         addLog(`🦾 ${cp.name} frappe ${m.icon} ${m.name} depuis la case adjacente !`);
+        addLog(mFirstLB
+          ? `⚠️ ${m.name} a l'initiative — ATK ${m.attack} > Force+Magie ${playerPowerLB}`
+          : `⚡ ${cp.name} a l'initiative — Force+Magie ${playerPowerLB} ≥ ATK ${m.attack}`);
         if (won) {
           if (m.pile === 1) {
             const p2 = MONSTER_PILE_2[Math.floor(Math.random() * MONSTER_PILE_2.length)];
@@ -1080,6 +1095,23 @@ export function useGameState(characters) {
       } else if (targetEnemy) {
         const defense = targetEnemy.defense ?? 0;
         const actualDmg = Math.max(1, dmg - defense);
+        const mFirstAtk = monsterGoesFirst(cp, targetEnemy);
+        const playerPowerAtk = (cp.stats.force ?? 0) + (cp.stats.magie ?? 0);
+        addLog(mFirstAtk
+          ? `⚠️ ${targetEnemy.name} a l'initiative — ATK ${targetEnemy.attack} > Force+Magie ${playerPowerAtk}`
+          : `⚡ ${cp.name} a l'initiative — Force+Magie ${playerPowerAtk} ≥ ATK ${targetEnemy.attack}`);
+        // Monster counter-attack if it goes first (and survives at least 1 round)
+        if (mFirstAtk) {
+          const counterDmg = physDmg(Math.max(1, targetEnemy.attack - Math.floor(cp.stats.force / 3)), cp);
+          addLog(`💢 ${targetEnemy.name} contre-attaque : ${counterDmg} dégâts sur ${cp.name} !`);
+          setPlayers(prev => {
+            const next = [...prev];
+            const p = { ...next[currentIdx] };
+            p.hp = Math.max(0, p.hp - counterDmg);
+            next[currentIdx] = p;
+            return next;
+          });
+        }
         addLog(`${cp.name} attaque ${targetEnemy.name} : dé=${roll}, dégâts=${actualDmg}`);
         const newHp = targetEnemy.hp - actualDmg;
         if (newHp <= 0) {
