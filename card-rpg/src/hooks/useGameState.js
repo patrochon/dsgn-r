@@ -47,6 +47,7 @@ function buildPlayer(charData, index, mapData) {
     forcedImmobile: false,
     premierSoinUsed: false,
     forcedImmobileNextTurn: false,
+    weaponJustSwapped: false,
     color: PLAYER_COLORS[index] ?? '#ffffff',
   };
 }
@@ -100,7 +101,7 @@ function getCardDeltas(card, stats) {
   if (deltas.length === 0 && card.effect.bonus > 0) {
     if (card.effect.type === 'magic_attack') {
       deltas = [{ stat: 'magie', val: card.effect.bonus }, { stat: 'force', val: Math.floor(card.effect.bonus / 2) }];
-    } else if (card.effect.type === 'attack' || card.effect.type === 'defense') {
+    } else if (card.effect.type === 'defense') {
       deltas = [{ stat: 'force', val: card.effect.bonus }];
     } else if (card.effect.type === 'legendary' && special.includes('all+3')) {
       deltas = Object.keys(stats).map(s => ({ stat: s, val: 3 }));
@@ -374,6 +375,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
         if (kept.length > 0)   addLog(`${p.name} tire ${kept.map(c => c.icon).join('')}.`);
         if (tooMany.length > 0) addLog(`🧪 ${p.name} défausse ${tooMany.map(c => c.icon).join('')} (limite 2 potions en main).`);
       }
+      p.weaponJustSwapped = false;
       next[currentIdx] = p;
       return next;
     });
@@ -413,9 +415,12 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
 
       // Unequip previous card in the same slot
       if (isWeapon && p.equippedWeapon) {
-        addLog(`↩ ${p.name} retire ${p.equippedWeapon.icon} ${p.equippedWeapon.name}.`);
+        addLog(`↩ ${p.name} retire ${p.equippedWeapon.icon} ${p.equippedWeapon.name} (défaussé).`);
         p = unequipCard(p, p.equippedWeapon);
         p.equippedWeapon = null;
+        p.weaponJustSwapped = true;
+      } else if (isWeapon) {
+        p.weaponJustSwapped = false;
       }
       if (isArmor && p.equippedArmor) {
         addLog(`↩ ${p.name} retire ${p.equippedArmor.icon} ${p.equippedArmor.name}.`);
@@ -447,10 +452,11 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       next[currentIdx] = p;
       return next;
     });
-    addLog(`${currentPlayer.name} équipe ${card.icon} ${card.name} (gratuit).`);
+    const swapped = players[currentIdx]?.equippedWeapon != null && (card.effect.type === 'attack' || card.effect.type === 'magic_attack');
+    addLog(`${currentPlayer.name} équipe ${card.icon} ${card.name} (gratuit).${swapped ? ` Ne peut attaquer qu'au prochain tour.` : ''}`);
     setSelectedCard(null);
     return true;
-  }, [currentIdx, currentPlayer]);
+  }, [currentIdx, currentPlayer, players]);
 
   // Start move — costs 1 action, animates die, shows reachable tiles
   const startMove = useCallback(() => {
@@ -1101,22 +1107,27 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
   }, [phase, highlightTiles, tilesBudget, hasMoved, currentIdx, selectedCard, currentPlayer, enemies, traps, chests, players, grid, pendingVoyageAstral]);
 
   // Map range string → numeric radius (for circular targeting)
-  const RANGE_NUMS = { melee: 1, back: 1, r2: 2, r4: 4, r6: 6, aoe1: 1, aoe2: 2 };
+  const RANGE_NUMS = { melee: 1, back: 1, r2: 2, r4: 4, r5: 5, r6: 6, aoe1: 1, aoe2: 2 };
 
   // Show attack targets (adjacent players and enemies)
   const showAttackTargets = useCallback(() => {
     if (actionsLeft < 1) return;
-    if (!selectedCard || (selectedCard.effect.type !== 'attack' && selectedCard.effect.type !== 'magic_attack')) {
-      addLog(`⚔️ Impossible d'attaquer sans arme — sélectionnez une carte arme.`);
+    const cp = players[currentIdx];
+    const weapon = cp.equippedWeapon;
+    if (!weapon) {
+      addLog(`⚔️ Impossible d'attaquer sans arme équipée.`);
       return;
     }
-    const cp = players[currentIdx];
-    const cardRange = selectedCard?.effect?.range ?? null;
+    if (cp.weaponJustSwapped) {
+      addLog(`⏳ ${cp.name} vient de changer d'arme — peut attaquer au prochain tour.`);
+      return;
+    }
+    const cardRange = weapon?.effect?.range ?? null;
 
     // Base range: stat portee, then legacy special override, then card range property
     let range = cp.stats.portee ?? 1;
-    if (selectedCard?.effect?.special) {
-      const sp = selectedCard.effect.special;
+    if (weapon?.effect?.special) {
+      const sp = weapon.effect.special;
       const m = sp.match(/range(\d+)/);
       if (m) range = Math.max(range, parseInt(m[1]));
     }
@@ -1159,7 +1170,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     setHighlightTiles(tiles);
     setPhase('choosing_attack');
     addLog(`${cp.name} choisit une cible...`);
-  }, [actionsLeft, currentIdx, players, grid, enemies, selectedCard]);
+  }, [actionsLeft, currentIdx, players, grid, enemies]);
 
   // Bum passive: throw a physical weapon card at a player within range 2 (free targeting)
   const startBumThrow = useCallback(() => {
@@ -1239,7 +1250,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     setPhase('rolling_attack');
 
     const cp = players[currentIdx];
-    const card = selectedCard;
+    const card = cp.equippedWeapon;
     const targetPlayerIdx = players.findIndex((p, i) => i !== currentIdx && p.isAlive && p.x === tx && p.y === ty);
     const targetEnemy = enemies[key];
 
@@ -1259,7 +1270,6 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       const baseStat = isMagic ? effectiveMagie : cp.stats.force;
       let dmg = effectiveRoll + baseStat + Math.floor(cp.stats.destin / 3);
       if (card) {
-        dmg += card.effect.bonus ?? 0;
         if (card.effect.special === 'crit_5_6' && effectiveRoll >= 5) dmg = Math.floor(dmg * 1.5);
         if (card.effect.special === 'double_on_6' && effectiveRoll === 6) dmg *= 2;
       }
@@ -1412,22 +1422,6 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
         setPhase('player_turn');
       } else {
         setPhase('player_turn');
-      }
-
-      // Discard attack card if it's a usable attack (not an equipped weapon)
-      if (card && (card.effect.type === 'attack' || card.effect.type === 'magic_attack')) {
-        // Only discard from hand if it's still in the hand (not already in inventory)
-        setPlayers(prev => {
-          const next = [...prev];
-          const p = { ...next[currentIdx] };
-          if (p.hand.includes(card)) {
-            p.hand = p.hand.filter(c => c !== card);
-            p.discard = [...p.discard, card];
-            next[currentIdx] = p;
-          }
-          return next;
-        });
-        setSelectedCard(null);
       }
 
       setActionsLeft(prev => prev - 1);
