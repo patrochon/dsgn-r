@@ -95,18 +95,18 @@ const ARMOR_CARDS = [
 
 // ─── ARMEMENT NON MAGIQUE (12) ────────────────────────────────────────────────
 const WEAPON_CARDS = [
-  card('dague',       'Dague',              '🗡️', C.WEAPON, R.COMMON,   'attack', 2, '+2 Force, +1 Richesse. Légère — attaque deux fois si dé = 6.',          'double_on_6',         0, 'melee'),
-  card('epee_courte', 'Épée courte',        '⚔️', C.WEAPON, R.COMMON,   'attack', 3, '+3 Force. Équilibrée, aucun malus.',                                     null,                  0, 'melee'),
-  card('hache_main',  'Hache de main',      '🪓', C.WEAPON, R.COMMON,   'attack', 3, '+3 Force. Lance-la : attaque à 2 cases de distance.',                    'throw',               0, 'melee'),
-  card('baton_combat','Bâton de combat',    '🏑', C.WEAPON, R.COMMON,   'attack', 2, '+2 Force, +1 Magie. Peut parer les attaques (dé ≥ 4).',                  'parry',               0, 'melee'),
-  card('lance',       'Lance',              '🏹', C.WEAPON, R.COMMON,   'attack', 3, '+3 Force. Portée 2 cases. Frappe avant les ennemis adjacents.',          'range2',              0, 'r2'),
-  card('epee_longue', 'Épée longue',        '🔱', C.WEAPON, R.UNCOMMON, 'attack', 4, '+4 Force. -1 Déplacement. Critique sur dé 5-6.',                        'crit_5_6',            0, 'melee'),
-  card('hache_guerre','Hache de guerre',    '⚒️', C.WEAPON, R.UNCOMMON, 'attack', 5, "+5 Force. -1 Déplacement. Ignore 2 points d'armure ennemie.",           'armor_pierce2',       0, 'melee'),
-  card('arc_court',   'Arc court',          '🏹', C.WEAPON, R.UNCOMMON, 'attack', 3, '+3 Force. Portée 4 cases. Pas d\'effet si ennemi adjacent.',            'range4',              0, 'r4'),
-  card('fléau',       "Fléau d'armes",      '⛓️', C.WEAPON, R.UNCOMMON, 'attack', 4, "+4 Force. Ignore toute l'armure ennemie si dé ≥ 5.",                    'armor_break',         0, 'melee'),
-  card('marteau',     'Marteau de guerre',  '🔨', C.WEAPON, R.UNCOMMON, 'attack', 5, '+5 Force. -2 Déplacement. Étourdit l\'ennemi sur dé 6 (passe son tour).','stun_6',             0, 'melee'),
-  card('arc_long',    'Arc long',           '🎯', C.WEAPON, R.RARE,     'attack', 4, '+4 Force. Portée 6 cases. +1 Richesse. Visée : +2 Force si immobile.',  'range6,aim',          0, 'r6'),
-  card('arbalete',    'Arbalète',           '🔰', C.WEAPON, R.RARE,     'attack', 5, '+5 Force, +1 Richesse. Perce l\'armure. Un tour sur deux.',              'armor_pierce_all,slow',0, 'r4'),
+  card('canif',       'Canif',              '🗡️', C.WEAPON, R.COMMON,   'attack', 1, 'Force requise 1. Attaque ×2 si dé = 6. +1 Richesse.',                    'double_on_6',      0, 'melee'),
+  card('epee_courte', 'Épée courte',        '⚔️', C.WEAPON, R.COMMON,   'attack', 2, 'Force requise 2. Équilibrée, aucun malus.',                              null,               0, 'melee'),
+  card('hache_main',  'Hache de main',      '🪓', C.WEAPON, R.COMMON,   'attack', 2, "Force requise 2. Lançable à 2 cases — détruite après le lancer.",        'throw_destroy',    0, 'melee'),
+  card('baton_combat','Bâton de combat',    '🏑', C.WEAPON, R.COMMON,   'attack', 1, 'Force requise 1. +1 Magie. Frappe derrière sans dépenser de mouvement.', 'back_free_attack', 0, 'back'),
+  card('lance',       'Lance',              '🏹', C.WEAPON, R.COMMON,   'attack', 2, "Force requise 2. Portée 2 cases. Repousse l'ennemi d'une case.",          'push_enemy',       0, 'r2'),
+  card('epee_longue', 'Épée longue',        '🔱', C.WEAPON, R.UNCOMMON, 'attack', 3, 'Force requise 3. Aucun déplacement possible ce tour.',                   'no_move_after',    0, 'melee'),
+  card('hache_guerre','Hache de guerre',    '⚒️', C.WEAPON, R.UNCOMMON, 'attack', 3, "Force requise 3. Perce 2 points d'armure ennemie.",                      'armor_pierce2',    0, 'melee'),
+  card('arc_court',   'Arc court',          '🏹', C.WEAPON, R.UNCOMMON, 'attack', 3, "Force requise 3. Portée 3–4 cases. Aucun effet si ennemi adjacent.",     'range_min3',       0, 'r4'),
+  card('fleau',       "Fléau d'armes",      '⛓️', C.WEAPON, R.UNCOMMON, 'attack', 3, "Force requise 3. Désarme l'ennemi (défausse 1 carte) sur dé 6.",         'disarm_6',         0, 'melee'),
+  card('marteau',     'Marteau de guerre',  '🔨', C.WEAPON, R.UNCOMMON, 'attack', 5, "Force requise 5. Étourdit l'ennemi sur dé 6 (passe son tour).",           'stun_6',           0, 'melee'),
+  card('arc_long',    'Arc long',           '🎯', C.WEAPON, R.RARE,     'attack', 5, 'Force requise 5. Portée 3–6 cases. +2 Force si immobile.',               'aim',              0, 'r6'),
+  card('arbalete',    'Arbalète',           '🔰', C.WEAPON, R.RARE,     'attack', 5, "Force requise 5. Portée 2–5 cases. Perce toute l'armure si immobile.",   'pierce_if_still',  0, 'r5'),
 ];
 
 // ─── ARMEMENT MAGIQUE (6) ─────────────────────────────────────────────────────
@@ -201,6 +201,7 @@ export const RANGE_META = {
   back:   { label: '↩',   color: '#cc8844' },
   r2:     { label: '●2',  color: '#55ccff' },
   r4:     { label: '●4',  color: '#44aaee' },
+  r5:     { label: '●5',  color: '#3399cc' },
   r6:     { label: '●6',  color: '#2288cc' },
   line:   { label: '━▶',  color: '#ffdd44' },
   aoe1:   { label: '💥1', color: '#ff7744' },
