@@ -947,30 +947,56 @@ export function useGameState(characters) {
     }
   }, [phase, highlightTiles, tilesBudget, hasMoved, currentIdx, selectedCard, currentPlayer, enemies, traps, chests, players, grid, heights]);
 
+  // Map range string → numeric radius (for circular targeting)
+  const RANGE_NUMS = { melee: 1, back: 1, r2: 2, r4: 4, r6: 6, aoe1: 1, aoe2: 2 };
+
   // Show attack targets (adjacent players and enemies)
   const showAttackTargets = useCallback(() => {
     if (actionsLeft < 1) return;
     const cp = players[currentIdx];
-    // Base range from stat portee, extended by weapon card special
+    const cardRange = selectedCard?.effect?.range ?? null;
+
+    // Base range: stat portee, then legacy special override, then card range property
     let range = cp.stats.portee ?? 1;
     if (selectedCard?.effect?.special) {
       const sp = selectedCard.effect.special;
-      const rangeMatch = sp.match(/range(\d+)/);
-      if (rangeMatch) range = Math.max(range, parseInt(rangeMatch[1]));
+      const m = sp.match(/range(\d+)/);
+      if (m) range = Math.max(range, parseInt(m[1]));
     }
+    if (cardRange && RANGE_NUMS[cardRange]) range = Math.max(range, RANGE_NUMS[cardRange]);
+
     const tiles = [];
-    for (let dy = -range; dy <= range; dy++) {
-      for (let dx = -range; dx <= range; dx++) {
-        if (Math.abs(dx) + Math.abs(dy) > range) continue;
-        if (dx === 0 && dy === 0) continue;
-        const nx = cp.x + dx;
-        const ny = cp.y + dy;
-        if (nx < 0 || ny < 0 || ny >= grid.length || nx >= grid[0].length) continue;
-        if (grid[ny][nx] === T.WALL) continue;
-        // Check if another player or enemy is here
-        const hasTarget = players.some((p, i) => i !== currentIdx && p.isAlive && p.x === nx && p.y === ny)
-          || enemies[`${nx},${ny}`];
-        if (hasTarget) tiles.push(`${nx},${ny}`);
+    const isTarget = (nx, ny) =>
+      players.some((p, i) => i !== currentIdx && p.isAlive && p.x === nx && p.y === ny)
+      || !!enemies[`${nx},${ny}`];
+
+    if (cardRange === 'back') {
+      // Single tile directly behind the player (opposite of facing)
+      if (cp.facing) {
+        const bx = cp.x - cp.facing.dx;
+        const by = cp.y - cp.facing.dy;
+        if (bx >= 0 && by >= 0 && by < grid.length && bx < grid[0].length && grid[by][bx] !== T.WALL)
+          if (isTarget(bx, by)) tiles.push(`${bx},${by}`);
+      }
+    } else if (cardRange === 'line') {
+      // All tiles in facing direction until a wall
+      if (cp.facing) {
+        let lx = cp.x + cp.facing.dx, ly = cp.y + cp.facing.dy;
+        while (lx >= 0 && ly >= 0 && ly < grid.length && lx < grid[0].length && grid[ly][lx] !== T.WALL) {
+          if (isTarget(lx, ly)) tiles.push(`${lx},${ly}`);
+          lx += cp.facing.dx; ly += cp.facing.dy;
+        }
+      }
+    } else {
+      if (cardRange === 'global') range = Math.max(grid.length, (grid[0]?.length ?? 0));
+      for (let dy = -range; dy <= range; dy++) {
+        for (let dx = -range; dx <= range; dx++) {
+          if (Math.abs(dx) + Math.abs(dy) > range || (dx === 0 && dy === 0)) continue;
+          const nx = cp.x + dx, ny = cp.y + dy;
+          if (nx < 0 || ny < 0 || ny >= grid.length || nx >= grid[0].length) continue;
+          if (grid[ny][nx] === T.WALL) continue;
+          if (isTarget(nx, ny)) tiles.push(`${nx},${ny}`);
+        }
       }
     }
     setHighlightTiles(tiles);

@@ -1,4 +1,4 @@
-import { RARITY_COLOR } from '../data/cards';
+import { RARITY_COLOR, RANGE_META } from '../data/cards';
 
 const CAT_LABEL = {
   deplacement:  'MV',
@@ -83,7 +83,7 @@ export default function CardHand({ hand, selected, onSelect, disabled }) {
               {card.name}
             </div>
 
-            {/* Bonus badge + gold value */}
+            {/* Bonus + range + gold badges */}
             <div style={{ marginTop: 'auto', display: 'flex', gap: 3, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
               {card.effect.bonus > 0 && (
                 <div style={{
@@ -96,6 +96,20 @@ export default function CardHand({ hand, selected, onSelect, disabled }) {
                   fontWeight: 700,
                 }}>
                   +{card.effect.bonus}
+                </div>
+              )}
+              {card.effect.range && RANGE_META[card.effect.range] && (
+                <div style={{
+                  fontSize: 9,
+                  background: RANGE_META[card.effect.range].color + '22',
+                  border: `1px solid ${RANGE_META[card.effect.range].color}55`,
+                  borderRadius: 4,
+                  padding: '1px 4px',
+                  color: RANGE_META[card.effect.range].color,
+                  fontWeight: 700,
+                  letterSpacing: 0.3,
+                }}>
+                  {RANGE_META[card.effect.range].label}
                 </div>
               )}
               {card.goldValue != null && (
