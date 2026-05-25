@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { FULL_DECK, shuffleDeck } from '../data/cards';
 import { MULTIPLAYER_MAPS } from '../data/multiplayerMaps';
 import { T } from '../data/map';
@@ -315,9 +315,29 @@ export function useGameState(characters) {
   const [winner, setWinner] = useState(null);
   const [pendingMessager, setPendingMessager] = useState(null);
 
+  const treasurePileRef = useRef({
+    1: shuffleDeck(FULL_DECK.filter(c => c.rarity === 'common')),
+    2: shuffleDeck(FULL_DECK.filter(c => c.rarity === 'uncommon')),
+    3: shuffleDeck(FULL_DECK.filter(c => c.rarity === 'rare' || c.rarity === 'legendary')),
+  });
+
   const currentPlayer = players[currentIdx] ?? players[0];
 
   const addLog = (msg) => setLog(prev => [msg, ...prev].slice(0, 30));
+
+  const drawFromTreasurePile = (pileNum) => {
+    const piles = treasurePileRef.current;
+    let pile = [...(piles[pileNum] ?? [])];
+    if (pile.length === 0) {
+      if (pileNum === 1) pile = shuffleDeck(FULL_DECK.filter(c => c.rarity === 'common'));
+      else if (pileNum === 2) pile = shuffleDeck(FULL_DECK.filter(c => c.rarity === 'uncommon'));
+      else pile = shuffleDeck(FULL_DECK.filter(c => c.rarity === 'rare' || c.rarity === 'legendary'));
+    }
+    if (pile.length === 0) return null;
+    const drawn = pile[0];
+    treasurePileRef.current = { ...piles, [pileNum]: pile.slice(1) };
+    return drawn;
+  };
 
   // Animate dice, call onDone(finalValue)
   const animateRoll = (onDone) => {
@@ -655,7 +675,8 @@ export function useGameState(characters) {
         const rawDmgTaken = mFirst ? rounds * mDmg : Math.max(0, (rounds - 1) * mDmg);
         const dmgTaken = physDmg(rawDmgTaken, cp);
         const won = cp.physicalImmune || cp.hp - dmgTaken > 0;
-        const loot = won ? (monsterThere.loot ?? 1) : 0;
+        const goldReward = won ? (monsterThere.attack ?? 1) : 0;
+        const treasureCard = won ? drawFromTreasurePile(monsterThere.pile) : null;
         const playerPower = (cp.stats.force ?? 0) + (cp.stats.magie ?? 0);
         addLog(`⚔️ ${cp.name} affronte ${monsterThere.icon} ${monsterThere.name} (pile ${monsterThere.pile}) ! (dé:${roll})`);
         addLog(mFirst
@@ -688,19 +709,16 @@ export function useGameState(characters) {
               np.isAlive = false; np.hp = 0;
             }
           }
-          if (won && loot > 0) {
-            let deck = [...np.deck], discard = [...np.discard];
-            if (deck.length < loot) { deck = [...deck, ...shuffleDeck(discard)]; discard = []; }
-            const drawn = deck.splice(0, loot);
-            np = { ...np, hand: [...np.hand, ...drawn], deck, discard };
+          if (won) {
+            np = { ...np, gold: (np.gold ?? 0) + goldReward };
+            if (treasureCard) np = { ...np, hand: [...np.hand, treasureCard] };
           }
           return np;
         });
         damageTakenThisMove += dmgTaken;
         setPlayers(nextPlayers);
         if (won) {
-          if (monsterThere.pile !== 1) addLog(`✅ ${monsterThere.name} vaincu (-${dmgTaken} PV, +${loot} carte(s))`);
-          else addLog(`✅ -${dmgTaken} PV, +${loot} carte(s)`);
+          addLog(`✅ ${monsterThere.name} vaincu ! -${dmgTaken} PV, +${goldReward}💰${treasureCard ? ` + ${treasureCard.icon} ${treasureCard.name}` : ''}`);
         } else if (nextPlayers[currentIdx].isAlive) {
           addLog(`✨ ${cp.name} renaît à sa base ! (${nextPlayers[currentIdx].stats.destin} vie(s) restante(s))`);
           let ni = (currentIdx + 1) % nextPlayers.length;
@@ -846,6 +864,8 @@ export function useGameState(characters) {
         const rawLBDmg = mFirstLB ? rounds * mDmg : Math.max(0, (rounds - 1) * mDmg);
         const dmgTaken = physDmg(rawLBDmg, cp);
         const won = cp.physicalImmune || pDmg * rounds >= m.maxHp;
+        const goldRewardLB = won ? (m.attack ?? 1) : 0;
+        const treasureCardLB = won ? drawFromTreasurePile(m.pile) : null;
         const playerPowerLB = (cp.stats.force ?? 0) + (cp.stats.magie ?? 0);
         addLog(`🦾 ${cp.name} frappe ${m.icon} ${m.name} depuis la case adjacente !`);
         addLog(mFirstLB
@@ -862,8 +882,8 @@ export function useGameState(characters) {
             addLog(`💀 ${m.name} vaincu — un ${p3.icon} ${p3.name} surgit !`);
           } else {
             setEnemies(prev => { const n = { ...prev }; delete n[key]; return n; });
-            addLog(`✅ ${m.name} vaincu !`);
           }
+          addLog(`✅ ${m.name} vaincu ! +${goldRewardLB}💰${treasureCardLB ? ` + ${treasureCardLB.icon} ${treasureCardLB.name}` : ''}`);
         }
         const nextPlayers = players.map((p, i) => {
           if (i !== currentIdx) return p;
@@ -875,6 +895,10 @@ export function useGameState(characters) {
             } else {
               np.isAlive = false; np.hp = 0;
             }
+          }
+          if (won) {
+            np = { ...np, gold: (np.gold ?? 0) + goldRewardLB };
+            if (treasureCardLB) np = { ...np, hand: [...np.hand, treasureCardLB] };
           }
           return np;
         });
@@ -1181,8 +1205,18 @@ export function useGameState(characters) {
         addLog(`${cp.name} attaque ${targetEnemy.name} : dé=${roll}, dégâts=${actualDmg}`);
         const newHp = targetEnemy.hp - actualDmg;
         if (newHp <= 0) {
-          addLog(`✅ ${targetEnemy.name} est vaincu !`);
+          const goldRewardAtk = targetEnemy.attack ?? 1;
+          const treasureCardAtk = drawFromTreasurePile(targetEnemy.pile);
+          addLog(`✅ ${targetEnemy.name} est vaincu ! +${goldRewardAtk}💰${treasureCardAtk ? ` + ${treasureCardAtk.icon} ${treasureCardAtk.name}` : ''}`);
           setEnemies(prev => { const n = { ...prev }; delete n[key]; return n; });
+          setPlayers(prev => {
+            const next = [...prev];
+            let np = { ...next[currentIdx] };
+            np.gold = (np.gold ?? 0) + goldRewardAtk;
+            if (treasureCardAtk) np.hand = [...np.hand, treasureCardAtk];
+            next[currentIdx] = np;
+            return next;
+          });
         } else {
           setEnemies(prev => ({ ...prev, [key]: { ...targetEnemy, hp: newHp } }));
         }
@@ -1371,8 +1405,18 @@ export function useGameState(characters) {
     } else if (targetEnemy) {
       const newHp = targetEnemy.hp - dmg;
       if (newHp <= 0) {
-        addLog(`✅ ${targetEnemy.name} est vaincu !`);
+        const goldRewardFou = targetEnemy.attack ?? 1;
+        const treasureCardFou = drawFromTreasurePile(targetEnemy.pile);
+        addLog(`✅ ${targetEnemy.name} est vaincu ! +${goldRewardFou}💰${treasureCardFou ? ` + ${treasureCardFou.icon} ${treasureCardFou.name}` : ''}`);
         setEnemies(prev => { const n = { ...prev }; delete n[key]; return n; });
+        setPlayers(prev => {
+          const next = [...prev];
+          let np = { ...next[currentIdx] };
+          np.gold = (np.gold ?? 0) + goldRewardFou;
+          if (treasureCardFou) np.hand = [...np.hand, treasureCardFou];
+          next[currentIdx] = np;
+          return next;
+        });
       } else {
         setEnemies(prev => ({ ...prev, [key]: { ...targetEnemy, hp: newHp } }));
       }
@@ -1439,7 +1483,8 @@ export function useGameState(characters) {
     const rawDmgTaken = mFirst ? rounds * mDmg : Math.max(0, (rounds - 1) * mDmg);
     const dmgTaken = physDmg(rawDmgTaken, cp);
     const won = cp.physicalImmune || cp.hp - dmgTaken > 0;
-    const loot = won ? (monsterThere.loot ?? 1) : 0;
+    const goldReward = won ? (monsterThere.attack ?? 1) : 0;
+    const treasureCard = won ? drawFromTreasurePile(monsterThere.pile) : null;
     const playerPower = (cp.stats.force ?? 0) + (cp.stats.magie ?? 0);
     addLog(`⚔️ ${cp.name} affronte ${monsterThere.icon} ${monsterThere.name} (pile ${monsterThere.pile}) ! (dé:${roll})`);
     addLog(mFirst
@@ -1471,18 +1516,16 @@ export function useGameState(characters) {
           np.isAlive = false; np.hp = 0;
         }
       }
-      if (won && loot > 0) {
-        let deck = [...np.deck], discard = [...np.discard];
-        if (deck.length < loot) { deck = [...deck, ...shuffleDeck(discard)]; discard = []; }
-        const drawn = deck.splice(0, loot);
-        np = { ...np, hand: [...np.hand, ...drawn], deck, discard };
+      if (won) {
+        np = { ...np, gold: (np.gold ?? 0) + goldReward };
+        if (treasureCard) np = { ...np, hand: [...np.hand, treasureCard] };
       }
       return np;
     });
     damageTakenThisMove += dmgTaken;
     setPlayers(nextPlayers);
     if (won) {
-      addLog(`✅ ${monsterThere.name} vaincu (-${dmgTaken} PV, +${loot} carte(s))`);
+      addLog(`✅ ${monsterThere.name} vaincu ! -${dmgTaken} PV, +${goldReward}💰${treasureCard ? ` + ${treasureCard.icon} ${treasureCard.name}` : ''}`);
     } else if (nextPlayers[currentIdx].isAlive) {
       addLog(`✨ ${cp.name} renaît à sa base ! (${nextPlayers[currentIdx].stats.destin} vie(s) restante(s))`);
       let ni = (currentIdx + 1) % nextPlayers.length;
