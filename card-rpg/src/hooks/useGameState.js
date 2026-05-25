@@ -191,10 +191,9 @@ function generateInitialTiles(mapData) {
 }
 
 // Dijkstra movement reachability — returns { tiles: string[], budgetAtTile: {key: number} }
-// hasZeles   : uphill costs 1 (not 2), downhill grants +2 budget
 // wallPass   : traverse all walls freely
 // oneWallPass: traverse at most one wall (Feux Follets passive)
-function runMoveDijkstra(fromX, fromY, budget, facing, hasZeles, wallPass, oneWallPass, grid, heights) {
+function runMoveDijkstra(fromX, fromY, budget, facing, wallPass, oneWallPass, grid) {
   const visited = {};
   const queue = [{ x: fromX, y: fromY, budget, wallsUsed: 0, dir: facing ?? null }];
   const tilesSet = new Set();
@@ -220,10 +219,7 @@ function runMoveDijkstra(fromX, fromY, budget, facing, hasZeles, wallPass, oneWa
       }
       const nWallsUsed = wallsUsed + (nIsWall ? 1 : 0);
       if (!wallPass && nWallsUsed > 1) continue;
-      const hDiff = nIsWall ? 0 : ((heights[ny]?.[nx] ?? 0) - (heights[y]?.[x] ?? 0));
-      let stepCost = hasZeles
-        ? (hDiff > 0 ? 1 : hDiff < 0 ? -2 : 1)
-        : Math.max(0, 1 + hDiff);
+      let stepCost = 1;
       // 180-degree turn costs 1 extra movement
       if (dir && dir.dx === -dx && dir.dy === -dy) stepCost += 1;
       const newBgt = bgt - stepCost;
@@ -248,30 +244,6 @@ function monsterGoesFirst(player, monster) {
   return monster.attack > ((player.stats?.force ?? 0) + (player.stats?.magie ?? 0));
 }
 
-// Generate organic height map (0 = flat, 1 = elevated, 2 = high ground)
-function generateHeights(grid) {
-  const rows = grid.length;
-  const cols = grid[0].length;
-  const h = Array.from({ length: rows }, () => new Array(cols).fill(0));
-  const seeds = Math.floor(rows * cols * 0.07);
-  for (let s = 0; s < seeds; s++) {
-    const sy = Math.floor(Math.random() * rows);
-    const sx = Math.floor(Math.random() * cols);
-    if (grid[sy][sx] === T.WALL) continue;
-    const peak = Math.random() < 0.35 ? 2 : 1;
-    for (let dy = -2; dy <= 2; dy++) {
-      for (let dx = -2; dx <= 2; dx++) {
-        const ny = sy + dy, nx = sx + dx;
-        if (ny < 0 || ny >= rows || nx < 0 || nx >= cols) continue;
-        if (grid[ny][nx] === T.WALL) continue;
-        const d = Math.abs(dx) + Math.abs(dy);
-        const th = peak - Math.floor(d / 2);
-        if (th > 0) h[ny][nx] = Math.max(h[ny][nx], th);
-      }
-    }
-  }
-  return h;
-}
 
 function getCrossedPlayers(startX, startY, endX, endY, allPlayers, currentIdx) {
   const crossed = [];
@@ -297,8 +269,7 @@ export function useGameState(characters) {
   const [mapData] = useState(() => MULTIPLAYER_MAPS[Math.floor(Math.random() * MULTIPLAYER_MAPS.length)]);
   const [mapName] = useState(() => mapData.name);
   const [grid] = useState(() => mapData.grid.map(r => [...r]));
-  const [heights] = useState(() => generateHeights(mapData.grid));
-  const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useState(() => generateInitialTiles(mapData));
+const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useState(() => generateInitialTiles(mapData));
   const [enemies, setEnemies] = useState(initEnemies);
   const [traps,   setTraps]   = useState(initTraps);
   const [chests,  setChests]  = useState(initChests);
@@ -507,15 +478,14 @@ export function useGameState(characters) {
 
       addLog(`🎲 ${currentPlayer.name} lance le dé : ${roll}${logSuffix} = ${range} cases.${card?.effect?.type === 'move' ? ` [${card.name}]` : ''}`);
 
-      const hasZeles = cp.race?.passive === 'zeles';
       const hasFeuxFollets = cp.race?.passive === 'feux_follets';
-      const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, range, cp.facing, hasZeles, wallPass, hasFeuxFollets, grid, heights);
+      const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, range, cp.facing, wallPass, hasFeuxFollets, grid);
       const otherBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
       setTilesBudget(budgetAtTile);
       setHighlightTiles(tiles.filter(t => !otherBases.has(t)));
       setPhase('choosing_move');
     });
-  }, [actionsLeft, hasMoved, selectedCard, currentIdx, players, grid, heights, setTilesBudget]);
+  }, [actionsLeft, hasMoved, selectedCard, currentIdx, players, grid, setTilesBudget]);
 
   // Anciens passive: reroll movement once per turn (no action cost)
   const rerollMove = useCallback(() => {
@@ -534,15 +504,14 @@ export function useGameState(characters) {
       else if (special === 'fixed_move') { range = bonus; logSuffix = ` (fixe ${range})`; }
       if (special === 'wall_pass') wallPass = true;
       addLog(`🌙 ${cp.name} relance le dé : ${roll}${logSuffix} = ${range} cases.`);
-      const hasZeles = false;
       const hasFeuxFollets = cp.race?.passive === 'feux_follets';
-      const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, range, cp.facing, hasZeles, wallPass, hasFeuxFollets, grid, heights);
+      const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, range, cp.facing, wallPass, hasFeuxFollets, grid);
       const otherBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
       setTilesBudget(budgetAtTile);
       setHighlightTiles(tiles.filter(t => !otherBases.has(t)));
       setPhase('choosing_move');
     });
-  }, [moveRerolled, currentIdx, players, selectedCard, grid, heights]);
+  }, [moveRerolled, currentIdx, players, selectedCard, grid]);
 
   // Complete the move
   const moveToTile = useCallback((tx, ty) => {
@@ -556,13 +525,11 @@ export function useGameState(characters) {
       if (!highlightTiles.includes(key)) return;
       if (players.some((p, i) => i !== currentIdx && p.isAlive && p.baseX === tx && p.baseY === ty)) return;
       setHighlightTiles([]);
-      const isContinuation = hasMoved; // Zélés mid-move continuation
-      if (!isContinuation) {
+      if (!hasMoved) {
         setHasMoved(true);
         setActionsLeft(prev => prev - 1);
       }
       const budgetHere = tilesBudget[key] ?? 0;
-      const hasZeles = players[currentIdx]?.race?.passive === 'zeles';
       let damageTakenThisMove = 0;
       const startX = players[currentIdx].x;
       const startY = players[currentIdx].y;
@@ -679,7 +646,7 @@ export function useGameState(characters) {
       if (monsterThere && !turnEnded) {
         if (cp.cls?.passive === 'messager') {
           const crossedIdxs = !teleported ? getCrossedPlayers(startX, startY, finalX, finalY, players, currentIdx) : [];
-          setPendingMessager({ type: 'monster', destKey, monsterThere, finalX, finalY, budgetHere, newFacing, hasZeles, teleported, damageTakenThisMove, crossedIdxs });
+          setPendingMessager({ type: 'monster', destKey, monsterThere, finalX, finalY, budgetHere, newFacing, teleported, damageTakenThisMove, crossedIdxs });
           setPhase('messager_monster');
           addLog(`📨 ${cp.name} tombe sur ${monsterThere.icon} ${monsterThere.name} — combattre ou passer ?`);
           return;
@@ -943,23 +910,9 @@ export function useGameState(characters) {
         if (players[currentIdx]?.cls?.passive === 'messager' && !teleported) {
           const crossedIdxs = getCrossedPlayers(startX, startY, finalX, finalY, players, currentIdx);
           if (crossedIdxs.length > 0) {
-            setPendingMessager({ type: 'exchange', crossedPlayerIdx: crossedIdxs[0], finalX, finalY, budgetHere, newFacing, hasZeles, damageTakenThisMove });
+            setPendingMessager({ type: 'exchange', crossedPlayerIdx: crossedIdxs[0], finalX, finalY, budgetHere, newFacing, damageTakenThisMove });
             setPhase('messager_exchange');
             addLog(`📨 ${currentPlayer.name} croise ${players[crossedIdxs[0]].name} en chemin — échange de carte ?`);
-            return;
-          }
-        }
-        // Passif Zélés : si aucun dégât reçu et budget restant > 0 → continue le déplacement
-        if (hasZeles && damageTakenThisMove === 0 && budgetHere > 0) {
-          const { tiles: contTiles, budgetAtTile: contBudget } =
-            runMoveDijkstra(finalX, finalY, budgetHere, newFacing, true, false, false, grid, heights);
-          const zelOtherBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
-          const filteredCont = contTiles.filter(t => !zelOtherBases.has(t));
-          if (filteredCont.length > 0) {
-            setTilesBudget(contBudget);
-            setHighlightTiles(filteredCont);
-            setPhase('choosing_move');
-            addLog(`⚡ Zélés continue son déplacement (${budgetHere} pts restants) !`);
             return;
           }
         }
@@ -1145,7 +1098,7 @@ export function useGameState(characters) {
     } else if (phase === 'fou_portal') {
       confirmFouPortal(tx, ty);
     }
-  }, [phase, highlightTiles, tilesBudget, hasMoved, currentIdx, selectedCard, currentPlayer, enemies, traps, chests, players, grid, heights, pendingVoyageAstral]);
+  }, [phase, highlightTiles, tilesBudget, hasMoved, currentIdx, selectedCard, currentPlayer, enemies, traps, chests, players, grid, pendingVoyageAstral]);
 
   // Map range string → numeric radius (for circular targeting)
   const RANGE_NUMS = { melee: 1, back: 1, r2: 2, r4: 4, r6: 6, aoe1: 1, aoe2: 2 };
@@ -1703,7 +1656,7 @@ export function useGameState(characters) {
     if (!pm || pm.type !== 'monster') return;
     setPendingMessager(null);
     const cp = players[currentIdx];
-    const { destKey, monsterThere, finalX, finalY, budgetHere, newFacing, hasZeles, crossedIdxs } = pm;
+    const { destKey, monsterThere, finalX, finalY, budgetHere, newFacing, crossedIdxs } = pm;
     let damageTakenThisMove = pm.damageTakenThisMove ?? 0;
     let turnEnded = false;
 
@@ -1787,16 +1740,10 @@ export function useGameState(characters) {
     }
     if (!turnEnded) {
       if (crossedIdxs && crossedIdxs.length > 0) {
-        setPendingMessager({ type: 'exchange', crossedPlayerIdx: crossedIdxs[0], finalX, finalY, budgetHere, newFacing, hasZeles, damageTakenThisMove });
+        setPendingMessager({ type: 'exchange', crossedPlayerIdx: crossedIdxs[0], finalX, finalY, budgetHere, newFacing, damageTakenThisMove });
         setPhase('messager_exchange');
         addLog(`📨 ${cp.name} croise ${players[crossedIdxs[0]].name} — échange de carte ?`);
         return;
-      }
-      if (hasZeles && damageTakenThisMove === 0 && budgetHere > 0) {
-        const { tiles: contTiles, budgetAtTile: contBudget } = runMoveDijkstra(finalX, finalY, budgetHere, newFacing, true, false, false, grid, heights);
-        const zelBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
-        const filtered = contTiles.filter(t => !zelBases.has(t));
-        if (filtered.length > 0) { setTilesBudget(contBudget); setHighlightTiles(filtered); setPhase('choosing_move'); addLog(`⚡ Zélés continue (${budgetHere} pts) !`); return; }
       }
       const hasLongsBras = players[currentIdx]?.race?.passive === 'longs_bras';
       if (hasLongsBras) {
@@ -1806,7 +1753,7 @@ export function useGameState(characters) {
       }
       setPhase('player_turn');
     }
-  }, [phase, pendingMessager, currentIdx, players, enemies, traps, chests, grid, heights]);
+  }, [phase, pendingMessager, currentIdx, players, enemies, traps, chests, grid]);
 
   // Messager: skip the monster on current tile
   const messagerSkip = useCallback(() => {
@@ -1815,19 +1762,13 @@ export function useGameState(characters) {
     if (!pm || pm.type !== 'monster') return;
     setPendingMessager(null);
     const cp = players[currentIdx];
-    const { monsterThere, finalX, finalY, budgetHere, newFacing, hasZeles, crossedIdxs } = pm;
+    const { monsterThere, finalX, finalY, budgetHere, newFacing, crossedIdxs } = pm;
     addLog(`📨 ${cp.name} passe à travers ${monsterThere.icon} ${monsterThere.name} sans combattre.`);
     if (crossedIdxs && crossedIdxs.length > 0) {
-      setPendingMessager({ type: 'exchange', crossedPlayerIdx: crossedIdxs[0], finalX, finalY, budgetHere, newFacing, hasZeles, damageTakenThisMove: 0 });
+      setPendingMessager({ type: 'exchange', crossedPlayerIdx: crossedIdxs[0], finalX, finalY, budgetHere, newFacing, damageTakenThisMove: 0 });
       setPhase('messager_exchange');
       addLog(`📨 ${cp.name} croise ${players[crossedIdxs[0]].name} — échange de carte ?`);
       return;
-    }
-    if (hasZeles && budgetHere > 0) {
-      const { tiles: contTiles, budgetAtTile: contBudget } = runMoveDijkstra(finalX, finalY, budgetHere, newFacing, true, false, false, grid, heights);
-      const zelBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
-      const filtered = contTiles.filter(t => !zelBases.has(t));
-      if (filtered.length > 0) { setTilesBudget(contBudget); setHighlightTiles(filtered); setPhase('choosing_move'); addLog(`⚡ Zélés continue (${budgetHere} pts) !`); return; }
     }
     const hasLongsBras = cp.race?.passive === 'longs_bras';
     if (hasLongsBras) {
@@ -1836,14 +1777,14 @@ export function useGameState(characters) {
       if (adjTargets.length > 0) { setHighlightTiles(adjTargets); setPhase('longs_bras_passive'); addLog(`🦾 Passif Longs Bras : choisissez une case adjacente.`); return; }
     }
     setPhase('player_turn');
-  }, [phase, pendingMessager, currentIdx, players, enemies, traps, chests, grid, heights]);
+  }, [phase, pendingMessager, currentIdx, players, enemies, traps, chests, grid]);
 
   // Messager: accept random card exchange with crossed player
   const messagerAcceptExchange = useCallback(() => {
     if (phase !== 'messager_exchange') return;
     const pm = pendingMessager;
     if (!pm || pm.type !== 'exchange') return;
-    const { crossedPlayerIdx, finalX, finalY, budgetHere, newFacing, hasZeles, damageTakenThisMove } = pm;
+    const { crossedPlayerIdx, finalX, finalY, budgetHere, newFacing, damageTakenThisMove } = pm;
     setPendingMessager(null);
     const cp = players[currentIdx];
     const target = players[crossedPlayerIdx];
@@ -1866,12 +1807,6 @@ export function useGameState(characters) {
     } else {
       addLog(`📨 Pas de cartes à échanger.`);
     }
-    if (hasZeles && damageTakenThisMove === 0 && budgetHere > 0) {
-      const { tiles: contTiles, budgetAtTile: contBudget } = runMoveDijkstra(finalX, finalY, budgetHere, newFacing, true, false, false, grid, heights);
-      const zelBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
-      const filtered = contTiles.filter(t => !zelBases.has(t));
-      if (filtered.length > 0) { setTilesBudget(contBudget); setHighlightTiles(filtered); setPhase('choosing_move'); addLog(`⚡ Zélés continue (${budgetHere} pts) !`); return; }
-    }
     const hasLongsBras = players[currentIdx]?.race?.passive === 'longs_bras';
     if (hasLongsBras) {
       const adjKeys = [[-1,0],[1,0],[0,-1],[0,1]].map(([dx,dy]) => `${finalX+dx},${finalY+dy}`);
@@ -1879,22 +1814,16 @@ export function useGameState(characters) {
       if (adjTargets.length > 0) { setHighlightTiles(adjTargets); setPhase('longs_bras_passive'); addLog(`🦾 Passif Longs Bras : choisissez une case adjacente.`); return; }
     }
     setPhase('player_turn');
-  }, [phase, pendingMessager, currentIdx, players, enemies, traps, chests, grid, heights]);
+  }, [phase, pendingMessager, currentIdx, players, enemies, traps, chests, grid]);
 
   // Messager: decline the card exchange
   const messagerDeclineExchange = useCallback(() => {
     if (phase !== 'messager_exchange') return;
     const pm = pendingMessager;
     if (!pm || pm.type !== 'exchange') return;
-    const { finalX, finalY, budgetHere, newFacing, hasZeles, damageTakenThisMove } = pm;
+    const { finalX, finalY, budgetHere, newFacing } = pm;
     setPendingMessager(null);
     addLog(`📨 ${players[currentIdx].name} refuse l'échange.`);
-    if (hasZeles && damageTakenThisMove === 0 && budgetHere > 0) {
-      const { tiles: contTiles, budgetAtTile: contBudget } = runMoveDijkstra(finalX, finalY, budgetHere, newFacing, true, false, false, grid, heights);
-      const zelBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
-      const filtered = contTiles.filter(t => !zelBases.has(t));
-      if (filtered.length > 0) { setTilesBudget(contBudget); setHighlightTiles(filtered); setPhase('choosing_move'); addLog(`⚡ Zélés continue (${budgetHere} pts) !`); return; }
-    }
     const hasLongsBras = players[currentIdx]?.race?.passive === 'longs_bras';
     if (hasLongsBras) {
       const adjKeys = [[-1,0],[1,0],[0,-1],[0,1]].map(([dx,dy]) => `${finalX+dx},${finalY+dy}`);
@@ -1902,7 +1831,7 @@ export function useGameState(characters) {
       if (adjTargets.length > 0) { setHighlightTiles(adjTargets); setPhase('longs_bras_passive'); addLog(`🦾 Passif Longs Bras : choisissez une case adjacente.`); return; }
     }
     setPhase('player_turn');
-  }, [phase, pendingMessager, currentIdx, players, enemies, traps, chests, grid, heights]);
+  }, [phase, pendingMessager, currentIdx, players, enemies, traps, chests, grid]);
 
   // Voodoo: defender spends gold equal to damage, attacker takes that damage instead
   const voodooReflect = useCallback(() => {
@@ -2217,7 +2146,6 @@ export function useGameState(characters) {
     currentIdx,
     currentPlayer,
     grid,
-    heights,
     enemies,
     traps,
     chests,

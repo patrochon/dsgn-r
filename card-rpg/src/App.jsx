@@ -177,7 +177,6 @@ function Game({ characters, onRestart }) {
             enemies={g.enemies}
             traps={g.traps}
             chests={g.chests}
-            heights={g.heights}
             highlightTiles={g.highlightTiles}
             phase={g.phase}
             onTileClick={(x, y) => {

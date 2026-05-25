@@ -5,8 +5,8 @@ const TILE_SIZE = 40;
 // ─── Tile visual data ─────────────────────────────────────────────────────────
 const TILE_DEF = {
   [T.FLOOR]: {
-    bg:     ['#111120', '#161626', '#1d1d32'],   // by height 0/1/2
-    border: ['#1c1c30', '#222240', '#2a2a52'],
+    bg:     '#111120',
+    border: '#1c1c30',
   },
   [T.WALL]: {
     bg: '#06060e', border: '#03030a',
@@ -64,21 +64,6 @@ function HighlightRing({ color }) {
   );
 }
 
-// Elevation indicator top-left
-function ElevBadge({ level }) {
-  return (
-    <div style={{
-      position: 'absolute', top: 2, left: 2,
-      fontSize: 6, color: level === 2 ? '#ffee88' : '#8899cc',
-      fontWeight: 900, lineHeight: 1, opacity: 0.8,
-      pointerEvents: 'none', letterSpacing: -0.5,
-      textShadow: '0 0 3px #000',
-    }}>
-      {level === 2 ? '▲▲' : '▲'}
-    </div>
-  );
-}
-
 // Special tile content (shop, teleport, exit)
 function SpecialTileContent({ def }) {
   if (!def) return null;
@@ -116,7 +101,6 @@ function HpBar({ pct, color, width = 26 }) {
 const LEGEND_ITEMS = [
   { label: 'Sol',      bg: '#111120', border: '#1c1c30', icon: null },
   { label: 'Mur',      bg: '#06060e', border: '#03030a', icon: null, pattern: true },
-  { label: 'Hauteur',  bg: '#1d1d32', border: '#2a2a52', icon: '▲', iconColor: '#8899cc' },
   { label: 'Magasin',  bg: '#1c1400', border: '#cc9900', icon: '🏪' },
   { label: 'Téléport', bg: '#0d0019', border: '#8833ee', icon: '🌀' },
   { label: 'Objectif', bg: '#001810', border: '#00bb66', icon: '⭐' },
@@ -165,7 +149,7 @@ function MapLegend() {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function GameMap({ grid, players, currentIdx, enemies, traps, chests, heights, highlightTiles, phase, onTileClick }) {
+export default function GameMap({ grid, players, currentIdx, enemies, traps, chests, highlightTiles, phase, onTileClick }) {
   const rows = grid.length;
   const cols = grid[0].length;
 
@@ -217,7 +201,6 @@ export default function GameMap({ grid, players, currentIdx, enemies, traps, che
           const isCurrent  = playerHere?.idx === currentIdx;
           const isAtk      = isHighlight && (phase === 'choosing_attack' || phase === 'bum_throw' || phase === 'fou_attack');
           const isMove     = isHighlight && !isAtk;
-          const tileH      = (!isWall && heights?.[y]?.[x]) ? Math.min(heights[y][x], 2) : 0;
           const isOwnBase  = playerHere && playerHere.player.baseX === x && playerHere.player.baseY === y;
 
           // Background and border
@@ -255,7 +238,7 @@ export default function GameMap({ grid, players, currentIdx, enemies, traps, che
             bg = `${baseHere.player.color}12`; border = `${baseHere.player.color}44`;
           } else {
             const fd = TILE_DEF[T.FLOOR];
-            bg = fd.bg[tileH]; border = fd.border[tileH];
+            bg = fd.bg; border = fd.border;
           }
 
           return (
@@ -279,7 +262,6 @@ export default function GameMap({ grid, players, currentIdx, enemies, traps, che
               {isWall && <WallCell />}
 
               {/* Height indicator */}
-              {tileH > 0 && !isWall && <ElevBadge level={tileH} />}
 
               {/* Highlight ring */}
               {isHighlight && !isWall && (
