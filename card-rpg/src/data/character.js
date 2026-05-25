@@ -81,7 +81,8 @@ export const CLASSES = [
     name: 'Le Messager',
     icon: '📨',
     flavor: 'Plus rapide que la rumeur. Il traverse les zones de combat sans même être vu.',
-    bonuses: { deplacement: 3, richesse: 2 },
+    bonuses: { deplacement: 2, richesse: 1 },
+    passive: 'messager',
   },
   {
     id: 'cravate',
@@ -189,6 +190,14 @@ export const SPECS = [
 export const BASE_STATS = {
   force: 1, magie: 1, vie: 6, deplacement: 0, richesse: 1, destin: 1, portee: 1,
 };
+
+export function getSpecs() {
+  try {
+    const s = localStorage.getItem('detopia_custom_specs');
+    if (s) return JSON.parse(s);
+  } catch {}
+  return SPECS;
+}
 
 export function computeStats(race, cls, spec) {
   const stats = { ...BASE_STATS };

@@ -149,6 +149,8 @@ function Game({ characters, onRestart }) {
               : g.phase === 'bum_throw' ? '🧣 Choisissez une cible à atteindre'
               : g.phase === 'fou_attack' ? '🃏 Sort du Fou — choisissez une cible'
               : g.phase === 'fou_portal' ? '🃏 Téléportation du Fou — choisissez un portail'
+              : g.phase === 'messager_monster' ? '📨 Monstre — combattre ou passer ?'
+              : g.phase === 'messager_exchange' ? '📨 Échange de carte'
               : g.phase}
           </span>
         </div>
@@ -304,6 +306,20 @@ function Game({ characters, onRestart }) {
           {g.phase === 'longs_bras_passive' && (<>
             <div style={{ color: '#aaffcc', fontSize: 13, padding: '8px 0' }}>🦾 Cliquez une case adjacente surlignée pour activer son effet (gratuit)</div>
             <Btn label="⏭️ Passer" onClick={g.skipPassive} />
+          </>)}
+          {g.phase === 'messager_monster' && (<>
+            <div style={{ color: '#ff8844', fontSize: 13, padding: '8px 0' }}>
+              📨 {cp?.name} — le monstre bloque le chemin. Combattre ou ignorer ?
+            </div>
+            <Btn label="⚔️ Combattre" onClick={g.messagerFight} primary />
+            <Btn label="📨 Ignorer et passer" onClick={g.messagerSkip} />
+          </>)}
+          {g.phase === 'messager_exchange' && (<>
+            <div style={{ color: '#44aaff', fontSize: 13, padding: '8px 0' }}>
+              📨 {cp?.name} croise {g.pendingMessager?.crossedPlayerIdx != null ? g.players[g.pendingMessager.crossedPlayerIdx]?.name : 'un joueur'} — échangez une carte au hasard ?
+            </div>
+            <Btn label="🔄 Échanger (aléatoire)" onClick={g.messagerAcceptExchange} primary />
+            <Btn label="❌ Refuser" onClick={g.messagerDeclineExchange} />
           </>)}
           {g.phase === 'choosing_portal' && (<>
             <div style={{ color: '#cc88ff', fontSize: 13, padding: '8px 0' }}>🎩 Cliquez un portail surlighté pour choisir votre sortie</div>

@@ -267,6 +267,26 @@ function generateHeights(grid) {
   return h;
 }
 
+function getCrossedPlayers(startX, startY, endX, endY, allPlayers, currentIdx) {
+  const crossed = [];
+  if (startX === endX && startY !== endY) {
+    const minY = Math.min(startY, endY);
+    const maxY = Math.max(startY, endY);
+    for (let i = 0; i < allPlayers.length; i++) {
+      if (i === currentIdx || !allPlayers[i].isAlive) continue;
+      if (allPlayers[i].x === startX && allPlayers[i].y > minY && allPlayers[i].y < maxY) crossed.push(i);
+    }
+  } else if (startY === endY && startX !== endX) {
+    const minX = Math.min(startX, endX);
+    const maxX = Math.max(startX, endX);
+    for (let i = 0; i < allPlayers.length; i++) {
+      if (i === currentIdx || !allPlayers[i].isAlive) continue;
+      if (allPlayers[i].y === startY && allPlayers[i].x > minX && allPlayers[i].x < maxX) crossed.push(i);
+    }
+  }
+  return crossed;
+}
+
 export function useGameState(characters) {
   const [mapData] = useState(() => MULTIPLAYER_MAPS[Math.floor(Math.random() * MULTIPLAYER_MAPS.length)]);
   const [mapName] = useState(() => mapData.name);
@@ -293,6 +313,7 @@ export function useGameState(characters) {
   const [selectedCard, setSelectedCard] = useState(null);
   const [log, setLog] = useState(['Bienvenue dans la partie multijoueur !', 'Joueur 1 commence — tirez vos cartes.']);
   const [winner, setWinner] = useState(null);
+  const [pendingMessager, setPendingMessager] = useState(null);
 
   const currentPlayer = players[currentIdx] ?? players[0];
 
@@ -507,6 +528,8 @@ export function useGameState(characters) {
       const budgetHere = tilesBudget[key] ?? 0;
       const hasZeles = players[currentIdx]?.race?.passive === 'zeles';
       let damageTakenThisMove = 0;
+      const startX = players[currentIdx].x;
+      const startY = players[currentIdx].y;
 
       // Collect all teleport tiles on the map
       const teleportTiles = [];
@@ -617,6 +640,13 @@ export function useGameState(characters) {
       // — Monster encounter —
       const monsterThere = enemies[destKey];
       if (monsterThere && !turnEnded) {
+        if (cp.cls?.passive === 'messager') {
+          const crossedIdxs = !teleported ? getCrossedPlayers(startX, startY, finalX, finalY, players, currentIdx) : [];
+          setPendingMessager({ type: 'monster', destKey, monsterThere, finalX, finalY, budgetHere, newFacing, hasZeles, teleported, damageTakenThisMove, crossedIdxs });
+          setPhase('messager_monster');
+          addLog(`📨 ${cp.name} tombe sur ${monsterThere.icon} ${monsterThere.name} — combattre ou passer ?`);
+          return;
+        }
         const roll = rollDie();
         const pDmg = Math.max(1, roll + cp.stats.force + Math.floor(cp.stats.richesse / 2) - monsterThere.defense);
         const mDmg = Math.max(1, monsterThere.attack - Math.floor(cp.stats.force / 3));
@@ -762,6 +792,16 @@ export function useGameState(characters) {
       }
 
       if (!turnEnded) {
+        // Passif Messager : échange de carte lors d'un croisement en ligne droite
+        if (players[currentIdx]?.cls?.passive === 'messager' && !teleported) {
+          const crossedIdxs = getCrossedPlayers(startX, startY, finalX, finalY, players, currentIdx);
+          if (crossedIdxs.length > 0) {
+            setPendingMessager({ type: 'exchange', crossedPlayerIdx: crossedIdxs[0], finalX, finalY, budgetHere, newFacing, hasZeles, damageTakenThisMove });
+            setPhase('messager_exchange');
+            addLog(`📨 ${currentPlayer.name} croise ${players[crossedIdxs[0]].name} en chemin — échange de carte ?`);
+            return;
+          }
+        }
         // Passif Zélés : si aucun dégât reçu et budget restant > 0 → continue le déplacement
         if (hasZeles && damageTakenThisMove === 0 && budgetHere > 0) {
           const { tiles: contTiles, budgetAtTile: contBudget } =
@@ -1354,6 +1394,207 @@ export function useGameState(characters) {
     setActionsLeft(prev => prev - 1);
   }, [actionsLeft, currentIdx, players]);
 
+  // Messager: fight the monster on current tile
+  const messagerFight = useCallback(() => {
+    if (phase !== 'messager_monster') return;
+    const pm = pendingMessager;
+    if (!pm || pm.type !== 'monster') return;
+    setPendingMessager(null);
+    const cp = players[currentIdx];
+    const { destKey, monsterThere, finalX, finalY, budgetHere, newFacing, hasZeles, crossedIdxs } = pm;
+    let damageTakenThisMove = pm.damageTakenThisMove ?? 0;
+    let turnEnded = false;
+
+    const roll = rollDie();
+    const pDmg = Math.max(1, roll + cp.stats.force + Math.floor(cp.stats.richesse / 2) - monsterThere.defense);
+    const mDmg = Math.max(1, monsterThere.attack - Math.floor(cp.stats.force / 3));
+    const rounds = Math.ceil(monsterThere.maxHp / pDmg);
+    const mFirst = monsterGoesFirst(cp, monsterThere);
+    const rawDmgTaken = mFirst ? rounds * mDmg : Math.max(0, (rounds - 1) * mDmg);
+    const dmgTaken = physDmg(rawDmgTaken, cp);
+    const won = cp.physicalImmune || cp.hp - dmgTaken > 0;
+    const loot = won ? (monsterThere.loot ?? 1) : 0;
+    const playerPower = (cp.stats.force ?? 0) + (cp.stats.magie ?? 0);
+    addLog(`⚔️ ${cp.name} affronte ${monsterThere.icon} ${monsterThere.name} (pile ${monsterThere.pile}) ! (dé:${roll})`);
+    addLog(mFirst
+      ? `⚠️ ${monsterThere.name} a l'initiative — ATK ${monsterThere.attack} > Force+Magie ${playerPower}`
+      : `⚡ ${cp.name} a l'initiative — Force+Magie ${playerPower} ≥ ATK ${monsterThere.attack}`);
+    if (won) {
+      if (monsterThere.pile === 1) {
+        const p2 = MONSTER_PILE_2[Math.floor(Math.random() * MONSTER_PILE_2.length)];
+        setEnemies(prev => ({ ...prev, [destKey]: { ...p2, hp: p2.maxHp } }));
+        addLog(`💀 ${monsterThere.name} vaincu — un ${p2.icon} ${p2.name} surgit !`);
+      } else if (monsterThere.pile === 2) {
+        const p3 = MONSTER_PILE_3[Math.floor(Math.random() * MONSTER_PILE_3.length)];
+        setEnemies(prev => ({ ...prev, [destKey]: { ...p3, hp: p3.maxHp } }));
+        addLog(`💀 ${monsterThere.name} vaincu — un ${p3.icon} ${p3.name} surgit !`);
+      } else {
+        setEnemies(prev => { const n = { ...prev }; delete n[destKey]; return n; });
+      }
+    } else {
+      setEnemies(prev => { const n = { ...prev }; delete n[destKey]; return n; });
+    }
+    const nextPlayers = players.map((p, i) => {
+      if (i !== currentIdx) return p;
+      let np = { ...p, hp: Math.max(0, p.hp - dmgTaken) };
+      if (!won) {
+        if (np.stats.destin > 0) {
+          const newDeck = shuffleDeck([...FULL_DECK]);
+          np = { ...np, hp: np.maxHp, x: np.baseX, y: np.baseY, gold: 0, hand: [], deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, facing: null, stats: { ...np.stats, destin: np.stats.destin - 1 } };
+        } else {
+          np.isAlive = false; np.hp = 0;
+        }
+      }
+      if (won && loot > 0) {
+        let deck = [...np.deck], discard = [...np.discard];
+        if (deck.length < loot) { deck = [...deck, ...shuffleDeck(discard)]; discard = []; }
+        const drawn = deck.splice(0, loot);
+        np = { ...np, hand: [...np.hand, ...drawn], deck, discard };
+      }
+      return np;
+    });
+    damageTakenThisMove += dmgTaken;
+    setPlayers(nextPlayers);
+    if (won) {
+      addLog(`✅ ${monsterThere.name} vaincu (-${dmgTaken} PV, +${loot} carte(s))`);
+    } else if (nextPlayers[currentIdx].isAlive) {
+      addLog(`✨ ${cp.name} renaît à sa base ! (${nextPlayers[currentIdx].stats.destin} vie(s) restante(s))`);
+      let ni = (currentIdx + 1) % nextPlayers.length;
+      while (!nextPlayers[ni]?.isAlive) ni = (ni + 1) % nextPlayers.length;
+      setCurrentIdx(ni); setActionsLeft(0); setHasMoved(false); setPhase('draw');
+      addLog(`--- Tour de ${nextPlayers[ni].name} ---`);
+      turnEnded = true;
+    } else {
+      addLog(`💀 ${cp.name} est définitivement tué par ${monsterThere.name} !`);
+      const alive = nextPlayers.filter(p => p.isAlive);
+      if (alive.length === 1) { setWinner(alive[0]); setPhase('win'); }
+      else {
+        let ni = (currentIdx + 1) % nextPlayers.length;
+        while (!nextPlayers[ni]?.isAlive) ni = (ni + 1) % nextPlayers.length;
+        setCurrentIdx(ni); setActionsLeft(0); setHasMoved(false); setPhase('draw');
+        addLog(`--- Tour de ${nextPlayers[ni].name} ---`);
+      }
+      turnEnded = true;
+    }
+    if (!turnEnded) {
+      if (crossedIdxs && crossedIdxs.length > 0) {
+        setPendingMessager({ type: 'exchange', crossedPlayerIdx: crossedIdxs[0], finalX, finalY, budgetHere, newFacing, hasZeles, damageTakenThisMove });
+        setPhase('messager_exchange');
+        addLog(`📨 ${cp.name} croise ${players[crossedIdxs[0]].name} — échange de carte ?`);
+        return;
+      }
+      if (hasZeles && damageTakenThisMove === 0 && budgetHere > 0) {
+        const { tiles: contTiles, budgetAtTile: contBudget } = runMoveDijkstra(finalX, finalY, budgetHere, newFacing, true, false, false, grid, heights);
+        const zelBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
+        const filtered = contTiles.filter(t => !zelBases.has(t));
+        if (filtered.length > 0) { setTilesBudget(contBudget); setHighlightTiles(filtered); setPhase('choosing_move'); addLog(`⚡ Zélés continue (${budgetHere} pts) !`); return; }
+      }
+      const hasLongsBras = players[currentIdx]?.race?.passive === 'longs_bras';
+      if (hasLongsBras) {
+        const adjKeys = [[-1,0],[1,0],[0,-1],[0,1]].map(([dx,dy]) => `${finalX+dx},${finalY+dy}`);
+        const adjTargets = adjKeys.filter(k => enemies[k] || traps[k] || chests[k]);
+        if (adjTargets.length > 0) { setHighlightTiles(adjTargets); setPhase('longs_bras_passive'); addLog(`🦾 Passif Longs Bras : choisissez une case adjacente.`); return; }
+      }
+      setPhase('player_turn');
+    }
+  }, [phase, pendingMessager, currentIdx, players, enemies, traps, chests, grid, heights]);
+
+  // Messager: skip the monster on current tile
+  const messagerSkip = useCallback(() => {
+    if (phase !== 'messager_monster') return;
+    const pm = pendingMessager;
+    if (!pm || pm.type !== 'monster') return;
+    setPendingMessager(null);
+    const cp = players[currentIdx];
+    const { monsterThere, finalX, finalY, budgetHere, newFacing, hasZeles, crossedIdxs } = pm;
+    addLog(`📨 ${cp.name} passe à travers ${monsterThere.icon} ${monsterThere.name} sans combattre.`);
+    if (crossedIdxs && crossedIdxs.length > 0) {
+      setPendingMessager({ type: 'exchange', crossedPlayerIdx: crossedIdxs[0], finalX, finalY, budgetHere, newFacing, hasZeles, damageTakenThisMove: 0 });
+      setPhase('messager_exchange');
+      addLog(`📨 ${cp.name} croise ${players[crossedIdxs[0]].name} — échange de carte ?`);
+      return;
+    }
+    if (hasZeles && budgetHere > 0) {
+      const { tiles: contTiles, budgetAtTile: contBudget } = runMoveDijkstra(finalX, finalY, budgetHere, newFacing, true, false, false, grid, heights);
+      const zelBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
+      const filtered = contTiles.filter(t => !zelBases.has(t));
+      if (filtered.length > 0) { setTilesBudget(contBudget); setHighlightTiles(filtered); setPhase('choosing_move'); addLog(`⚡ Zélés continue (${budgetHere} pts) !`); return; }
+    }
+    const hasLongsBras = cp.race?.passive === 'longs_bras';
+    if (hasLongsBras) {
+      const adjKeys = [[-1,0],[1,0],[0,-1],[0,1]].map(([dx,dy]) => `${finalX+dx},${finalY+dy}`);
+      const adjTargets = adjKeys.filter(k => enemies[k] || traps[k] || chests[k]);
+      if (adjTargets.length > 0) { setHighlightTiles(adjTargets); setPhase('longs_bras_passive'); addLog(`🦾 Passif Longs Bras : choisissez une case adjacente.`); return; }
+    }
+    setPhase('player_turn');
+  }, [phase, pendingMessager, currentIdx, players, enemies, traps, chests, grid, heights]);
+
+  // Messager: accept random card exchange with crossed player
+  const messagerAcceptExchange = useCallback(() => {
+    if (phase !== 'messager_exchange') return;
+    const pm = pendingMessager;
+    if (!pm || pm.type !== 'exchange') return;
+    const { crossedPlayerIdx, finalX, finalY, budgetHere, newFacing, hasZeles, damageTakenThisMove } = pm;
+    setPendingMessager(null);
+    const cp = players[currentIdx];
+    const target = players[crossedPlayerIdx];
+    if (target && target.hand.length > 0 && cp.hand.length > 0) {
+      const myIdx = Math.floor(Math.random() * cp.hand.length);
+      const theirIdx = Math.floor(Math.random() * target.hand.length);
+      const myCard = cp.hand[myIdx];
+      const theirCard = target.hand[theirIdx];
+      setPlayers(prev => {
+        const next = [...prev];
+        const me = { ...next[currentIdx], hand: [...next[currentIdx].hand] };
+        const them = { ...next[crossedPlayerIdx], hand: [...next[crossedPlayerIdx].hand] };
+        me.hand[myIdx] = theirCard;
+        them.hand[theirIdx] = myCard;
+        next[currentIdx] = me;
+        next[crossedPlayerIdx] = them;
+        return next;
+      });
+      addLog(`📨 ${cp.name} échange ${myCard.icon} contre ${theirCard.icon} ${theirCard.name} (${target.name}) !`);
+    } else {
+      addLog(`📨 Pas de cartes à échanger.`);
+    }
+    if (hasZeles && damageTakenThisMove === 0 && budgetHere > 0) {
+      const { tiles: contTiles, budgetAtTile: contBudget } = runMoveDijkstra(finalX, finalY, budgetHere, newFacing, true, false, false, grid, heights);
+      const zelBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
+      const filtered = contTiles.filter(t => !zelBases.has(t));
+      if (filtered.length > 0) { setTilesBudget(contBudget); setHighlightTiles(filtered); setPhase('choosing_move'); addLog(`⚡ Zélés continue (${budgetHere} pts) !`); return; }
+    }
+    const hasLongsBras = players[currentIdx]?.race?.passive === 'longs_bras';
+    if (hasLongsBras) {
+      const adjKeys = [[-1,0],[1,0],[0,-1],[0,1]].map(([dx,dy]) => `${finalX+dx},${finalY+dy}`);
+      const adjTargets = adjKeys.filter(k => enemies[k] || traps[k] || chests[k]);
+      if (adjTargets.length > 0) { setHighlightTiles(adjTargets); setPhase('longs_bras_passive'); addLog(`🦾 Passif Longs Bras : choisissez une case adjacente.`); return; }
+    }
+    setPhase('player_turn');
+  }, [phase, pendingMessager, currentIdx, players, enemies, traps, chests, grid, heights]);
+
+  // Messager: decline the card exchange
+  const messagerDeclineExchange = useCallback(() => {
+    if (phase !== 'messager_exchange') return;
+    const pm = pendingMessager;
+    if (!pm || pm.type !== 'exchange') return;
+    const { finalX, finalY, budgetHere, newFacing, hasZeles, damageTakenThisMove } = pm;
+    setPendingMessager(null);
+    addLog(`📨 ${players[currentIdx].name} refuse l'échange.`);
+    if (hasZeles && damageTakenThisMove === 0 && budgetHere > 0) {
+      const { tiles: contTiles, budgetAtTile: contBudget } = runMoveDijkstra(finalX, finalY, budgetHere, newFacing, true, false, false, grid, heights);
+      const zelBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
+      const filtered = contTiles.filter(t => !zelBases.has(t));
+      if (filtered.length > 0) { setTilesBudget(contBudget); setHighlightTiles(filtered); setPhase('choosing_move'); addLog(`⚡ Zélés continue (${budgetHere} pts) !`); return; }
+    }
+    const hasLongsBras = players[currentIdx]?.race?.passive === 'longs_bras';
+    if (hasLongsBras) {
+      const adjKeys = [[-1,0],[1,0],[0,-1],[0,1]].map(([dx,dy]) => `${finalX+dx},${finalY+dy}`);
+      const adjTargets = adjKeys.filter(k => enemies[k] || traps[k] || chests[k]);
+      if (adjTargets.length > 0) { setHighlightTiles(adjTargets); setPhase('longs_bras_passive'); addLog(`🦾 Passif Longs Bras : choisissez une case adjacente.`); return; }
+    }
+    setPhase('player_turn');
+  }, [phase, pendingMessager, currentIdx, players, enemies, traps, chests, grid, heights]);
+
   // End turn — advance to next living player
   const endTurn = useCallback(() => {
     // Compute all end-of-turn player updates in one pass
@@ -1612,6 +1853,11 @@ export function useGameState(characters) {
     confirmFouPortal,
     alchimisteHeal,
     castReadyScroll,
+    messagerFight,
+    messagerSkip,
+    messagerAcceptExchange,
+    messagerDeclineExchange,
+    pendingMessager,
     skipPassive,
     skipPortalChoice,
     useItem,
