@@ -32,7 +32,7 @@ function buildPlayer(charData, index, mapData) {
     maxHp: finalMaxHp,
     stats: { ...stats },
     inventory: [],
-    gold: 0,
+    gold: (stats.richesse ?? 1) * 3,
     lastScroll: null,
     readyScroll: null,
     equippedWeapon: null,
@@ -359,10 +359,10 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       if (p.physicalImmune) addLog(`🪨 ${p.name} est immunisé aux dégâts physiques ce tour.`);
       p.physicalImmune = false;
       p.forcedImmobileNextTurn = false;
-      // Gold income: receive richesse stat in gold each turn
-      const income = p.stats?.richesse ?? 1;
+      // Gold income: 3 gold per richesse point each turn
+      const income = (p.stats?.richesse ?? 1) * 3;
       p.gold = (p.gold ?? 0) + income;
-      addLog(`💰 ${p.name} reçoit ${income} pièce(s) d'or (Richesse: ${p.stats?.richesse ?? 1}). Total: ${p.gold}`);
+      addLog(`💰 ${p.name} reçoit ${income} pièce(s) d'or (Richesse ×3: ${p.stats?.richesse ?? 1}). Total: ${p.gold}`);
       // Draw exactly 1 card per turn (up to hand limit)
       const needed = p.hand.length < HAND_LIMIT ? 1 : 0;
       if (needed > 0) {
