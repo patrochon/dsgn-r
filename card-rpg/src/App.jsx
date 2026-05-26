@@ -144,6 +144,8 @@ function Game({ characters, onRestart }) {
               : g.phase === 'player_turn' ? `Tour actif — ${g.actionsLeft} action${g.actionsLeft !== 1 ? 's' : ''}`
               : g.phase === 'rolling_move' || g.phase === 'rolling_attack' || g.phase === 'rolling_prison' ? '🎲 Lancement…'
               : g.phase === 'choosing_prison_swap' ? '👔 Cravaté — choisissez un adversaire à interchanger'
+              : g.phase === 'choosing_move_bonus' ? '🎲 Bonus de déplacement disponible'
+              : g.phase === 'touffus_bonus_choice' ? '🌿 Touffus — déplacer ou action bonus ?'
               : g.phase === 'choosing_move' ? '🗺️ Choisissez une case'
               : g.phase === 'choosing_attack' ? '⚔️ Choisissez une cible'
               : g.phase === 'longs_bras_passive' ? '🦾 Passif — case adjacente'
@@ -317,11 +319,22 @@ function Game({ characters, onRestart }) {
             )}
             <Btn label="⏭️ Fin de tour" onClick={g.endTurn} />
           </>)}
-          {g.phase === 'choosing_move' && (<>
+          {g.phase === 'choosing_move' && (
             <div style={{ color: '#5ab4ff', fontSize: 13, padding: '8px 0' }}>🗺️ Cliquez une case bleue pour vous déplacer</div>
-            {cp?.race?.passive === 'anciens' && !g.moveRerolled && (
-              <Btn label="🌙 Relancer le dé" onClick={g.rerollMove} primary />
-            )}
+          )}
+          {g.phase === 'choosing_move_bonus' && (<>
+            <div style={{ color: '#aaffcc', fontSize: 13, padding: '8px 0' }}>
+              Utiliser le bonus de déplacement ?
+            </div>
+            <Btn label={`✅ Avec bonus (+${cp?.stats?.deplacement ?? 0} cases)`} onClick={() => g.confirmMoveBonus(true)} primary />
+            <Btn label="❌ Sans bonus" onClick={() => g.confirmMoveBonus(false)} />
+          </>)}
+          {g.phase === 'touffus_bonus_choice' && (<>
+            <div style={{ color: '#aaffcc', fontSize: 13, padding: '8px 0' }}>
+              🌿 Résultat 6 — se déplacer ou action bonus ?
+            </div>
+            <Btn label={`🗺️ Se déplacer (${Math.max(0, 6 + (cp?.stats?.deplacement ?? 0))} cases)`} onClick={g.touffusContinueMove} primary />
+            <Btn label="⚡ Action bonus" onClick={g.touffusBonusAction} />
           </>)}
           {g.phase === 'choosing_attack' && (
             <div style={{ color: '#ff6644', fontSize: 13, padding: '8px 0' }}>⚔️ Cliquez une cible surlignée pour attaquer</div>

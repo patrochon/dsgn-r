@@ -43,8 +43,6 @@ function buildPlayer(charData, index, mapData) {
     isAlive: true,
     physicalImmune: false,
     facing: null,
-    magicAbsorbAvailable: true,
-    forcedImmobile: false,
     premierSoinUsed: false,
     forcedImmobileNextTurn: false,
     weaponJustSwapped: false,
@@ -308,6 +306,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
   const [pendingVoodoo, setPendingVoodoo] = useState(null);
   const [pendingNde, setPendingNde] = useState(null);
   const [pendingVoyageAstral, setPendingVoyageAstral] = useState(null);
+  const [pendingMoveRoll, setPendingMoveRoll] = useState(null);
 
   const treasurePileRef = useRef({
     1: shuffleDeck(FULL_DECK.filter(c => c.rarity === 'common')),
@@ -353,7 +352,6 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
   // Draw cards up to HAND_LIMIT for current player, set actionsLeft, reset hasMoved
   const drawCards = useCallback(() => {
     const cp = players[currentIdx];
-    const wasForcedImmobile = cp?.race?.passive === 'anciens' && cp?.forcedImmobile;
     const wasForcedImmobileJJ = cp?.forcedImmobileNextTurn === true;
     setPlayers(prev => {
       const next = [...prev];
@@ -365,11 +363,6 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       const income = p.stats?.richesse ?? 1;
       p.gold = (p.gold ?? 0) + income;
       addLog(`💰 ${p.name} reçoit ${income} pièce(s) d'or (Richesse: ${p.stats?.richesse ?? 1}). Total: ${p.gold}`);
-      // Anciens: reset absorb, clear forced immobile flag
-      if (p.race?.passive === 'anciens') {
-        p.magicAbsorbAvailable = true;
-        p.forcedImmobile = false;
-      }
       // Draw exactly 1 card per turn (up to hand limit)
       const needed = p.hand.length < HAND_LIMIT ? 1 : 0;
       if (needed > 0) {
@@ -395,10 +388,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     });
     setMoveRerolled(false);
     setActionsLeft(3); // 3 actions per turn: move, attack, class ability
-    if (wasForcedImmobile) {
-      setHasMoved(true);
-      addLog(`🌙 ${cp.name} reste immobile ce tour (prix de l'absorption magique).`);
-    } else if (wasForcedImmobileJJ) {
+    if (wasForcedImmobileJJ) {
       setHasMoved(true);
       addLog(`🥋 ${cp.name} est immobilisé ce tour (Jiu Jitsu) !`);
     } else {
@@ -498,7 +488,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
         if (roll <= threshold) {
           addLog(`🎲 ${cpCheck.name} réussit l'évasion (${roll} ≤ ${threshold}) — avance de ${roll} case(s).`);
           const cp2 = { ...cpCheck, prisonEffect: null };
-          const hasFF = cp2.race?.passive === 'feux_follets';
+          const hasFF = cp2.race?.passive === 'peluches';
           const { tiles, budgetAtTile } = runMoveDijkstra(cp2.x, cp2.y, roll, cp2.facing, false, hasFF, grid);
           const otherBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
           setTilesBudget(budgetAtTile);
@@ -532,24 +522,40 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
 
     animateRoll((roll) => {
       const cp = players[currentIdx];
-      let range = roll + bonus;
+      let baseRange = roll + bonus;
       let logSuffix = bonus !== 0 ? ` +${bonus}` : '';
       let wallPass = false;
 
-      // Apply card special effects that modify the die result
-      if (special === 'double_roll') {
-        range = roll * 2;
-        logSuffix = ' ×2';
-      } else if (special === 'fixed_move') {
-        range = bonus; // bonus holds the fixed distance (6 for ailes_vent)
-        logSuffix = ` (fixe ${range})`;
-      }
+      if (special === 'double_roll') { baseRange = roll * 2; logSuffix = ' ×2'; }
+      else if (special === 'fixed_move') { baseRange = bonus; logSuffix = ` (fixe ${baseRange})`; }
       if (special === 'wall_pass') wallPass = true;
 
-      addLog(`🎲 ${currentPlayer.name} lance le dé : ${roll}${logSuffix} = ${range} cases.${card?.effect?.type === 'move' ? ` [${card.name}]` : ''}`);
+      const depBonus = cp.stats.deplacement ?? 0;
+      const optionalDep = cp.race?.passive === 'longs_bras' || cp.race?.passive === 'zeles';
 
-      const hasFeuxFollets = cp.race?.passive === 'feux_follets';
-      const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, range, cp.facing, wallPass, hasFeuxFollets, grid);
+      // Touffus: raw roll = 6 → choice between move or bonus action
+      if (cp.race?.passive === 'touffus' && roll === 6) {
+        setPendingMoveRoll({ roll: baseRange, wallPass, depBonus });
+        setPhase('touffus_bonus_choice');
+        addLog(`🎲 ${cp.name} lance le dé : 6 — se déplacer (${Math.max(0, baseRange + depBonus)} cases) ou action bonus ?`);
+        return;
+      }
+
+      // Optional deplacement bonus (Longs Bras, Zélés)
+      if (optionalDep && depBonus > 0) {
+        setPendingMoveRoll({ roll: baseRange, wallPass, depBonus });
+        setPhase('choosing_move_bonus');
+        addLog(`🎲 ${cp.name} lance le dé : ${roll}${logSuffix} = ${baseRange} cases. Bonus déplacement +${depBonus} disponible.`);
+        return;
+      }
+
+      // All others: add deplacement automatically
+      const finalRange = Math.max(0, baseRange + depBonus);
+      const logDep = depBonus !== 0 ? ` (dep ${depBonus > 0 ? '+' : ''}${depBonus})` : '';
+      addLog(`🎲 ${cp.name} lance le dé : ${roll}${logSuffix}${logDep} = ${finalRange} cases.${card?.effect?.type === 'move' ? ` [${card.name}]` : ''}`);
+
+      const hasPeluches = cp.race?.passive === 'peluches';
+      const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, finalRange, cp.facing, wallPass, hasPeluches, grid);
       const otherBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
       setTilesBudget(budgetAtTile);
       setHighlightTiles(tiles.filter(t => !otherBases.has(t)));
@@ -576,6 +582,48 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     });
     addLog(`🔓 ${cp.name} paie ${cost}💰 et annule l'effet prison — déplacement libre ce tour.`);
   }, [currentIdx, players]);
+
+  // Confirm optional deplacement bonus (Longs Bras, Zélés)
+  const confirmMoveBonus = useCallback((useBonus) => {
+    if (phase !== 'choosing_move_bonus') return;
+    const cp = players[currentIdx];
+    const { roll, wallPass, depBonus } = pendingMoveRoll;
+    const finalRange = Math.max(0, useBonus ? roll + depBonus : roll);
+    setPendingMoveRoll(null);
+    addLog(`🎲 ${cp.name} se déplace de ${finalRange} case(s)${useBonus ? ` (+${depBonus} bonus)` : ' (sans bonus)'}.`);
+    const hasPeluches = cp.race?.passive === 'peluches';
+    const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, finalRange, cp.facing, wallPass, hasPeluches, grid);
+    const otherBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
+    setTilesBudget(budgetAtTile);
+    setHighlightTiles(tiles.filter(t => !otherBases.has(t)));
+    setPhase('choosing_move');
+  }, [phase, currentIdx, players, pendingMoveRoll, grid]);
+
+  // Touffus: take bonus action instead of moving (roll=6)
+  const touffusBonusAction = useCallback(() => {
+    if (phase !== 'touffus_bonus_choice') return;
+    setPendingMoveRoll(null);
+    setHasMoved(true);
+    setActionsLeft(prev => prev + 1);
+    addLog(`🌿 ${players[currentIdx].name} (Touffus) renonce au mouvement — action bonus accordée !`);
+    setPhase('player_turn');
+  }, [phase, currentIdx, players]);
+
+  // Touffus: continue with normal movement (roll=6)
+  const touffusContinueMove = useCallback(() => {
+    if (phase !== 'touffus_bonus_choice') return;
+    const cp = players[currentIdx];
+    const { roll, wallPass, depBonus } = pendingMoveRoll;
+    const finalRange = Math.max(0, roll + depBonus);
+    setPendingMoveRoll(null);
+    addLog(`🌿 ${cp.name} (Touffus) choisit de se déplacer (${finalRange} cases).`);
+    const hasPeluches = cp.race?.passive === 'peluches';
+    const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, finalRange, cp.facing, wallPass, hasPeluches, grid);
+    const otherBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
+    setTilesBudget(budgetAtTile);
+    setHighlightTiles(tiles.filter(t => !otherBases.has(t)));
+    setPhase('choosing_move');
+  }, [phase, currentIdx, players, pendingMoveRoll, grid]);
 
   // Wiki passive: swap force ↔ magie once per turn; discard cards no longer usable
   const wikiSwapStats = useCallback(() => {
@@ -613,7 +661,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
 
   // Anciens passive: reroll movement once per turn (no action cost)
   const rerollMove = useCallback(() => {
-    if (moveRerolled || players[currentIdx]?.race?.passive !== 'anciens') return;
+    if (moveRerolled || players[currentIdx]?.race?.passive !== '__no_race__') return; // no race has reroll
     setMoveRerolled(true);
     const card = selectedCard;
     const special = (card?.effect?.type === 'move') ? (card.effect.special ?? null) : null;
@@ -628,8 +676,8 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       else if (special === 'fixed_move') { range = bonus; logSuffix = ` (fixe ${range})`; }
       if (special === 'wall_pass') wallPass = true;
       addLog(`🌙 ${cp.name} relance le dé : ${roll}${logSuffix} = ${range} cases.`);
-      const hasFeuxFollets = cp.race?.passive === 'feux_follets';
-      const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, range, cp.facing, wallPass, hasFeuxFollets, grid);
+      const hasPeluches2 = cp.race?.passive === 'peluches';
+      const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, range, cp.facing, wallPass, hasPeluches2, grid);
       const otherBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
       setTilesBudget(budgetAtTile);
       setHighlightTiles(tiles.filter(t => !otherBases.has(t)));
@@ -1470,20 +1518,8 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
 
       if (targetPlayerIdx >= 0) {
         const target = players[targetPlayerIdx];
-        // Passif Anciens : absorbe une source de dégâts magiques par tour
-        if (isMagic && target.race?.passive === 'anciens' && target.magicAbsorbAvailable) {
-          setPlayers(prev => {
-            const next = [...prev];
-            next[targetPlayerIdx] = { ...next[targetPlayerIdx], magicAbsorbAvailable: false, forcedImmobile: true };
-            return next;
-          });
-          addLog(`🌙 ${target.name} absorbe les dégâts magiques ! (restera immobile au prochain déplacement)`);
-          setActionsLeft(prev => prev - 1);
-          setPhase('player_turn');
-          return;
-        }
-        // Passif Feux Follets : ne peut pas être attaqué de dos
-        if (target.race?.passive === 'feux_follets' && target.facing) {
+        // Passif Peluches : ne peut pas être attaqué de dos
+        if (target.race?.passive === 'peluches' && target.facing) {
           const relDx = cp.x - target.x;
           const relDy = cp.y - target.y;
           const dot = target.facing.dx * relDx + target.facing.dy * relDy;
@@ -2352,6 +2388,9 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     startMove,
     rerollMove,
     moveRerolled,
+    confirmMoveBonus,
+    touffusBonusAction,
+    touffusContinueMove,
     moveToTile,
     showAttackTargets,
     attackTile,
