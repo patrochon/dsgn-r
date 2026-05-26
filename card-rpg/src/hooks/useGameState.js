@@ -53,6 +53,7 @@ function buildPlayer(charData, index, mapData) {
     tempDepBonus: 0,
     frenzied: false,
     stunned: false,
+    cursed: false,
     color: PLAYER_COLORS[index] ?? '#ffffff',
   };
 }
@@ -536,6 +537,24 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
 
     animateRoll((roll) => {
       const cp = players[currentIdx];
+
+      // Malédiction (Arc des Ténèbres): premier mouvement après malédiction → dé impair = dégâts magiques
+      if (cp.cursed) {
+        setPlayers(prev => {
+          const next = [...prev];
+          const p = { ...next[currentIdx] };
+          p.cursed = false;
+          if (roll % 2 !== 0) p.hp = Math.max(0, p.hp - roll);
+          next[currentIdx] = p;
+          return next;
+        });
+        if (roll % 2 !== 0) {
+          addLog(`🌑 Malédiction ! ${cp.name} roule ${roll} (impair) — subit ${roll} dégâts magiques !`);
+        } else {
+          addLog(`🌑 Malédiction de ${cp.name} dissipée (${roll} — pair, pas de dégât).`);
+        }
+      }
+
       let baseRange = roll + bonus;
       let logSuffix = bonus !== 0 ? ` +${bonus}` : '';
       let wallPass = false;
@@ -1619,6 +1638,10 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
           }
           // Weapon special effects (only if target survived)
           if (t.isAlive) {
+            if (card?.effect?.special === 'curse') {
+              t = { ...t, cursed: true };
+              addLog(`🌑 ${t.name} est maudit — dé impair sur son prochain déplacement = dégâts magiques !`);
+            }
             if (card?.effect?.special === 'stun_6' && effectiveRoll === 6) {
               t = { ...t, stunned: true };
               addLog(`💫 ${t.name} est étourdi — passera son prochain tour !`);

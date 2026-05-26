@@ -112,7 +112,7 @@ const WEAPON_CARDS = [
 // ─── ARMEMENT MAGIQUE (6) ─────────────────────────────────────────────────────
 const MAGIC_WEAPON_CARDS = [
   card('epee_flamme',   'Épée flamboyante',  '🔥', C.MAGIC_WPN, R.RARE,      'magic_attack', 4, '+4 Force, +2 Magie. Brûle l\'ennemi : dégâts supplémentaires sur dé 5-6.',     'burn',        0, 'melee'),
-  card('arc_tenebres',  'Arc des Ténèbres',  '🌑', C.MAGIC_WPN, R.RARE,      'magic_attack', 3, '+3 Force, +3 Magie. Maudit la cible (-2 à tous ses jets).',                     'curse',       0, 'r4'),
+  card('arc_tenebres',  'Arc des Ténèbres',  '🌑', C.MAGIC_WPN, R.RARE,      'magic_attack', 3, 'Force requise 3. Maudit la cible : dé impair à son prochain déplacement = dégâts magiques égaux au résultat.', 'curse', 0, 'r4'),
   card('sceptre_givre', 'Sceptre de givre',  '❄️', C.MAGIC_WPN, R.RARE,      'magic_attack', 2, 'Force requise 2. Ralentit l\'ennemi : -4 Déplacement à son prochain tour.',   'slow_enemy',  0, 'r2'),
   card('dague_venin',   'Dague venimeuse',   '🐍', C.MAGIC_WPN, R.RARE,      'magic_attack', 3, 'Force requise 3. +2 Destin. Critique automatique sur dé 5-6 (×1.5 dégâts).',  'crit_5_6',    0, 'melee'),
   card('hache_runique',  'Hache runique',    '🪬', C.MAGIC_WPN, R.RARE,      'magic_attack', 5, '+5 Force, +2 Destin. Active une rune aléatoire sur dé 4+.',                     'rune',        0, 'melee'),
