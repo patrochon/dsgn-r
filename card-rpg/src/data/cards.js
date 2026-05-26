@@ -114,7 +114,7 @@ const MAGIC_WEAPON_CARDS = [
   card('epee_flamme',   'Épée flamboyante',  '🔥', C.MAGIC_WPN, R.RARE,      'magic_attack', 4, '+4 Force, +2 Magie. Brûle l\'ennemi : dégâts supplémentaires sur dé 5-6.',     'burn',        0, 'melee'),
   card('arc_tenebres',  'Arc des Ténèbres',  '🌑', C.MAGIC_WPN, R.RARE,      'magic_attack', 3, '+3 Force, +3 Magie. Maudit la cible (-2 à tous ses jets).',                     'curse',       0, 'r4'),
   card('sceptre_givre', 'Sceptre de givre',  '❄️', C.MAGIC_WPN, R.RARE,      'magic_attack', 2, '+2 Force, +4 Magie. Ralentit l\'ennemi : -3 Déplacement pour 2 tours.',         'slow_enemy',  0, 'r2'),
-  card('dague_venin',   'Dague venimeuse',   '🐍', C.MAGIC_WPN, R.RARE,      'magic_attack', 3, '+3 Force, +2 Destin. Empoisonne : -2 HP/tour pendant 3 tours.',                 'poison',      0, 'melee'),
+  card('dague_venin',   'Dague venimeuse',   '🐍', C.MAGIC_WPN, R.RARE,      'magic_attack', 3, 'Force requise 3. +2 Destin. Critique automatique sur dé 5-6 (×1.5 dégâts).',  'crit_5_6',    0, 'melee'),
   card('hache_runique',  'Hache runique',    '🪬', C.MAGIC_WPN, R.RARE,      'magic_attack', 5, '+5 Force, +2 Destin. Active une rune aléatoire sur dé 4+.',                     'rune',        0, 'melee'),
   card('lame_spectrale','Lame spectrale',    '👻', C.MAGIC_WPN, R.LEGENDARY, 'magic_attack', 3, '+3 Force, +4 Magie. Ignore totalement l\'armure et la résistance.',             'ignore_armor',0, 'melee'),
 ];
@@ -128,7 +128,7 @@ const POTION_CARDS = [
   card('celerite',     'Potion de Célérité',      '⚡', C.POTION, R.COMMON,   'buff',  3, '+3 Déplacement pendant 1 tour. (✨1)',                                         'buff:deplacement+3,duration:turn',1, 'self'),
   card('resistance',   'Potion de Résistance',    '🛡️', C.POTION, R.UNCOMMON, 'buff',  4, '+4 Force défensive pendant 1 combat. (✨2)',                                   'buff:defense+4,duration:combat', 2, 'self'),
   card('chance_brew',  'Potion de Richesse',       '🍀', C.POTION, R.UNCOMMON, 'buff',  3, '+3 Richesse pendant 3 tours. (✨2)',                                           'buff:richesse+3,duration:3turns',2, 'self'),
-  card('antidote',     'Antidote',                '🌿', C.POTION, R.COMMON,   'cure',  0, 'Annule poison, malédiction ou ralentissement. (✨1)',                          'cure_all',                       1, 'self'),
+  card('antidote',     'Antidote',                '🌿', C.POTION, R.COMMON,   'cure',  0, 'Annule malédiction ou ralentissement. (✨1)',                                  'cure_all',                       1, 'self'),
   card('magie_brew',   'Potion de Magie',         '🔮', C.POTION, R.UNCOMMON, 'buff',  5, '+5 Magie. Lance immédiatement un sort aléatoire. (✨2)',                       'buff:magie+5,cast_random',       2, 'self'),
   card('elixir_vie',   'Élixir de Vie',           '❤️', C.POTION, R.RARE,     'buff',  0, '+5 Vie permanent (augmente le HP max). (✨4)',                                 'perm:vie+5',                     4, 'self'),
   card('destin_brew',  'Potion de Destin',        '🌟', C.POTION, R.RARE,     'buff',  0, '+2 Destin permanent. (✨3)',                                                   'perm:destin+2',                  3, 'self'),
@@ -162,7 +162,7 @@ const RARE_CARDS = [
 const LEGENDARY_CARDS = [
   card('couronne_rois', 'Couronne des Rois',   '👑', C.LEGENDARY, R.LEGENDARY, 'legendary', 0, 'Toutes les stats +3 permanent. Les ennemis proches ont 10% de chance de fuir.','perm:all+3,enemy_flee10',           0, 'aoe2'),
   card('oeil_destin',   "L'Œil du Destin",    '👁️', C.LEGENDARY, R.LEGENDARY, 'legendary', 0, "Rejoue n'importe quel dé jusqu'à 3 fois par partie. +3 Destin.",               'perm:destin+3,reroll3',             0, 'global'),
-  card('coeur_dragon',  'Cœur de Dragon',     '🐉', C.LEGENDARY, R.LEGENDARY, 'legendary', 0, '+20 HP max, +5 Force. Immunité au feu et au poison. Régénère 2 HP/tour.',       'perm:vie+10,force+5,immune_fire_poison,regen2', 0, 'self'),
+  card('coeur_dragon',  'Cœur de Dragon',     '🐉', C.LEGENDARY, R.LEGENDARY, 'legendary', 0, '+20 HP max, +5 Force. Immunité au feu. Régénère 2 HP/tour.',                    'perm:vie+10,force+5,immune_fire,regen2', 0, 'self'),
 ];
 
 export const FULL_DECK = [

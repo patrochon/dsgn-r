@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Détopia — Ligne du temps (outil de travail)</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #06060f;
+    color: #ddd;
+    font-family: 'Segoe UI', system-ui, monospace;
+    font-size: 13px;
+    padding: 32px 24px;
+    min-width: 900px;
+  }
+  h1 { color: #88aaff; font-size: 18px; letter-spacing: 3px; margin-bottom: 4px; }
+  .subtitle { color: #444; font-size: 11px; margin-bottom: 32px; }
+
+  /* ── ROTATION BAR ────────────────────────────────── */
+  .rotation {
+    display: flex; align-items: center; gap: 0;
+    background: #0d0d1a; border: 1px solid #1e1e3a;
+    border-radius: 10px; padding: 12px 20px; margin-bottom: 36px;
+  }
+  .rotation-label { color: #555; font-size: 11px; margin-right: 16px; white-space: nowrap; }
+  .pjt {
+    display: flex; align-items: center; justify-content: center;
+    width: 44px; height: 44px; border-radius: 50%;
+    font-size: 12px; font-weight: 700;
+    border: 2px solid;
+    flex-shrink: 0;
+  }
+  .arrow { color: #333; font-size: 18px; margin: 0 6px; }
+  .pjt-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .pjt-name { font-size: 9px; color: #666; }
+  .loop-arrow { color: #2a2a4a; font-size: 22px; margin: 0 6px; }
+
+  /* ── MAIN FLOW ───────────────────────────────────── */
+  .flow { display: flex; flex-direction: column; gap: 0; }
+
+  .block {
+    display: flex; gap: 0;
+    margin-bottom: 0;
+  }
+
+  /* connector column */
+  .spine {
+    width: 32px; flex-shrink: 0;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .spine-dot {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid; flex-shrink: 0;
+    margin-top: 16px;
+  }
+  .spine-line {
+    width: 2px; flex: 1;
+    background: #1e1e3a;
+    min-height: 20px;
+  }
+
+  /* card */
+  .card {
+    flex: 1;
+    border: 1px solid;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin: 8px 0 8px 0;
+    position: relative;
+  }
+  .card-title {
+    font-size: 13px; font-weight: 700;
+    margin-bottom: 2px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card-phase {
+    font-size: 10px; font-family: monospace;
+    padding: 2px 7px; border-radius: 4px;
+    background: rgba(0,0,0,0.4);
+    letter-spacing: 0.5px;
+  }
+  .card-body { color: #aaa; margin-top: 10px; }
+
+  /* row inside card */
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .col { flex: 1; min-width: 160px; }
+
+  /* sub-items */
+  .item {
+    display: flex; align-items: flex-start; gap: 7px;
+    padding: 5px 8px; border-radius: 6px;
+    margin-bottom: 5px;
+    border-left: 3px solid;
+    background: rgba(0,0,0,0.25);
+    line-height: 1.4;
+  }
+  .item-icon { flex-shrink: 0; width: 18px; text-align: center; }
+  .item-text { color: #ccc; }
+  .item-note { color: #666; font-size: 11px; display: block; margin-top: 2px; }
+
+  /* branch boxes */
+  .branch {
+    border: 1px dashed;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-top: 8px;
+    margin-bottom: 4px;
+  }
+  .branch-title {
+    font-size: 11px; font-weight: 700;
+    margin-bottom: 6px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .branch-if { font-size: 10px; color: #888; font-weight: 400; }
+  .branch-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .branch-yes, .branch-no, .branch-opt {
+    flex: 1; min-width: 120px;
+    border-radius: 6px; padding: 8px 10px;
+    border: 1px solid;
+    font-size: 11px; line-height: 1.5;
+  }
+  .choice-label { font-weight: 700; font-size: 10px; margin-bottom: 4px; }
+
+  /* section headers inside card */
+  .section-head {
+    font-size: 10px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; color: #555;
+    border-bottom: 1px solid #1a1a2a;
+    padding-bottom: 4px; margin: 12px 0 8px;
+  }
+
+  /* tag chips */
+  .tag {
+    display: inline-block;
+    font-size: 10px; font-family: monospace;
+    padding: 1px 6px; border-radius: 3px;
+    margin-left: 4px;
+    vertical-align: middle;
+  }
+  .tag-free { background: #1a2a1a; color: #5a9; border: 1px solid #2a4a2a; }
+  .tag-act  { background: #2a1a0a; color: #c84; border: 1px solid #4a2a0a; }
+  .tag-once { background: #1a1a2a; color: #66a; border: 1px solid #2a2a4a; }
+  .tag-cond { background: #2a1a2a; color: #a66; border: 1px solid #4a2a4a; }
+
+  /* color themes */
+  .theme-init  { --c: #3355aa; --cl: #5577cc; --cb: #0d1530; }
+  .theme-draw  { --c: #2277aa; --cl: #44aacc; --cb: #0d1f2a; }
+  .theme-turn  { --c: #226622; --cl: #44aa44; --cb: #0d1a0d; }
+  .theme-move  { --c: #557722; --cl: #88bb33; --cb: #161d0a; }
+  .theme-atk   { --c: #882222; --cl: #cc4444; --cb: #1a0d0d; }
+  .theme-class { --c: #774422; --cl: #cc8833; --cb: #1a1206; }
+  .theme-equip { --c: #445566; --cl: #7799bb; --cb: #0d131a; }
+  .theme-end   { --c: #553377; --cl: #9966cc; --cb: #120d1a; }
+  .theme-win   { --c: #775500; --cl: #ffcc44; --cb: #1a1500; }
+
+  .theme-init  .card { border-color: var(--c); background: var(--cb); }
+  .theme-draw  .card { border-color: var(--c); background: var(--cb); }
+  .theme-turn  .card { border-color: var(--c); background: var(--cb); }
+  .theme-move  .card { border-color: var(--c); background: var(--cb); }
+  .theme-atk   .card { border-color: var(--c); background: var(--cb); }
+  .theme-class .card { border-color: var(--c); background: var(--cb); }
+  .theme-equip .card { border-color: var(--c); background: var(--cb); }
+  .theme-end   .card { border-color: var(--c); background: var(--cb); }
+  .theme-win   .card { border-color: var(--c); background: var(--cb); }
+
+  .theme-init  .card-title { color: var(--cl); }
+  .theme-draw  .card-title { color: var(--cl); }
+  .theme-turn  .card-title { color: var(--cl); }
+  .theme-move  .card-title { color: var(--cl); }
+  .theme-atk   .card-title { color: var(--cl); }
+  .theme-class .card-title { color: var(--cl); }
+  .theme-equip .card-title { color: var(--cl); }
+  .theme-end   .card-title { color: var(--cl); }
+  .theme-win   .card-title { color: var(--cl); }
+
+  .theme-init  .card-phase { color: var(--cl); border: 1px solid var(--c); }
+  .theme-draw  .card-phase { color: var(--cl); border: 1px solid var(--c); }
+  .theme-turn  .card-phase { color: var(--cl); border: 1px solid var(--c); }
+  .theme-move  .card-phase { color: var(--cl); border: 1px solid var(--c); }
+  .theme-atk   .card-phase { color: var(--cl); border: 1px solid var(--c); }
+  .theme-class .card-phase { color: var(--cl); border: 1px solid var(--c); }
+  .theme-equip .card-phase { color: var(--cl); border: 1px solid var(--c); }
+  .theme-end   .card-phase { color: var(--cl); border: 1px solid var(--c); }
+  .theme-win   .card-phase { color: var(--cl); border: 1px solid var(--c); }
+
+  .theme-init  .spine-dot { border-color: var(--cl); background: var(--cb); }
+  .theme-draw  .spine-dot { border-color: var(--cl); background: var(--cb); }
+  .theme-turn  .spine-dot { border-color: var(--cl); background: var(--cb); }
+  .theme-move  .spine-dot { border-color: var(--cl); background: var(--cb); }
+  .theme-atk   .spine-dot { border-color: var(--cl); background: var(--cb); }
+  .theme-class .spine-dot { border-color: var(--cl); background: var(--cb); }
+  .theme-equip .spine-dot { border-color: var(--cl); background: var(--cb); }
+  .theme-end   .spine-dot { border-color: var(--cl); background: var(--cb); }
+  .theme-win   .spine-dot { border-color: var(--cl); background: var(--cb); }
+
+  .theme-move  .branch { border-color: #557722; }
+  .theme-atk   .branch { border-color: #882222; }
+  .theme-end   .branch { border-color: #553377; }
+
+  .item.i-blue   { border-left-color: #3399ff; }
+  .item.i-green  { border-left-color: #44aa44; }
+  .item.i-yellow { border-left-color: #ccaa22; }
+  .item.i-red    { border-left-color: #cc4444; }
+  .item.i-purple { border-left-color: #9966cc; }
+  .item.i-orange { border-left-color: #cc8833; }
+  .item.i-grey   { border-left-color: #445566; }
+
+  .branch-yes { border-color: #2a6a2a; background: #0d1a0d; color: #88cc88; }
+  .branch-no  { border-color: #6a2a2a; background: #1a0d0d; color: #cc8888; }
+  .branch-opt { border-color: #4a4a2a; background: #12120d; color: #cccc88; }
+
+  .choice-yes { color: #5a9; }
+  .choice-no  { color: #c66; }
+  .choice-opt { color: #bb9; }
+
+  /* passive strip */
+  .passive-strip {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin-top: 10px;
+  }
+  .passive-chip {
+    display: flex; align-items: center; gap: 5px;
+    background: #0d0d1a; border: 1px solid #2a2a4a;
+    border-radius: 6px; padding: 4px 9px;
+    font-size: 11px; color: #99aacc;
+  }
+  .passive-icon { font-size: 14px; }
+
+  /* legend */
+  .legend {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    margin-top: 36px; padding: 14px 18px;
+    background: #0d0d1a; border: 1px solid #1e1e3a;
+    border-radius: 10px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 7px; font-size: 11px; color: #888; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  /* implemented status */
+  .impl { font-size: 10px; padding: 1px 6px; border-radius: 3px; margin-left: 6px; }
+  .impl-yes { background: #0d2a0d; color: #5a9; border: 1px solid #1a4a1a; }
+  .impl-partial { background: #2a2a0d; color: #cc9; border: 1px solid #4a4a1a; }
+  .impl-no  { background: #2a0d0d; color: #c55; border: 1px solid #4a1a1a; }
+</style>
+</head>
+<body>
+
+<h1>⚔ DÉTOPIA — LIGNE DU TEMPS</h1>
+<p class="subtitle">Outil de travail interne · 6 joueurs · État de l'implémentation · mai 2026</p>
+
+<!-- ── ROTATION ──────────────────────────────────────────── -->
+<div class="rotation">
+  <div class="rotation-label">ROTATION<br>DES TOURS</div>
+  <div class="pjt-wrap">
+    <div class="pjt" style="border-color:#ff6666;color:#ff6666;background:#1a0d0d">J1</div>
+    <div class="pjt-name">init → 'draw'</div>
+  </div>
+  <div class="arrow">→</div>
+  <div class="pjt-wrap">
+    <div class="pjt" style="border-color:#ffaa44;color:#ffaa44;background:#1a1206">J2</div>
+    <div class="pjt-name">'draw'</div>
+  </div>
+  <div class="arrow">→</div>
+  <div class="pjt-wrap">
+    <div class="pjt" style="border-color:#ffff55;color:#cccc33;background:#1a1a06">J3</div>
+    <div class="pjt-name">'draw'</div>
+  </div>
+  <div class="arrow">→</div>
+  <div class="pjt-wrap">
+    <div class="pjt" style="border-color:#44cc44;color:#44cc44;background:#0d1a0d">J4</div>
+    <div class="pjt-name">'draw'</div>
+  </div>
+  <div class="arrow">→</div>
+  <div class="pjt-wrap">
+    <div class="pjt" style="border-color:#44aaff;color:#44aaff;background:#0d141a">J5</div>
+    <div class="pjt-name">'draw'</div>
+  </div>
+  <div class="arrow">→</div>
+  <div class="pjt-wrap">
+    <div class="pjt" style="border-color:#cc66ff;color:#cc66ff;background:#120d1a">J6</div>
+    <div class="pjt-name">'draw'</div>
+  </div>
+  <div class="loop-arrow">↩</div>
+  <div style="color:#333;font-size:11px;margin-left:4px">boucle jusqu'au<br>dernier survivant</div>
+</div>
+
+<div class="flow">
+
+  <!-- ━━━ DÉBUT DE PARTIE ━━━ -->
+  <div class="block theme-init">
+    <div class="spine">
+      <div class="spine-dot"></div>
+      <div class="spine-line"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">
+        🎮 DÉBUT DE PARTIE
+        <span class="card-phase">phase initiale</span>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col">
+            <div class="item i-blue"><span class="item-icon">🗺️</span><span class="item-text">Sélection de la carte parmi 6 maps<span class="item-note">Le Colisée · L'Étoile · Le Carrefour · Labyrinthe Miroir · La Citadelle · Le Vortex</span></span></div>
+            <div class="item i-blue"><span class="item-icon">👤</span><span class="item-text">Création des personnages (Race + Classe + Spec)<span class="item-note">Stats calculées = BASE + race.bonuses + cls.bonuses + spec.bonuses</span></span></div>
+          </div>
+          <div class="col">
+            <div class="item i-yellow"><span class="item-icon">💰</span><span class="item-text">Or de départ = richesse × 3 pour chaque joueur<span class="item-note">Ex : richesse 4 → 12 pièces au départ</span></span></div>
+            <div class="item i-green"><span class="item-icon">🃏</span><span class="item-text">Main initiale = 6 cartes piochées au hasard<span class="item-note">HAND_LIMIT = 6 · deck = copie mélangée de FULL_DECK</span></span></div>
+            <div class="item i-grey"><span class="item-icon">⛓️</span><span class="item-text">Cases Prison initialisées niveau 1 (6 par map)<span class="item-note">state prisons : { "x,y": { level: 1 } }</span></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ━━━ DÉBUT DE TOUR (draw) ━━━ -->
+  <div class="block theme-draw">
+    <div class="spine">
+      <div class="spine-dot"></div>
+      <div class="spine-line"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">
+        🃏 DÉBUT DE TOUR — drawCards()
+        <span class="card-phase">phase: 'draw'</span>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col">
+            <div class="item i-green"><span class="item-icon">🃏</span><span class="item-text">Piocher 1 carte du deck<span class="item-note">Si main ≥ 6 → rien · Si deck vide → recycler la défausse mélangée</span></span></div>
+            <div class="item i-green"><span class="item-icon">🧪</span><span class="item-text">Limite potions : max 2 en main<span class="item-note">La carte en trop va directement à la défausse</span></span></div>
+          </div>
+          <div class="col">
+            <div class="item i-yellow"><span class="item-icon">💰</span><span class="item-text">Revenu d'or = richesse × 3<span class="item-note">Ajouté à l'or existant du joueur</span></span></div>
+            <div class="item i-purple"><span class="item-icon">🔄</span><span class="item-text">Reset des flags de tour<span class="item-note">weaponJustSwapped, armorJustSwapped, wikiSwapped → false</span></span></div>
+            <div class="item i-orange"><span class="item-icon">🥋</span><span class="item-text">Jiu Jitsu immobilisé? → hasMoved = true<span class="item-note">forcedImmobileNextTurn avait été posé le tour précédent</span></span></div>
+          </div>
+        </div>
+        <div style="margin-top:10px;padding:8px 12px;background:#0a1520;border-radius:6px;border:1px solid #1e3a55;font-size:11px;color:#77aacc">
+          ✅ Fin de drawCards → <strong>actionsLeft = 3</strong>, hasMoved = false → <span style="color:#44aacc">phase: 'player_turn'</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ━━━ TOUR ACTIF ━━━ -->
+  <div class="block theme-turn">
+    <div class="spine">
+      <div class="spine-dot"></div>
+      <div class="spine-line"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">
+        ⚔ TOUR ACTIF — 3 ACTIONS DISPONIBLES
+        <span class="card-phase">phase: 'player_turn'</span>
+      </div>
+      <div class="card-body">
+        <div style="color:#556;font-size:11px">Le joueur peut effectuer les actions suivantes dans n'importe quel ordre jusqu'à épuisement de ses 3 actions.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ━━━ DÉPLACEMENT ━━━ -->
+  <div class="block theme-move">
+    <div class="spine">
+      <div class="spine-dot"></div>
+      <div class="spine-line"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">
+        🗺️ ACTION : DÉPLACEMENT
+        <span class="tag tag-act">1 action</span>
+        <span class="tag tag-once">1 fois/tour</span>
+      </div>
+      <div class="card-body">
+
+        <!-- Prison check -->
+        <div class="branch">
+          <div class="branch-title">⛓️ EFFET PRISON ACTIF ? <span class="branch-if">(prisonEffect ≠ null)</span></div>
+          <div class="branch-row">
+            <div class="branch-yes">
+              <div class="choice-label choice-yes">✅ OUI</div>
+              <strong>phase: 'rolling_prison'</strong><br>
+              Lancer 1d6 :<br>
+              · Niv.1 : succès si dé ≤ 4 · Niv.2 : ≤ 3, échec = -1 PV · Niv.3 : ≤ 1, échec = -3 PV<br>
+              <br>
+              <span style="color:#88aa88">Succès → déplacement normal<br>Échec → immobile, fin de déplacement</span>
+            </div>
+            <div class="branch-opt">
+              <div class="choice-label choice-opt">💰 ALTERNATIVE</div>
+              Payer 2/4/6 or selon le niveau<br>→ annule l'effet prison<br>→ déplacement normal
+            </div>
+            <div class="branch-no">
+              <div class="choice-label choice-no">❌ NON</div>
+              Continuer vers le<br>lancer de dé normal ↓
+            </div>
+          </div>
+        </div>
+
+        <!-- Dé de déplacement -->
+        <div class="section-head">LANCER DÉ DE DÉPLACEMENT → phase: 'rolling_move'</div>
+        <div style="font-size:11px;color:#888;margin-bottom:8px">Portée de base = résultat du dé · Le déplacement (stat) est ajouté selon la race ↓</div>
+
+        <div class="branch">
+          <div class="branch-title">🌿 TOUFFUS + DÉ = 6 ?</div>
+          <div class="branch-row">
+            <div class="branch-yes">
+              <div class="choice-label choice-yes">✅ OUI → phase: 'touffus_bonus_choice'</div>
+              <strong>Option A</strong> — Se déplacer<br>
+              Portée = 6 + deplacement (peut être négatif → max 0)<br>
+              → phase: 'choosing_move'<br><br>
+              <strong>Option B</strong> — Action bonus<br>
+              hasMoved = true, actionsLeft +1<br>
+              → phase: 'player_turn'
+            </div>
+            <div class="branch-no">
+              <div class="choice-label choice-no">❌ NON — Longs Bras ou Zélés ?</div>
+              <div class="branch-row" style="margin-top:6px">
+                <div class="branch-yes" style="flex:none;min-width:0">
+                  <div class="choice-label choice-yes">✅ OUI → phase: 'choosing_move_bonus'</div>
+                  Longs Bras : +1 dep optionnel<br>
+                  Zélés : +3 dep optionnel (tout ou rien)<br>
+                  Choix : avec bonus / sans bonus
+                </div>
+                <div class="branch-no" style="flex:none;min-width:0">
+                  <div class="choice-label choice-no">❌ NON</div>
+                  Portée finale = dé + deplacement auto<br>
+                  (min 0 · stat deplacement peut être négatif)
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- choosing_move -->
+        <div class="section-head">CHOISIR LA CASE → phase: 'choosing_move'</div>
+        <div style="font-size:11px;color:#888;margin-bottom:8px">runMoveDijkstra calcule les cases accessibles (budget = portée). Peluches = traversée de murs.</div>
+
+        <div class="branch">
+          <div class="branch-title">📍 ARRIVÉE SUR LA CASE</div>
+          <div class="passive-strip">
+            <div class="passive-chip"><span class="passive-icon">🪤</span> Piège → dégâts + effet spécial</div>
+            <div class="passive-chip"><span class="passive-icon">📦</span> Coffre → carte aléatoire</div>
+            <div class="passive-chip"><span class="passive-icon">👾</span> Monstre → combat auto (force + richesse/2 vs def)</div>
+            <div class="passive-chip"><span class="passive-icon">⛓️</span> Prison → prisonEffect posé (niv. actuel) + case monte en niv.</div>
+            <div class="passive-chip"><span class="passive-icon">👔</span> Cravaté sur prison → 'choosing_prison_swap' (échange ≤6 cases)</div>
+            <div class="passive-chip"><span class="passive-icon">📨</span> Messager croise joueur → 'messager_monster' ou 'messager_exchange'</div>
+            <div class="passive-chip"><span class="passive-icon">🦾</span> Longs Bras → 'longs_bras_passive' (case adjacente gratuite)</div>
+            <div class="passive-chip"><span class="passive-icon">🌀</span> Portail → 'choosing_portal' (sortie au choix)</div>
+            <div class="passive-chip"><span class="passive-icon">🏠</span> Base propre → +1 PV, +1 or</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ━━━ ATTAQUE ━━━ -->
+  <div class="block theme-atk">
+    <div class="spine">
+      <div class="spine-dot"></div>
+      <div class="spine-line"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">
+        ⚔ ACTION : ATTAQUE
+        <span class="tag tag-act">1 action</span>
+        <span class="tag tag-cond">arme équipée requise</span>
+      </div>
+      <div class="card-body">
+
+        <div class="row" style="margin-bottom:10px">
+          <div class="col">
+            <div class="item i-red"><span class="item-icon">🔍</span><span class="item-text">showAttackTargets() → 'choosing_attack'<span class="item-note">Conditions : actionsLeft ≥ 1 · equippedWeapon ≠ null · !weaponJustSwapped</span></span></div>
+            <div class="item i-red"><span class="item-icon">🎯</span><span class="item-text">Cliquer cible → attackTile() → 'rolling_attack'<span class="item-note">Cibles valides : joueurs adverses ou monstres dans la portée de l'arme</span></span></div>
+          </div>
+          <div class="col">
+            <div class="item i-red"><span class="item-icon">🎲</span><span class="item-text">Dégâts = dé + stat (force ou magie) + destin/3<span class="item-note">+ bonus arme spéciaux (crit_5_6, double_on_6, etc.)</span></span></div>
+            <div class="item i-red"><span class="item-icon">🛡️</span><span class="item-text">Défense cible = force/3 (physique) ou 0 (magique)<span class="item-note">armorJustSwapped → défense de l'armure annulée ce tour</span></span></div>
+          </div>
+        </div>
+
+        <div class="section-head">MODIFICATEURS D'ATTAQUE</div>
+        <div class="passive-strip">
+          <div class="passive-chip"><span class="passive-icon">💰</span> +bonus chance = richesse/2 au jet</div>
+          <div class="passive-chip"><span class="passive-icon">🖤</span> Cœur Noir adjacent → magie attaquant = 1</div>
+          <div class="passive-chip"><span class="passive-icon">🧸</span> Peluches attaqué de dos → attaque annulée</div>
+          <div class="passive-chip"><span class="passive-icon">💎</span> Impérissable + AOE → immune</div>
+          <div class="passive-chip"><span class="passive-icon">🧿</span> Voodoo → 'voodoo_reflect' (renvoyer les dégâts)</div>
+          <div class="passive-chip"><span class="passive-icon">🥊</span> Autodéfense → contre-attaque physique automatique</div>
+        </div>
+
+        <div class="section-head">RÉSOLUTION DES DÉGÂTS</div>
+        <div class="branch">
+          <div class="branch-row">
+            <div class="branch-opt">
+              <div class="choice-label choice-opt">💥 Cible à 0 PV</div>
+              1. Premier Soin → revive avec 1d6 PV (1 fois)<br>
+              2. Destin &gt; 0 → renaît à la base (destin -1)<br>
+              &nbsp;&nbsp;&nbsp;NDE → garde or + main, revive 1d6 PV<br>
+              3. Destin = 0 → éliminé définitivement
+            </div>
+            <div class="branch-opt">
+              <div class="choice-label choice-opt">🧣 Bum throw</div>
+              throwWeapon() → 'bum_throw'<br>
+              Choisir cible à portée 2<br>
+              Arme détruite (pas défaussée)<br>
+              Dégâts comme attaque normale
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ━━━ ACTIONS DE CLASSE ━━━ -->
+  <div class="block theme-class">
+    <div class="spine">
+      <div class="spine-dot"></div>
+      <div class="spine-line"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">
+        🎭 ACTIONS DE CLASSE / SPÉC / OBJET
+        <span class="tag tag-act">1 action (sauf exceptions)</span>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col">
+            <div class="section-head">CLASSES</div>
+            <div class="item i-orange"><span class="item-icon">🃏</span><span class="item-text">Fou — startFouAttack()<span class="item-note">Sort aléatoire → 'fou_attack' → clic cible</span></span></div>
+            <div class="item i-orange"><span class="item-icon">⚗️</span><span class="item-text">Alchimiste — alchimisteHeal()<span class="item-note">Utilise une potion de son inventaire pour se soigner</span></span></div>
+            <div class="item i-orange"><span class="item-icon">📚</span><span class="item-text">Wiki — wikiSwapStats() <span class="tag tag-free">GRATUIT</span><span class="item-note">Échange force↔magie · 1 fois/tour · arme discard si force insuffisante</span></span></div>
+          </div>
+          <div class="col">
+            <div class="section-head">SPÉCIALISATIONS / OBJETS</div>
+            <div class="item i-orange"><span class="item-icon">📜</span><span class="item-text">Parchemin prêt — castReadyScroll()<span class="item-note">readyScroll doit être chargé · effets variés (aoe, chain, freeze…)</span></span></div>
+            <div class="item i-orange"><span class="item-icon">🌌</span><span class="item-text">Voyage Astral — startVoyageAstral()<span class="item-note">'voyage_astral_select' → choisir monstre → 'voyage_astral_move' → destination ligne droite</span></span></div>
+            <div class="item i-orange"><span class="item-icon">🧪</span><span class="item-text">Utiliser objet — useItem(card)<span class="item-note">Potions (heal/buff), objets magiques, parchemins</span></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ━━━ ÉQUIPEMENT ━━━ -->
+  <div class="block theme-equip">
+    <div class="spine">
+      <div class="spine-dot"></div>
+      <div class="spine-line"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">
+        🛡️ ÉQUIPEMENT — equipCard()
+        <span class="tag tag-free">GRATUIT (pas d'action)</span>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col">
+            <div class="item i-grey"><span class="item-icon">⚔</span><span class="item-text">Slot Arme (1 seul)<span class="item-note">Remplacement → ancien défaussé · weaponJustSwapped = true → pas d'attaque ce tour</span></span></div>
+            <div class="item i-grey"><span class="item-icon">🛡️</span><span class="item-text">Slot Armure (1 seul)<span class="item-note">Remplacement → ancien défaussé · armorJustSwapped = true → défense absente ce tour</span></span></div>
+          </div>
+          <div class="col">
+            <div class="item i-grey"><span class="item-icon">✨</span><span class="item-text">Objets magiques / Légendaires (max 2)<span class="item-note">Passifs permanents · s'ajoutent à l'inventaire · appliquent bonus stats</span></span></div>
+            <div class="item i-grey"><span class="item-icon">📋</span><span class="item-text">Parchemin → readyScroll (1 slot)<span class="item-note">Chargé = prêt à lancer via castReadyScroll() au prochain tour</span></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ━━━ FIN DE TOUR ━━━ -->
+  <div class="block theme-end">
+    <div class="spine">
+      <div class="spine-dot"></div>
+      <div class="spine-line"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">
+        🔚 FIN DE TOUR — endTurn()
+        <span class="card-phase">passifs de fin + rotation</span>
+      </div>
+      <div class="card-body">
+
+        <div class="section-head">PASSIFS DE FIN DE TOUR (dans l'ordre)</div>
+        <div class="branch">
+          <div class="branch-row">
+            <div class="branch-opt">
+              <div class="choice-label choice-opt">🪨 Cailloux — !hasMoved</div>
+              physicalImmune = true<br>
+              → immunité dégâts physiques<br>au prochain tour
+            </div>
+            <div class="branch-opt">
+              <div class="choice-label choice-opt">🧣 Bum — sur adversaire</div>
+              Pousse l'adversaire<br>vers une case adjacente<br>
+              Peut déclencher piège<br>ou élimination
+            </div>
+            <div class="branch-opt">
+              <div class="choice-label choice-opt">⚗️ Alchimiste — sur adversaire</div>
+              Achat forcé d'une potion<br>(1 pièce d'or)<br>
+              Puis pousse l'adversaire
+            </div>
+            <div class="branch-opt">
+              <div class="choice-label choice-opt">🃏 Fou — sur adversaire</div>
+              Sélection d'un portail<br>→ 'fou_portal'<br>
+              Téléportation avant<br>passage au joueur suivant
+            </div>
+          </div>
+        </div>
+
+        <div class="section-head">ROTATION</div>
+        <div style="padding:8px 12px;background:#0d0a1a;border-radius:6px;border:1px solid #2a1a4a;font-size:11px;color:#9966cc">
+          currentIdx = prochain joueur vivant (circulaire) · actionsLeft = 0 · hasMoved = false → <strong>phase: 'draw'</strong>
+        </div>
+
+        <div class="section-head">VÉRIFICATION VICTOIRE</div>
+        <div class="passive-strip">
+          <div class="passive-chip"><span class="passive-icon">💀</span> Vérifié après chaque mort · 1 survivant → phase: 'win'</div>
+          <div class="passive-chip"><span class="passive-icon">⚡</span> Vérification aussi après attaque, poison, pousse, piège</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ━━━ VICTOIRE ━━━ -->
+  <div class="block theme-win">
+    <div class="spine">
+      <div class="spine-dot"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">
+        🏆 VICTOIRE
+        <span class="card-phase">phase: 'win'</span>
+      </div>
+      <div class="card-body">
+        <div class="item i-yellow"><span class="item-icon">🏆</span><span class="item-text">Dernier joueur isAlive = true → winner défini → écran de victoire affiché</span></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /flow -->
+
+<!-- ── ÉTAT D'IMPLÉMENTATION ──────────────────────────────── -->
+<div style="margin-top:40px;padding:20px;background:#0d0d1a;border:1px solid #1e1e3a;border-radius:12px">
+  <div style="color:#555;font-size:10px;letter-spacing:1px;text-transform:uppercase;margin-bottom:14px">État de l'implémentation</div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;font-size:11px">
+
+    <div>
+      <div style="color:#44aacc;font-size:10px;margin-bottom:6px">✅ IMPLÉMENTÉ &amp; FONCTIONNEL</div>
+      <div style="color:#888;line-height:2">
+        Rotation des tours · drawCards · actionsLeft=3 · hasMoved<br>
+        Déplacement Dijkstra · portée + deplacement<br>
+        Prison (3 niveaux, payer or, Cravaté swap)<br>
+        Longs Bras passif (case adjacente)<br>
+        Touffus (choix dé=6) · Zélés/LB bonus optionnel<br>
+        Peluches (traversée murs) · back-attack immunity<br>
+        Attaque physique &amp; magique · défense force/3<br>
+        Coeur Noir · Autodéfense · Voodoo reflect<br>
+        Imperissable AOE immunity<br>
+        Mort → Destin → Premier Soin → NDE<br>
+        Équipement arme/armure + swap cooldown<br>
+        Wiki swap force↔magie<br>
+        Cravaté prison swap<br>
+        Bum push endTurn · Alchimiste achat forcé + push<br>
+        Fou endTurn portal<br>
+        Messager exchange / monster cross<br>
+        Voyage Astral (monstre en ligne droite)<br>
+        Or : départ richesse×3 · revenu richesse×3/tour<br>
+        Cailloux physicalImmune<br>
+        Jiu Jitsu forcedImmobile<br>
+        Portails · Coffres · Pièges · Monstres<br>
+        Pacte · Ectomorphe (traversée pièges)<br>
+        Bum throw (arme détruite)
+      </div>
+    </div>
+
+    <div>
+      <div style="color:#ccaa22;font-size:10px;margin-bottom:6px">⚠️ DÉFINI MAIS PAS RÉSOLU EN JEU</div>
+      <div style="color:#888;line-height:2">
+        Brûlure (burn) — arme flamme<br>
+        Malédiction (curse) — arc ténèbres<br>
+        Ralentissement (slow) — sceptre givre<br>
+        Bouclier magique (shield10)<br>
+        Résurrection (revive_50)<br>
+        Invocation (summon)<br>
+        Gèle (freeze) — Nova de givre<br>
+        Potion de Richesse (+3R pendant 3 tours)<br>
+        Potion de Célérité (+3dep ce tour)<br>
+        Potion de Force (buffed combat)<br>
+        Philtre de rage (frénésie)<br>
+        Potion de Magie (sort aléatoire)<br>
+        Rune aléatoire — hache runique<br>
+        Repousse (push_enemy) — lance<br>
+        Désarmement (disarm_6) — fléau<br>
+        Étourdissement (stun_6) — marteau<br>
+        Visée (aim / pierce_if_still)<br>
+        Légendaires : effets permanents (all+3, reroll3…)<br>
+        Couponing · Secrétariat · Pacte (or/carte sur monstre)
+      </div>
+    </div>
+
+    <div>
+      <div style="color:#cc4444;font-size:10px;margin-bottom:6px">📋 NOTES / À DÉCIDER</div>
+      <div style="color:#888;line-height:2">
+        Les effets ⚠️ ci-contre <em>s'affichent</em> sur les cartes<br>
+        mais ne s'exécutent pas encore côté logique.<br><br>
+        Certains auront besoin d'états persistants<br>
+        (ex: stacks de malédiction, compteurs de tours)<br><br>
+        Peluches n'est plus renommé Feux Follets ✅<br>
+        Anciens supprimé ✅<br>
+        Empoisonnement supprimé ✅<br><br>
+        Stat portee (Longs Bras +1) : <br>
+        — définie dans stats<br>
+        — non encore lue par showAttackTargets()
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── LÉGENDE ───────────────────────────────────────────── -->
+<div class="legend">
+  <div style="color:#555;font-size:10px;letter-spacing:1px;width:100%;text-transform:uppercase">Légende</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#3355aa"></div> Début de partie</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#2277aa"></div> Début de tour (draw)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#226622"></div> Tour actif</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#557722"></div> Déplacement</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#882222"></div> Attaque</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#774422"></div> Classe / Spéc / Objet</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#445566"></div> Équipement (gratuit)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#553377"></div> Fin de tour</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#775500"></div> Victoire</div>
+  <div class="legend-item"><span class="tag tag-free">GRATUIT</span> Sans coût d'action</div>
+  <div class="legend-item"><span class="tag tag-act">1 action</span> Coûte 1 des 3 actions</div>
+  <div class="legend-item"><span class="tag tag-once">1 fois/tour</span> Verrou de tour</div>
+  <div class="legend-item"><span class="tag tag-cond">cond.</span> Condition requise</div>
+</div>
+
+</body>
+</html>
