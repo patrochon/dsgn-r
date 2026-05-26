@@ -9,6 +9,7 @@ export const T = {
   CHEST: 6,
   TELEPORT: 7,
   SHOP: 8,
+  PRISON: 9,
 };
 
 export const MAPS = [

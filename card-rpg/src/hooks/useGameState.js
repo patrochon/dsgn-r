@@ -49,6 +49,8 @@ function buildPlayer(charData, index, mapData) {
     forcedImmobileNextTurn: false,
     weaponJustSwapped: false,
     armorJustSwapped: false,
+    prisonEffect: null,
+    wikiSwapped: false,
     color: PLAYER_COLORS[index] ?? '#ffffff',
   };
 }
@@ -275,6 +277,15 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
   const [enemies, setEnemies] = useState(initEnemies);
   const [traps,   setTraps]   = useState(initTraps);
   const [chests,  setChests]  = useState(initChests);
+  const [prisons, setPrisons] = useState(() => {
+    const ps = {};
+    for (let y = 0; y < mapData.grid.length; y++) {
+      for (let x = 0; x < mapData.grid[y].length; x++) {
+        if (mapData.grid[y][x] === T.PRISON) ps[`${x},${y}`] = { level: 1 };
+      }
+    }
+    return ps;
+  });
 
   const [players, setPlayers] = useState(() =>
     (characters ?? []).map((ch, i) => buildPlayer(ch, i, mapData))
@@ -378,6 +389,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       }
       p.weaponJustSwapped = false;
       p.armorJustSwapped = false;
+      p.wikiSwapped = false;
       next[currentIdx] = p;
       return next;
     });
@@ -468,6 +480,51 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
   // Start move — costs 1 action, animates die, shows reachable tiles
   const startMove = useCallback(() => {
     if (actionsLeft < 1 || hasMoved) return;
+    const cpCheck = players[currentIdx];
+
+    // Prison roll: restricted movement check
+    if (cpCheck?.prisonEffect) {
+      const { level } = cpCheck.prisonEffect;
+      const threshold = level === 1 ? 4 : level === 2 ? 3 : 1;
+      const damage    = level === 2 ? 1 : level === 3 ? 3 : 0;
+      setPhase('rolling_prison');
+      animateRoll((roll) => {
+        // Always consume the prisonEffect after attempting the roll
+        setPlayers(prev => {
+          const next = [...prev];
+          next[currentIdx] = { ...next[currentIdx], prisonEffect: null };
+          return next;
+        });
+        if (roll <= threshold) {
+          addLog(`🎲 ${cpCheck.name} réussit l'évasion (${roll} ≤ ${threshold}) — avance de ${roll} case(s).`);
+          const cp2 = { ...cpCheck, prisonEffect: null };
+          const hasFF = cp2.race?.passive === 'feux_follets';
+          const { tiles, budgetAtTile } = runMoveDijkstra(cp2.x, cp2.y, roll, cp2.facing, false, hasFF, grid);
+          const otherBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
+          setTilesBudget(budgetAtTile);
+          setHighlightTiles(tiles.filter(t => !otherBases.has(t)));
+          setPhase('choosing_move');
+        } else {
+          const failMsg = damage > 0
+            ? `🔒 ${cpCheck.name} échoue l'évasion (${roll} > ${threshold}) — reste immobile et subit ${damage} dégât(s).`
+            : `🔒 ${cpCheck.name} échoue l'évasion (${roll} > ${threshold}) — ne peut pas se déplacer.`;
+          addLog(failMsg);
+          if (damage > 0) {
+            setPlayers(prev => {
+              const next = [...prev];
+              const p = { ...next[currentIdx] };
+              p.hp = Math.max(0, p.hp - damage);
+              next[currentIdx] = p;
+              return next;
+            });
+          }
+          setHasMoved(true);
+          setPhase('player_turn');
+        }
+      });
+      return;
+    }
+
     setPhase('rolling_move');
     const card = selectedCard;
     const special = (card?.effect?.type === 'move') ? (card.effect.special ?? null) : null;
@@ -500,6 +557,60 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     });
   }, [actionsLeft, hasMoved, selectedCard, currentIdx, players, grid, setTilesBudget]);
 
+  // Pay gold to bypass prison effect this turn
+  const prisonPayGold = useCallback(() => {
+    const cp = players[currentIdx];
+    if (!cp?.prisonEffect) return;
+    const cost = cp.prisonEffect.level * 2;
+    if (cp.gold < cost) {
+      addLog(`❌ ${cp.name} n'a pas assez d'or pour se libérer (requis: ${cost}, disponible: ${cp.gold}).`);
+      return;
+    }
+    setPlayers(prev => {
+      const next = [...prev];
+      const p = { ...next[currentIdx] };
+      p.gold -= cost;
+      p.prisonEffect = null;
+      next[currentIdx] = p;
+      return next;
+    });
+    addLog(`🔓 ${cp.name} paie ${cost}💰 et annule l'effet prison — déplacement libre ce tour.`);
+  }, [currentIdx, players]);
+
+  // Wiki passive: swap force ↔ magie once per turn; discard cards no longer usable
+  const wikiSwapStats = useCallback(() => {
+    const cp = players[currentIdx];
+    if (cp?.cls?.passive !== 'wiki' || cp?.wikiSwapped) return;
+    setPlayers(prev => {
+      const next = [...prev];
+      const p = { ...next[currentIdx], stats: { ...next[currentIdx].stats } };
+      const oldForce = p.stats.force;
+      const oldMagie = p.stats.magie;
+      p.stats.force = oldMagie;
+      p.stats.magie = oldForce;
+      p.wikiSwapped = true;
+      // Discard weapon if force requirement no longer met
+      if (p.equippedWeapon) {
+        const req = p.equippedWeapon.effect.bonus ?? 0;
+        if (p.stats.force < req) {
+          addLog(`🔴 ${p.name} ne peut plus porter ${p.equippedWeapon.icon} ${p.equippedWeapon.name} (Force ${p.stats.force} < requis ${req}) — défaussé.`);
+          p = unequipCard(p, p.equippedWeapon);
+          p.equippedWeapon = null;
+        }
+      }
+      next[currentIdx] = p;
+      return next;
+    });
+    const cp2 = players[currentIdx];
+    addLog(`📚 ${cp2.name} (Wiki) interéchange Force (${cp2.stats.force}) ↔ Magie (${cp2.stats.magie}).`);
+  }, [currentIdx, players]);
+
+  // Skip Cravaté prison swap (optional)
+  const skipPrisonSwap = useCallback(() => {
+    setHighlightTiles([]);
+    setPhase('player_turn');
+  }, []);
+
   // Anciens passive: reroll movement once per turn (no action cost)
   const rerollMove = useCallback(() => {
     if (moveRerolled || players[currentIdx]?.race?.passive !== 'anciens') return;
@@ -528,6 +639,36 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
 
   // Complete the move
   const moveToTile = useCallback((tx, ty) => {
+    // Cravaté swap selection
+    if (phase === 'choosing_prison_swap') {
+      const key = `${tx},${ty}`;
+      setHighlightTiles([]);
+      if (highlightTiles.includes(key)) {
+        const cp = players[currentIdx];
+        const targetPlayerIdx = players.findIndex((p, i) => i !== currentIdx && p.isAlive && p.x === tx && p.y === ty);
+        if (targetPlayerIdx >= 0) {
+          const [myX, myY] = [cp.x, cp.y];
+          setPlayers(prev => {
+            const next = [...prev];
+            next[currentIdx]    = { ...next[currentIdx], x: tx, y: ty };
+            next[targetPlayerIdx] = { ...next[targetPlayerIdx], x: myX, y: myY };
+            return next;
+          });
+          addLog(`👔 ${cp.name} interéchange avec ${players[targetPlayerIdx].name} !`);
+        } else if (enemies[key]) {
+          const enemy = enemies[key];
+          const [myX, myY] = [cp.x, cp.y];
+          setPlayers(prev => { const next = [...prev]; next[currentIdx] = { ...next[currentIdx], x: tx, y: ty }; return next; });
+          setEnemies(prev => { const n = { ...prev }; delete n[key]; n[`${myX},${myY}`] = enemy; return n; });
+          addLog(`👔 ${cp.name} interéchange avec ${enemy.icon} ${enemy.name} !`);
+        }
+      } else {
+        addLog(`👔 Échange annulé.`);
+      }
+      setPhase('player_turn');
+      return;
+    }
+
     if (phase !== 'choosing_move' && phase !== 'choosing_attack'
       && phase !== 'longs_bras_passive' && phase !== 'choosing_portal'
       && phase !== 'bum_throw' && phase !== 'fou_attack' && phase !== 'fou_portal'
@@ -929,6 +1070,44 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
             return;
           }
         }
+        // — Prison landing —
+        const prisonThere = prisons[destKey];
+        if (prisonThere) {
+          const lvl = prisonThere.level;
+          const goldCost = lvl * 2;
+          const threshold = lvl === 1 ? 4 : lvl === 2 ? 3 : 1;
+          // Upgrade the prison (max lvl 3)
+          setPrisons(prev => ({ ...prev, [destKey]: { level: Math.min(3, lvl + 1) } }));
+          // Apply prisonEffect to player
+          setPlayers(prev => {
+            const next = [...prev];
+            next[currentIdx] = { ...next[currentIdx], prisonEffect: { level: lvl } };
+            return next;
+          });
+          addLog(`⛓️ ${cp.name} atterrit sur une Case Prison (niv.${lvl}) ! Prochain tour: rouler ≤${threshold} pour avancer, sinon immobile${lvl > 1 ? ` (-${lvl === 2 ? 1 : 3} PV)` : ''}. Payer ${goldCost}💰 pour annuler.`);
+          // Cravaté passive: can swap with adversary within 6 tiles
+          if (players[currentIdx]?.cls?.passive === 'cravate') {
+            const swapTargets = [];
+            for (let dy2 = -6; dy2 <= 6; dy2++) {
+              for (let dx2 = -6; dx2 <= 6; dx2++) {
+                if (Math.abs(dx2) + Math.abs(dy2) > 6) continue;
+                const nx = finalX + dx2, ny = finalY + dy2;
+                if (nx < 0 || ny < 0 || ny >= grid.length || nx >= grid[0].length) continue;
+                const k = `${nx},${ny}`;
+                if (players.some((p, i) => i !== currentIdx && p.isAlive && p.x === nx && p.y === ny)) swapTargets.push(k);
+                else if (enemies[k]) swapTargets.push(k);
+              }
+            }
+            const uniqueTargets = [...new Set(swapTargets)];
+            if (uniqueTargets.length > 0) {
+              setHighlightTiles(uniqueTargets);
+              setPhase('choosing_prison_swap');
+              addLog(`👔 ${cp.name} (Cravaté) peut interchanger avec un adversaire à portée (ou ⏭️ pour passer).`);
+              return;
+            }
+          }
+        }
+
         // Passif Longs Bras : après déplacement, propose d'activer une case adjacente
         const hasLongsBras = players[currentIdx]?.race?.passive === 'longs_bras';
         if (hasLongsBras) {
@@ -1760,7 +1939,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       }
       setPhase('player_turn');
     }
-  }, [phase, pendingMessager, currentIdx, players, enemies, traps, chests, grid]);
+  }, [phase, pendingMessager, currentIdx, players, enemies, traps, chests, prisons, grid, highlightTiles]);
 
   // Messager: skip the monster on current tile
   const messagerSkip = useCallback(() => {
@@ -2156,6 +2335,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     enemies,
     traps,
     chests,
+    prisons,
     actionsLeft,
     hasMoved,
     phase,
@@ -2190,6 +2370,9 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     pendingAutodefense,
     pendingVoodoo,
     pendingVoyageAstral,
+    prisonPayGold,
+    skipPrisonSwap,
+    wikiSwapStats,
     skipPassive,
     skipPortalChoice,
     useItem,

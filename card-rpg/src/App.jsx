@@ -142,7 +142,8 @@ function Game({ characters, onRestart }) {
           <span style={{ fontSize: 12, color: '#aaa' }}>
             {g.phase === 'draw' ? '🃏 Tirez vos cartes'
               : g.phase === 'player_turn' ? `Tour actif — ${g.actionsLeft} action${g.actionsLeft !== 1 ? 's' : ''}`
-              : g.phase === 'rolling_move' || g.phase === 'rolling_attack' ? '🎲 Lancement…'
+              : g.phase === 'rolling_move' || g.phase === 'rolling_attack' || g.phase === 'rolling_prison' ? '🎲 Lancement…'
+              : g.phase === 'choosing_prison_swap' ? '👔 Cravaté — choisissez un adversaire à interchanger'
               : g.phase === 'choosing_move' ? '🗺️ Choisissez une case'
               : g.phase === 'choosing_attack' ? '⚔️ Choisissez une cible'
               : g.phase === 'longs_bras_passive' ? '🦾 Passif — case adjacente'
@@ -178,10 +179,11 @@ function Game({ characters, onRestart }) {
             enemies={g.enemies}
             traps={g.traps}
             chests={g.chests}
+            prisons={g.prisons}
             highlightTiles={g.highlightTiles}
             phase={g.phase}
             onTileClick={(x, y) => {
-              if (g.phase === 'choosing_move' || g.phase === 'voyage_astral_select' || g.phase === 'voyage_astral_move') g.moveToTile(x, y);
+              if (g.phase === 'choosing_move' || g.phase === 'voyage_astral_select' || g.phase === 'voyage_astral_move' || g.phase === 'choosing_prison_swap') g.moveToTile(x, y);
               else if (g.phase === 'choosing_attack') g.attackTile(x, y);
             }}
           />
@@ -210,12 +212,21 @@ function Game({ characters, onRestart }) {
             <Btn label="🃏 Tirer des cartes" onClick={g.drawCards} primary />
           )}
           {g.phase === 'player_turn' && (<>
+            {cp?.prisonEffect && !g.hasMoved && (
+              <Btn
+                label={`🔓 Payer ${cp.prisonEffect.level * 2}💰 — annuler prison`}
+                onClick={g.prisonPayGold}
+                primary={cp.gold >= cp.prisonEffect.level * 2}
+                disabled={cp.gold < cp.prisonEffect.level * 2}
+                hint={`Niv.${cp.prisonEffect.level} — ou tentez le jet de dé en vous déplaçant`}
+              />
+            )}
             <Btn
-              label={`🗺️ Se déplacer (1 action)${g.hasMoved ? ' ✓' : ''}`}
+              label={`🗺️ Se déplacer (1 action)${g.hasMoved ? ' ✓' : cp?.prisonEffect ? ' 🔒 Jet requis' : ''}`}
               onClick={g.startMove}
               disabled={!canMove}
               primary={canMove}
-              hint={g.hasMoved ? 'Déjà déplacé ce tour' : !g.selectedCard || cardType !== 'move' ? 'Facultatif : sélectionnez une carte ♦ pour bonus' : `Carte ${g.selectedCard.name} active`}
+              hint={g.hasMoved ? 'Déjà déplacé ce tour' : cp?.prisonEffect ? `Prison niv.${cp.prisonEffect.level} — jet de dé requis` : !g.selectedCard || cardType !== 'move' ? 'Facultatif : sélectionnez une carte ♦ pour bonus' : `Carte ${g.selectedCard.name} active`}
             />
             <Btn
               label="⚔️ Attaquer (1 action)"
@@ -296,6 +307,14 @@ function Game({ characters, onRestart }) {
                 hint="Déplace un monstre en ligne droite au lieu de vous déplacer"
               />
             )}
+            {cp?.cls?.passive === 'wiki' && !cp?.wikiSwapped && (
+              <Btn
+                label={`📚 Wiki — interchanger Force↔Magie (gratuit, 1×/tour)`}
+                onClick={g.wikiSwapStats}
+                primary
+                hint={`Force: ${cp.stats.force} → ${cp.stats.magie} | Magie: ${cp.stats.magie} → ${cp.stats.force}`}
+              />
+            )}
             <Btn label="⏭️ Fin de tour" onClick={g.endTurn} />
           </>)}
           {g.phase === 'choosing_move' && (<>
@@ -316,6 +335,10 @@ function Game({ characters, onRestart }) {
           {g.phase === 'fou_portal' && (<>
             <div style={{ color: '#cc88ff', fontSize: 13, padding: '8px 0' }}>🃏 Cliquez un portail surlighté pour vous téléporter</div>
             <Btn label="🎲 Portail aléatoire" onClick={g.skipPortalChoice} />
+          </>)}
+          {g.phase === 'choosing_prison_swap' && (<>
+            <div style={{ color: '#ff9944', fontSize: 13, padding: '8px 0' }}>👔 Cravaté — cliquez un adversaire surligné pour interchanger (max 6 cases)</div>
+            <Btn label="⏭️ Passer" onClick={g.skipPrisonSwap} />
           </>)}
           {g.phase === 'longs_bras_passive' && (<>
             <div style={{ color: '#aaffcc', fontSize: 13, padding: '8px 0' }}>🦾 Cliquez une case adjacente surlignée pour activer son effet (gratuit)</div>

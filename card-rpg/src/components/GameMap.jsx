@@ -27,6 +27,10 @@ const TILE_DEF = {
     bg: '#0d130d', border: '#2a4a2a',
     icon: '✦', iconColor: '#3a6a3a',
   },
+  [T.PRISON]: {
+    bg: '#1a0a0a', border: '#994422',
+    icon: '⛓️',
+  },
 };
 
 // Wall brick pattern (drawn as an inner element)
@@ -110,6 +114,7 @@ const LEGEND_ITEMS = [
   { label: 'Monstre③', bg: '#2a1414', border: '#cc3333', icon: '🐉', pileDot: '#cc3333' },
   { label: 'Piège',    bg: '#1e1208', border: '#ff6633', icon: '🪤' },
   { label: 'Coffre',   bg: '#181408', border: '#aa8822', icon: '💰' },
+  { label: 'Prison①',  bg: '#1a0a0a', border: '#994422', icon: '⛓️' },
   { label: 'Base',     bg: '#111120', border: '#5ab4ff', icon: '⬡', iconColor: '#5ab4ff' },
   { label: 'Déplacer', bg: 'rgba(80,180,255,0.18)', border: '#5ab4ff', icon: null },
   { label: 'Attaque',  bg: 'rgba(255,80,60,0.22)', border: '#ff5040', icon: null },
@@ -149,7 +154,7 @@ function MapLegend() {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function GameMap({ grid, players, currentIdx, enemies, traps, chests, highlightTiles, phase, onTileClick }) {
+export default function GameMap({ grid, players, currentIdx, enemies, traps, chests, prisons, highlightTiles, phase, onTileClick }) {
   const rows = grid.length;
   const cols = grid[0].length;
 
@@ -169,6 +174,7 @@ export default function GameMap({ grid, players, currentIdx, enemies, traps, che
     'voyage_astral_select', 'voyage_astral_move',
     'longs_bras_passive', 'choosing_portal',
     'bum_throw', 'fou_attack', 'fou_portal',
+    'choosing_prison_swap',
   ].includes(phase);
 
   return (
@@ -198,6 +204,8 @@ export default function GameMap({ grid, players, currentIdx, enemies, traps, che
           const enemy      = enemies?.[key];
           const trap       = traps?.[key];
           const chest      = chests?.[key];
+          const prison     = prisons?.[key];
+          const isPrison   = cell === T.PRISON;
           const isCurrent  = playerHere?.idx === currentIdx;
           const isAtk      = isHighlight && (phase === 'choosing_attack' || phase === 'bum_throw' || phase === 'fou_attack');
           const isMove     = isHighlight && !isAtk;
@@ -230,6 +238,10 @@ export default function GameMap({ grid, players, currentIdx, enemies, traps, che
           } else if (isItem) {
             const d = TILE_DEF[T.ITEM];
             bg = d.bg; border = d.border;
+          } else if (isPrison) {
+            const lvl = prison?.level ?? 1;
+            const prisonColors = ['#994422','#bb3311','#dd1100'];
+            bg = '#1a0a0a'; border = prisonColors[lvl - 1] ?? '#994422';
           } else if (trap) {
             bg = '#1a0e04'; border = `${trap.color}88`;
           } else if (chest) {
@@ -280,6 +292,14 @@ export default function GameMap({ grid, players, currentIdx, enemies, traps, che
               )}
               {!isWall && !playerHere && isItem && !enemy && !trap && (
                 <span style={{ fontSize: 10, color: '#2a4a2a', opacity: 0.7 }}>✦</span>
+              )}
+
+              {/* Prison tile */}
+              {isPrison && !playerHere && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
+                  <span style={{ fontSize: 12, lineHeight: 1 }}>⛓️</span>
+                  <div style={{ fontSize: 6, color: prison?.level === 3 ? '#dd1100' : prison?.level === 2 ? '#bb3311' : '#994422', fontWeight: 800, lineHeight: 1 }}>N{prison?.level ?? 1}</div>
+                </div>
               )}
 
               {/* Trap */}

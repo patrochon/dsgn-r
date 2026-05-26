@@ -89,14 +89,16 @@ export const CLASSES = [
     name: 'Le Cravaté',
     icon: '👔',
     flavor: 'L\'autorité incarnée. Sa seule présence intimide — et son poing confirme.',
-    bonuses: { force: 3, destin: 2 },
+    bonuses: { deplacement: 1, richesse: 3 },
+    passive: 'cravate',
   },
   {
     id: 'wiki',
     name: 'Le Wiki',
     icon: '📚',
     flavor: 'Il sait tout sur tout. La connaissance est son arme la plus tranchante.',
-    bonuses: { destin: 3, magie: 2 },
+    bonuses: { destin: 1, force: 1, magie: 1 },
+    passive: 'wiki',
   },
 ];
 
