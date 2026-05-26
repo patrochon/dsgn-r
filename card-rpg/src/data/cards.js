@@ -122,18 +122,18 @@ const MAGIC_WEAPON_CARDS = [
 
 // ─── POTIONS (12) ─────────────────────────────────────────────────────────────
 const POTION_CARDS = [
-  card('soin_mineur',  'Potion de soin mineur',  '🧪', C.POTION, R.COMMON,   'heal', 10, 'Restaure 10 HP. (✨1)',                                                         null,                             1, 'self'),
-  card('soin_moyen',   'Potion de soin moyen',   '💚', C.POTION, R.COMMON,   'heal', 20, 'Restaure 20 HP. (✨2)',                                                         null,                             2, 'self'),
-  card('soin_majeur',  'Potion de soin majeur',  '💊', C.POTION, R.UNCOMMON, 'heal', 30, 'Restaure 30 HP. (✨3)',                                                         null,                             3, 'self'),
-  card('force_brew',   'Potion de Force',         '💪', C.POTION, R.COMMON,   'buff',  0, '+1 Force permanent. (✨1)',                                                    'perm:force+1',                   1, 'self'),
-  card('celerite',     'Potion de Célérité',      '⚡', C.POTION, R.COMMON,   'buff',  0, '+3 Déplacement ce tour. (✨1)',                                                 'celerite',                       1, 'self'),
-  card('resistance',   'Potion de Résistance',    '🛡️', C.POTION, R.UNCOMMON, 'buff',  4, '+4 Force défensive pendant 1 combat. (✨2)',                                   'buff:defense+4,duration:combat', 2, 'self'),
-  card('chance_brew',  'Potion de Richesse',       '🍀', C.POTION, R.UNCOMMON, 'buff',  0, 'Obtient 1d6 pièces d\'or. (✨2)',                                              'gold_1d6',                       2, 'self'),
-  card('antidote',     'Antidote',                '🌿', C.POTION, R.COMMON,   'cure',  0, 'Annule malédiction ou ralentissement. (✨1)',                                  'cure_all',                       1, 'self'),
-  card('magie_brew',   'Potion de Magie',         '🔮', C.POTION, R.UNCOMMON, 'buff',  0, '+1 Magie permanent. (✨2)',                                                    'perm:magie+1',                   2, 'self'),
-  card('elixir_vie',   'Élixir de Vie',           '❤️', C.POTION, R.RARE,     'buff',  0, '+5 Vie permanent (augmente le HP max). (✨4)',                                 'perm:vie+5',                     4, 'self'),
-  card('destin_brew',  'Potion de Destin',        '🌟', C.POTION, R.RARE,     'buff',  0, '+2 Destin permanent. (✨3)',                                                   'perm:destin+2',                  3, 'self'),
-  card('philtre_rage', 'Philtre de rage',         '🩸', C.POTION, R.RARE,     'buff',  0, '+6 Force, -3 Déplacement, attaque double — ce tour uniquement. (✨3)',         'rage',                           3, 'self'),
+  card('verre_eau',      "Verre d'eau",               '💧', C.POTION, R.COMMON,   'heal', 10, 'Restaure 10 HP. (✨1)',                                                                    null,                1, 'self'),
+  card('grand_verre',    "Grand verre d'eau",          '🥤', C.POTION, R.COMMON,   'heal', 20, 'Restaure 20 HP. (✨2)',                                                                    null,                2, 'self'),
+  card('gros_smoothie',  'Gros smoothie',              '🍵', C.POTION, R.UNCOMMON, 'heal', 30, 'Restaure 30 HP. (✨3)',                                                                    null,                3, 'self'),
+  card('jus_vert',       'Verre de jus vert',          '🥦', C.POTION, R.COMMON,   'heal',  5, 'Restaure 5 HP. Immunise contre les malédictions jusqu\'au prochain tour. (✨1)',           'curse_shield',      1, 'self'),
+  card('shake_prot',     "Shake de prot'",             '🥛', C.POTION, R.COMMON,   'buff',  0, '+3 dégâts sur la prochaine attaque. (✨1)',                                                'next_atk_bonus_3',  1, 'self'),
+  card('double_allonge', 'Double allongé noir',        '☕', C.POTION, R.COMMON,   'buff',  0, '+3 Déplacement sur le prochain mouvement. (✨1)',                                          'next_move_bonus_3', 1, 'self'),
+  card('antibiotique',   "Cuillère d'antibiotique",    '🧴', C.POTION, R.UNCOMMON, 'buff',  0, '+12 PV temporaires. Immunise contre les malédictions jusqu\'au prochain tour. (✨2)',      'temphp_curse_shield', 2, 'self'),
+  card('champagne',      'Coupe de champagne',         '🥂', C.POTION, R.UNCOMMON, 'buff',  0, 'Double les 3 prochains gains d\'or. (✨2)',                                                'gold_double_3',     2, 'self'),
+  card('jus_etoile',     "Verre de jus d'étoile",      '⭐', C.POTION, R.UNCOMMON, 'buff',  0, '+6 dégâts sur la prochaine attaque. (✨2)',                                                'next_atk_bonus_6',  2, 'self'),
+  card('lait_licorne',   'Verre de lait de licorne',   '🦄', C.POTION, R.RARE,     'buff',  0, '+18 Vie permanent (augmente le HP max). (✨4)',                                            'perm:vie+18',       4, 'self'),
+  card('sang_dragon',    'Verre de sang de dragon',    '🐉', C.POTION, R.RARE,     'buff',  0, '+1 Destin permanent. (✨2)',                                                               'perm:destin+1',     2, 'self'),
+  card('biere_viking',   'Bière de viking',            '🍺', C.POTION, R.RARE,     'buff',  0, '×2 dégâts sur les 3 prochaines attaques physiques. (✨3)',                                 'frenzied_3',        3, 'self'),
 ];
 
 // ─── PARCHEMINS MAGIQUES (9) ──────────────────────────────────────────────────

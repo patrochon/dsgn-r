@@ -58,6 +58,10 @@ function buildPlayer(charData, index, mapData) {
     hunterTarget: null,
     hunterStreak: 0,
     scrollsUsedThisTurn: 0,
+    nextAttackBonus: 0,
+    curseImmune: false,
+    goldDoubleRemaining: 0,
+    frenziedAttacks: 0,
     color: PLAYER_COLORS[index] ?? '#ffffff',
   };
 }
@@ -394,8 +398,11 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       p.forcedImmobileNextTurn = false;
       // Gold income: 3 gold per richesse point each turn
       const income = (p.stats?.richesse ?? 1) * 3;
-      p.gold = (p.gold ?? 0) + income;
-      addLog(`💰 ${p.name} reçoit ${income} pièce(s) d'or (Richesse ×3: ${p.stats?.richesse ?? 1}). Total: ${p.gold}`);
+      const doubleIncome = (p.goldDoubleRemaining ?? 0) > 0;
+      const actualIncome = doubleIncome ? income * 2 : income;
+      if (doubleIncome) { p.goldDoubleRemaining--; }
+      p.gold = (p.gold ?? 0) + actualIncome;
+      addLog(`💰 ${p.name} reçoit ${actualIncome} pièce(s) d'or${doubleIncome ? ' (×2 🥂)' : ''}. Total: ${p.gold}`);
       // Draw exactly 1 card per turn (up to hand limit)
       const needed = p.hand.length < HAND_LIMIT ? 1 : 0;
       if (needed > 0) {
@@ -421,6 +428,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       p.frenzied = false;
       p.stunned = false;
       p.scrollsUsedThisTurn = 0;
+      p.curseImmune = false;
       next[currentIdx] = p;
       return next;
     });
@@ -971,7 +979,9 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
           setPlayers(prev => {
             const next = [...prev];
             let np = { ...next[currentIdx] };
-            np.gold = (np.gold ?? 0) + goldReward;
+            const doubleG = (np.goldDoubleRemaining ?? 0) > 0;
+            np.gold = (np.gold ?? 0) + (doubleG ? goldReward * 2 : goldReward);
+            if (doubleG) { np.goldDoubleRemaining--; addLog(`🥂 Champagne ! Or doublé (${np.goldDoubleRemaining} restant(s))`); }
             if (treasureCard) np.hand = [...np.hand, treasureCard];
             next[currentIdx] = np;
             return next;
@@ -1627,7 +1637,9 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
           addLog(`🪬 ${cp.name} (Hache du chasseur) bonus chasseur : +${hunterBonus} dégâts !`);
         }
       }
-      let dmg = effectiveRoll + baseStat + Math.floor(cp.stats.destin / 3) + hunterBonus;
+      const atkBonus = cp.nextAttackBonus ?? 0;
+      let dmg = effectiveRoll + baseStat + Math.floor(cp.stats.destin / 3) + hunterBonus + atkBonus;
+      if (atkBonus > 0) addLog(`🥛 ${cp.name} bonus prochaine attaque : +${atkBonus} dégâts !`);
       if (card) {
         if (card.effect.special === 'crit_5_6' && effectiveRoll >= 5) dmg = Math.floor(dmg * 1.5);
         if (card.effect.special === 'double_on_6' && effectiveRoll === 6) dmg *= 2;
@@ -1635,6 +1647,8 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
         if (card.effect.special === 'aim' && !hasMoved) { dmg += 2; addLog(`🎯 Visée : +2 Force (immobile).`); }
       }
       if (!isMagic && cp.frenzied) { dmg *= 2; addLog(`🩸 Frénésie — attaque double !`); }
+      const beerAttacks = cp.frenziedAttacks ?? 0;
+      if (!isMagic && beerAttacks > 0) { dmg *= 2; addLog(`🍺 ${cp.name} (Bière de viking) ×2 ! (${beerAttacks} attaque(s) restante(s))`); }
       const piercedArmor = (card?.effect?.special === 'pierce_if_still' && !hasMoved) || card?.effect?.special === 'ignore_armor';
       // Imperissable: AOE immunity
       const isAoeAtk = card?.effect?.range === 'aoe1' || card?.effect?.range === 'aoe2';
@@ -1728,8 +1742,12 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
           // Weapon special effects (only if target survived)
           if (t.isAlive) {
             if (card?.effect?.special === 'curse') {
-              t = { ...t, cursed: true };
-              addLog(`🌑 ${t.name} est maudit — dé impair sur son prochain déplacement = dégâts magiques !`);
+              if (t.curseImmune) {
+                addLog(`🥦 ${t.name} est immunisé contre la malédiction !`);
+              } else {
+                t = { ...t, cursed: true };
+                addLog(`🌑 ${t.name} est maudit — dé impair sur son prochain déplacement = dégâts magiques !`);
+              }
             }
             if (card?.effect?.special === 'stun_6' && effectiveRoll === 6) {
               if (t.equippedArmor?.effect?.special?.includes('no_stun')) {
@@ -1762,16 +1780,20 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
               }
             }
           }
-          // Hunter streak update
-          if (card?.effect?.special === 'hunter') {
+          // Hunter streak update + consume attack buffs
+          {
             let att = { ...next[currentIdx] };
-            if (!t.isAlive) {
-              att.hunterTarget = null; att.hunterStreak = 0;
-            } else if (att.hunterTarget === targetPlayerIdx) {
-              att.hunterStreak = Math.min(2, (att.hunterStreak ?? 0) + 1);
-            } else {
-              att.hunterStreak = 1; att.hunterTarget = targetPlayerIdx;
+            if (card?.effect?.special === 'hunter') {
+              if (!t.isAlive) {
+                att.hunterTarget = null; att.hunterStreak = 0;
+              } else if (att.hunterTarget === targetPlayerIdx) {
+                att.hunterStreak = Math.min(2, (att.hunterStreak ?? 0) + 1);
+              } else {
+                att.hunterStreak = 1; att.hunterTarget = targetPlayerIdx;
+              }
             }
+            att.nextAttackBonus = 0;
+            if ((cp.frenziedAttacks ?? 0) > 0) att.frenziedAttacks = cp.frenziedAttacks - 1;
             next[currentIdx] = att;
           }
           next[targetPlayerIdx] = t;
@@ -1815,12 +1837,24 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
           setPlayers(prev => {
             const next = [...prev];
             let np = { ...next[currentIdx] };
-            np.gold = (np.gold ?? 0) + goldRewardAtk;
+            const doubleGold = (np.goldDoubleRemaining ?? 0) > 0;
+            np.gold = (np.gold ?? 0) + (doubleGold ? goldRewardAtk * 2 : goldRewardAtk);
+            if (doubleGold) { np.goldDoubleRemaining--; addLog(`🥂 Champagne ! Or doublé : +${goldRewardAtk * 2}💰 (${np.goldDoubleRemaining} restant(s))`); }
             if (treasureCardAtk) np.hand = [...np.hand, treasureCardAtk];
+            np.nextAttackBonus = 0;
+            if ((cp.frenziedAttacks ?? 0) > 0) np.frenziedAttacks = cp.frenziedAttacks - 1;
             next[currentIdx] = np;
             return next;
           });
         } else {
+          setPlayers(prev => {
+            const next = [...prev];
+            let np = { ...next[currentIdx] };
+            np.nextAttackBonus = 0;
+            if ((cp.frenziedAttacks ?? 0) > 0) np.frenziedAttacks = cp.frenziedAttacks - 1;
+            next[currentIdx] = np;
+            return next;
+          });
           setEnemies(prev => ({ ...prev, [key]: { ...targetEnemy, hp: newHp } }));
         }
         setPhase('player_turn');
@@ -1847,17 +1881,19 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
 
     if (card.effect.type === 'heal') {
       const healAmt = card.effect.bonus;
+      const isCurseShield = card.effect.special === 'curse_shield';
       setPlayers(prev => {
         const next = [...prev];
         const p = { ...next[currentIdx] };
         p.hp = Math.min(p.maxHp, p.hp + healAmt);
         p.cursed = false;
+        if (isCurseShield) p.curseImmune = true;
         p.hand = p.hand.filter(c => c !== card);
         p.discard = [...p.discard, card];
         next[currentIdx] = p;
         return next;
       });
-      addLog(`${cp.name} utilise ${card.icon} ${card.name} : +${healAmt} HP.`);
+      addLog(`${cp.name} utilise ${card.icon} ${card.name} : +${healAmt} HP.${isCurseShield ? ' Immunisé contre les malédictions !' : ''}`);
     } else if (card.effect.type === 'buff') {
       const special = card.effect.special ?? '';
       if (special.startsWith('perm:')) {
@@ -1906,6 +1942,63 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
           return next;
         });
         addLog(`🩸 ${cp.name} entre en Frénésie : +6 Force, -3 Déplacement, attaque double ce tour !`);
+      } else if (special === 'next_atk_bonus_3' || special === 'next_atk_bonus_6') {
+        const bonus = special === 'next_atk_bonus_3' ? 3 : 6;
+        setPlayers(prev => {
+          const next = [...prev];
+          const p = { ...next[currentIdx] };
+          p.nextAttackBonus = (p.nextAttackBonus ?? 0) + bonus;
+          p.hand = p.hand.filter(c => c !== card);
+          p.discard = [...p.discard, card];
+          next[currentIdx] = p;
+          return next;
+        });
+        addLog(`${cp.name} utilise ${card.icon} ${card.name} : +${bonus} dégâts sur la prochaine attaque !`);
+      } else if (special === 'next_move_bonus_3') {
+        setPlayers(prev => {
+          const next = [...prev];
+          const p = { ...next[currentIdx] };
+          p.tempDepBonus = (p.tempDepBonus ?? 0) + 3;
+          p.hand = p.hand.filter(c => c !== card);
+          p.discard = [...p.discard, card];
+          next[currentIdx] = p;
+          return next;
+        });
+        addLog(`${cp.name} utilise ${card.icon} ${card.name} : +3 Déplacement ce tour !`);
+      } else if (special === 'temphp_curse_shield') {
+        setPlayers(prev => {
+          const next = [...prev];
+          const p = { ...next[currentIdx] };
+          p.tempHp = (p.tempHp ?? 0) + 12;
+          p.curseImmune = true;
+          p.hand = p.hand.filter(c => c !== card);
+          p.discard = [...p.discard, card];
+          next[currentIdx] = p;
+          return next;
+        });
+        addLog(`${cp.name} utilise ${card.icon} ${card.name} : +12 PV temporaires + immunité malédiction !`);
+      } else if (special === 'gold_double_3') {
+        setPlayers(prev => {
+          const next = [...prev];
+          const p = { ...next[currentIdx] };
+          p.goldDoubleRemaining = (p.goldDoubleRemaining ?? 0) + 3;
+          p.hand = p.hand.filter(c => c !== card);
+          p.discard = [...p.discard, card];
+          next[currentIdx] = p;
+          return next;
+        });
+        addLog(`🥂 ${cp.name} utilise ${card.icon} ${card.name} : les 3 prochains gains d'or seront doublés !`);
+      } else if (special === 'frenzied_3') {
+        setPlayers(prev => {
+          const next = [...prev];
+          const p = { ...next[currentIdx] };
+          p.frenziedAttacks = (p.frenziedAttacks ?? 0) + 3;
+          p.hand = p.hand.filter(c => c !== card);
+          p.discard = [...p.discard, card];
+          next[currentIdx] = p;
+          return next;
+        });
+        addLog(`🍺 ${cp.name} utilise ${card.icon} ${card.name} : ×2 sur les 3 prochaines attaques physiques !`);
       } else {
         setPlayers(prev => {
           const next = [...prev];
@@ -2036,7 +2129,9 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
         setPlayers(prev => {
           const next = [...prev];
           let np = { ...next[currentIdx] };
-          np.gold = (np.gold ?? 0) + goldRewardFou;
+          const doubleGFou = (np.goldDoubleRemaining ?? 0) > 0;
+          np.gold = (np.gold ?? 0) + (doubleGFou ? goldRewardFou * 2 : goldRewardFou);
+          if (doubleGFou) { np.goldDoubleRemaining--; addLog(`🥂 Champagne ! Or doublé (${np.goldDoubleRemaining} restant(s))`); }
           if (treasureCardFou) np.hand = [...np.hand, treasureCardFou];
           next[currentIdx] = np;
           return next;
