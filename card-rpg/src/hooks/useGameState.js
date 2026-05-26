@@ -57,6 +57,7 @@ function buildPlayer(charData, index, mapData) {
     tempHp: 0,
     hunterTarget: null,
     hunterStreak: 0,
+    scrollsUsedThisTurn: 0,
     color: PLAYER_COLORS[index] ?? '#ffffff',
   };
 }
@@ -111,7 +112,7 @@ function getCardDeltas(card, stats) {
     if (card.effect.type === 'magic_attack') {
       deltas = [{ stat: 'magie', val: card.effect.bonus }, { stat: 'force', val: Math.floor(card.effect.bonus / 2) }];
     } else if (card.effect.type === 'defense') {
-      deltas = [{ stat: 'force', val: card.effect.bonus }];
+      deltas = [];
     } else if (card.effect.type === 'legendary' && special.includes('all+3')) {
       deltas = Object.keys(stats).map(s => ({ stat: s, val: 3 }));
     }
@@ -200,10 +201,21 @@ function generateInitialTiles(mapData) {
   return { enemies, traps, chests };
 }
 
+// Returns a Set of tile keys occupied by block_passage armor wearers (excluding excludeIdx)
+function getBlockedTiles(players, excludeIdx) {
+  const blocked = new Set();
+  players.forEach((p, i) => {
+    if (i !== excludeIdx && p.isAlive && p.equippedArmor?.effect?.special?.includes('block_passage')) {
+      blocked.add(`${p.x},${p.y}`);
+    }
+  });
+  return blocked.size > 0 ? blocked : null;
+}
+
 // Dijkstra movement reachability — returns { tiles: string[], budgetAtTile: {key: number} }
 // wallPass   : traverse all walls freely
 // oneWallPass: traverse at most one wall (Feux Follets passive)
-function runMoveDijkstra(fromX, fromY, budget, facing, wallPass, oneWallPass, grid) {
+function runMoveDijkstra(fromX, fromY, budget, facing, wallPass, oneWallPass, grid, blockedTiles = null) {
   const visited = {};
   const queue = [{ x: fromX, y: fromY, budget, wallsUsed: 0, dir: facing ?? null }];
   const tilesSet = new Set();
@@ -233,7 +245,7 @@ function runMoveDijkstra(fromX, fromY, budget, facing, wallPass, oneWallPass, gr
       // 180-degree turn costs 1 extra movement
       if (dir && dir.dx === -dx && dir.dy === -dy) stepCost += 1;
       const newBgt = bgt - stepCost;
-      if (newBgt >= 0) queue.push({ x: nx, y: ny, budget: newBgt, wallsUsed: nWallsUsed, dir: { dx, dy } });
+      if (newBgt >= 0 && !(blockedTiles?.has(`${nx},${ny}`))) queue.push({ x: nx, y: ny, budget: newBgt, wallsUsed: nWallsUsed, dir: { dx, dy } });
     }
   }
   return { tiles: [...tilesSet], budgetAtTile };
@@ -408,6 +420,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       p.tempDepBonus = 0;
       p.frenzied = false;
       p.stunned = false;
+      p.scrollsUsedThisTurn = 0;
       next[currentIdx] = p;
       return next;
     });
@@ -448,6 +461,14 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       const cp2 = players[currentIdx];
       if ((cp2.stats.magie ?? 0) < card.effect.magieCost) {
         addLog(`❌ ${cp2.name} n'a pas assez de Magie pour équiper ${card.icon} ${card.name} (requis : ${card.effect.magieCost}, actuel : ${cp2.stats.magie ?? 0}).`);
+        return false;
+      }
+    }
+    // Armor force requirement
+    if (isArmor && (card.effect.bonus ?? 0) > 0) {
+      const cp3 = players[currentIdx];
+      if ((cp3.stats.force ?? 0) < card.effect.bonus) {
+        addLog(`❌ ${cp3.name} n'a pas assez de Force pour équiper ${card.icon} ${card.name} (requis : ${card.effect.bonus}, actuel : ${cp3.stats.force ?? 0}).`);
         return false;
       }
     }
@@ -527,7 +548,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
           addLog(`🎲 ${cpCheck.name} réussit l'évasion (${roll} ≤ ${threshold}) — avance de ${roll} case(s).`);
           const cp2 = { ...cpCheck, prisonEffect: null };
           const hasFF = cp2.race?.passive === 'peluches';
-          const { tiles, budgetAtTile } = runMoveDijkstra(cp2.x, cp2.y, roll, cp2.facing, false, hasFF, grid);
+          const { tiles, budgetAtTile } = runMoveDijkstra(cp2.x, cp2.y, roll, cp2.facing, false, hasFF, grid, getBlockedTiles(players, currentIdx));
           const otherBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
           setTilesBudget(budgetAtTile);
           setHighlightTiles(tiles.filter(t => !otherBases.has(t)));
@@ -622,7 +643,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       addLog(`🎲 ${cp.name} lance le dé : ${roll}${logSuffix}${logDep} = ${finalRange} cases.${card?.effect?.type === 'move' ? ` [${card.name}]` : ''}`);
 
       const hasPeluches = cp.race?.passive === 'peluches';
-      const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, finalRange, cp.facing, wallPass, hasPeluches, grid);
+      const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, finalRange, cp.facing, wallPass, hasPeluches, grid, getBlockedTiles(players, currentIdx));
       const otherBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
       setTilesBudget(budgetAtTile);
       setHighlightTiles(tiles.filter(t => !otherBases.has(t)));
@@ -659,7 +680,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     setPendingMoveRoll(null);
     addLog(`🎲 ${cp.name} se déplace de ${finalRange} case(s)${useBonus ? ` (+${depBonus} bonus)` : ' (sans bonus)'}.`);
     const hasPeluches = cp.race?.passive === 'peluches';
-    const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, finalRange, cp.facing, wallPass, hasPeluches, grid);
+    const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, finalRange, cp.facing, wallPass, hasPeluches, grid, getBlockedTiles(players, currentIdx));
     const otherBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
     setTilesBudget(budgetAtTile);
     setHighlightTiles(tiles.filter(t => !otherBases.has(t)));
@@ -685,7 +706,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     setPendingMoveRoll(null);
     addLog(`🌿 ${cp.name} (Touffus) choisit de se déplacer (${finalRange} cases).`);
     const hasPeluches = cp.race?.passive === 'peluches';
-    const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, finalRange, cp.facing, wallPass, hasPeluches, grid);
+    const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, finalRange, cp.facing, wallPass, hasPeluches, grid, getBlockedTiles(players, currentIdx));
     const otherBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
     setTilesBudget(budgetAtTile);
     setHighlightTiles(tiles.filter(t => !otherBases.has(t)));
@@ -744,7 +765,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       if (special === 'wall_pass') wallPass = true;
       addLog(`🌙 ${cp.name} relance le dé : ${roll}${logSuffix} = ${range} cases.`);
       const hasPeluches2 = cp.race?.passive === 'peluches';
-      const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, range, cp.facing, wallPass, hasPeluches2, grid);
+      const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, range, cp.facing, wallPass, hasPeluches2, grid, getBlockedTiles(players, currentIdx));
       const otherBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
       setTilesBudget(budgetAtTile);
       setHighlightTiles(tiles.filter(t => !otherBases.has(t)));
@@ -816,7 +837,8 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       let teleported = false;
       const hasChapeaux = players[currentIdx]?.race?.passive === 'chapeaux';
 
-      if (grid[ty][tx] === T.TELEPORT && teleportTiles.length > 1) {
+      const hasImmuneForce = players[currentIdx]?.equippedArmor?.effect?.special?.includes('immune_forced_move');
+      if (grid[ty][tx] === T.TELEPORT && teleportTiles.length > 1 && !hasImmuneForce) {
         const others = teleportTiles.filter(t => !(t.x === tx && t.y === ty));
         if (hasChapeaux && others.length > 1) {
           // Discard move card before suspending for portal choice
@@ -1596,7 +1618,8 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
         }
       }
       const frenziedBonus = (!isMagic && cp.frenzied) ? 6 : 0;
-      const baseStat = (isMagic ? effectiveMagie : cp.stats.force) + frenziedBonus;
+      const meleeForceBonusAtt = (!isMagic && cardRange === 'melee' && cp.equippedArmor?.effect?.special?.includes('melee_force_bonus')) ? 1 : 0;
+      const baseStat = (isMagic ? effectiveMagie : cp.stats.force + meleeForceBonusAtt) + frenziedBonus;
       let hunterBonus = 0;
       if (card?.effect?.special === 'hunter' && targetPlayerIdx >= 0) {
         if (cp.hunterTarget === targetPlayerIdx && (cp.hunterStreak ?? 0) >= 1) {
@@ -1636,10 +1659,8 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
             return;
           }
         }
-        const armorPenalty = (target.armorJustSwapped && target.equippedArmor) ? (target.equippedArmor.effect.bonus ?? 0) : 0;
-        const defense = piercedArmor ? 0 : Math.floor((target.stats.force - armorPenalty) / 3);
+        const defense = piercedArmor ? 0 : Math.floor(target.stats.force / 3);
         if (piercedArmor) addLog(`🔰 Armure percée — défense de ${target.name} annulée !`);
-        else if (armorPenalty > 0) addLog(`🛡️ ${target.name} vient de changer d'armure — protection inactive ce tour.`);
         const isMagicAtk = card?.effect?.type === 'magic_attack';
         const rawActualDmg = Math.max(1, dmg - defense);
         const actualDmg = isMagicAtk ? rawActualDmg : physDmg(rawActualDmg, target);
@@ -1711,8 +1732,12 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
               addLog(`🌑 ${t.name} est maudit — dé impair sur son prochain déplacement = dégâts magiques !`);
             }
             if (card?.effect?.special === 'stun_6' && effectiveRoll === 6) {
-              t = { ...t, stunned: true };
-              addLog(`💫 ${t.name} est étourdi — passera son prochain tour !`);
+              if (t.equippedArmor?.effect?.special?.includes('no_stun')) {
+                addLog(`⛑️ ${t.name} est immunisé à l'étourdissement (Casque de baseball) !`);
+              } else {
+                t = { ...t, stunned: true };
+                addLog(`💫 ${t.name} est étourdi — passera son prochain tour !`);
+              }
             }
             if (card?.effect?.special === 'disarm_6' && effectiveRoll === 6 && t.equippedWeapon) {
               addLog(`⛓️ ${t.name} est désarmé ! ${t.equippedWeapon.icon} ${t.equippedWeapon.name} défaussé.`);
@@ -1724,12 +1749,16 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
               addLog(`❄️ ${t.name} est ralenti — -4 Déplacement à son prochain tour !`);
             }
             if (card?.effect?.special === 'push_enemy') {
+              if (t.equippedArmor?.effect?.special?.includes('immune_forced_move')) {
+                addLog(`🤿 ${t.name} est immunisé aux déplacements forcés (Scaphandrier) !`);
+              } else {
               const pdx = t.x - cp.x, pdy = t.y - cp.y;
               const pnx = t.x + Math.sign(pdx !== 0 ? pdx : 0);
               const pny = t.y + Math.sign(pdy !== 0 ? pdy : (pdx === 0 ? 1 : 0));
               if (pnx >= 0 && pny >= 0 && pny < grid.length && pnx < grid[0].length && grid[pny][pnx] !== T.WALL) {
                 t = { ...t, x: pnx, y: pny };
                 addLog(`🏹 ${t.name} est repoussé d'une case !`);
+              }
               }
             }
           }
@@ -2046,6 +2075,11 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     if (actionsLeft < 1) return;
     const cp = players[currentIdx];
     if (!cp.readyScroll) return;
+    const maxScrolls = cp.equippedArmor?.effect?.special?.includes('extra_scroll') ? 2 : 1;
+    if ((cp.scrollsUsedThisTurn ?? 0) >= maxScrolls) {
+      addLog(`❌ ${cp.name} a déjà utilisé ${maxScrolls} parchemin(s) ce tour.`);
+      return;
+    }
     const card = cp.readyScroll;
     const isFreeze = card.effect.special === 'freeze';
     const isShield = card.effect.special === 'shield10';
@@ -2068,7 +2102,8 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       }
       setPlayers(prev => {
         const next = [...prev];
-        next[currentIdx] = { ...next[currentIdx], readyScroll: null, discard: [...next[currentIdx].discard, card], lastScroll: card };
+        const p = next[currentIdx];
+        next[currentIdx] = { ...p, readyScroll: null, discard: [...p.discard, card], lastScroll: card, scrollsUsedThisTurn: (p.scrollsUsedThisTurn ?? 0) + 1 };
         return next;
       });
       setActionsLeft(prev => prev - 1);
@@ -2078,7 +2113,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
 
     setPlayers(prev => {
       const next = [...prev];
-      next[currentIdx] = { ...next[currentIdx], readyScroll: null, discard: [...next[currentIdx].discard, card], lastScroll: card };
+      next[currentIdx] = { ...next[currentIdx], readyScroll: null, discard: [...next[currentIdx].discard, card], lastScroll: card, scrollsUsedThisTurn: (next[currentIdx].scrollsUsedThisTurn ?? 0) + 1 };
       if (isFreeze) {
         const caster = next[currentIdx];
         for (let i = 0; i < next.length; i++) {
@@ -2577,7 +2612,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     setPendingMoveRoll(null);
     addLog(`📋 ${cp.name} (Secrétariat) ajuste son déplacement${delta !== 0 ? ` de ${delta > 0 ? '+' : ''}${delta}` : ''} = ${finalRange} case(s).`);
     const hasPeluches = cp.race?.passive === 'peluches';
-    const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, finalRange, cp.facing, wallPass, hasPeluches, grid);
+    const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, finalRange, cp.facing, wallPass, hasPeluches, grid, getBlockedTiles(players, currentIdx));
     const otherBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
     setTilesBudget(budgetAtTile);
     setHighlightTiles(tiles.filter(t => !otherBases.has(t)));
