@@ -107,6 +107,7 @@ const WEAPON_CARDS = [
   card('marteau',     'Marteau de guerre',  '🔨', C.WEAPON, R.UNCOMMON, 'attack', 5, "Force requise 5. Étourdit l'ennemi sur dé 6 (passe son tour).",           'stun_6',           0, 'melee'),
   card('arc_long',    'Arc long',           '🎯', C.WEAPON, R.RARE,     'attack', 5, 'Force requise 5. Portée 3–6 cases. +2 Force si immobile.',               'aim',              0, 'r6'),
   card('arbalete',    'Arbalète',           '🔰', C.WEAPON, R.RARE,     'attack', 5, "Force requise 5. Portée 2–5 cases. Perce toute l'armure si immobile.",   'pierce_if_still',  0, 'r5'),
+  card('hache_chasseur', 'Hache du chasseur', '🪬', C.WEAPON, R.RARE, 'attack', 3, "Force requise 3. +3 dégâts si même cible qu'au dernier tour, +6 au deuxième tour consécutif. Reset si cible différente.", 'hunter', 0, 'melee'),
 ];
 
 // ─── ARMEMENT MAGIQUE (6) ─────────────────────────────────────────────────────
@@ -115,8 +116,7 @@ const MAGIC_WEAPON_CARDS = [
   card('arc_tenebres',  'Arc des Ténèbres',  '🌑', C.MAGIC_WPN, R.RARE,      'magic_attack', 3, 'Force requise 3. Maudit la cible : dé impair à son prochain déplacement = dégâts magiques égaux au résultat.', 'curse', 0, 'r4'),
   card('sceptre_givre', 'Sceptre de givre',  '❄️', C.MAGIC_WPN, R.RARE,      'magic_attack', 2, 'Force requise 2. Ralentit l\'ennemi : -4 Déplacement à son prochain tour.',   'slow_enemy',  0, 'r2'),
   card('dague_venin',   'Dague venimeuse',   '🐍', C.MAGIC_WPN, R.RARE,      'magic_attack', 3, 'Force requise 3. +2 Destin. Critique automatique sur dé 5-6 (×1.5 dégâts).',  'crit_5_6',    0, 'melee'),
-  card('hache_runique',  'Hache runique',    '🪬', C.MAGIC_WPN, R.RARE,      'magic_attack', 5, '+5 Force, +2 Destin. Active une rune aléatoire sur dé 4+.',                     'rune',        0, 'melee'),
-  card('lame_spectrale','Lame spectrale',    '👻', C.MAGIC_WPN, R.LEGENDARY, 'magic_attack', 3, '+3 Force, +4 Magie. Ignore totalement l\'armure et la résistance.',             'ignore_armor',0, 'melee'),
+  card('lame_spectrale','Lame spectrale',    '👻', C.MAGIC_WPN, R.LEGENDARY, 'magic_attack', 3, 'Force requise 3, Magie requise 4. Ignore armure et résistance. Attaque à travers les murs.', 'ignore_armor', 4, 'wall_melee'),
 ];
 
 // ─── POTIONS (12) ─────────────────────────────────────────────────────────────
@@ -140,10 +140,10 @@ const SCROLL_CARDS = [
   card('boule_feu',    'Boule de Feu',         '🔥', C.SCROLL, R.UNCOMMON, 'magic',  8, "8 dégâts magiques à l'ennemi ciblé + 4 aux adjacents. (✨3)",    'aoe',        3, 'r4'),
   card('eclair',       'Éclair',               '⚡', C.SCROLL, R.UNCOMMON, 'magic',  6, 'Touche jusqu\'à 3 ennemis en ligne. 6 dégâts. (✨2)',             'chain',      2, 'line'),
   card('gel',          'Nova de Givre',        '❄️', C.SCROLL, R.UNCOMMON, 'magic',  0, 'Gèle tous les joueurs à portée 2 : -4 Déplacement à leur prochain tour. (✨2)','freeze', 2, 'aoe2'),
-  card('invocation',   'Invocation',           '👾', C.SCROLL, R.RARE,     'magic',  0, 'Crée un allié combattant adjacent pendant 2 tours. (✨4)',        'summon',     4, 'melee'),
+  card('invocation',   'Invocation — Golem',   '⛰️', C.SCROLL, R.RARE,     'magic',  0, 'Convoque un Golem adjacent. 1✨=Golem de Terre (6PV/F3), 3✨=Golem de Pierre (12PV/F5), 6✨=Golem d\'Or (24PV/F8). (✨1/3/6)', 'summon', 1, 'melee'),
   card('soin_masse',   'Soin de masse',        '✨', C.SCROLL, R.UNCOMMON, 'magic', 15, 'Restaure 15 HP à tous les alliés adjacents. (✨3)',               'aoe_heal',   3, 'aoe1'),
   card('malediction',  'Malédiction',          '🧿', C.SCROLL, R.UNCOMMON, 'magic',  0, 'Réduit toutes les stats ennemies de 2 pendant 3 tours. (✨2)',    'debuff_all', 2, 'r4'),
-  card('bouclier_mag', 'Bouclier Magique',     '🔵', C.SCROLL, R.RARE,     'magic',  0, 'Absorbe les 10 prochains dégâts reçus. (✨3)',                    'shield10',   3, 'self'),
+  card('bouclier_mag', 'Bouclier Magique',     '🔵', C.SCROLL, R.RARE,     'magic',  0, 'Donne 18 points de vie temporaires. (✨3)',                       'shield10',   3, 'self'),
   card('vision',       'Vision prophétique',   '👁️', C.SCROLL, R.RARE,     'magic',  0, 'Révèle toute la carte. +2 Richesse pour ce tour. (✨2)',          'reveal_map', 2, 'global'),
   card('resurrection', 'Résurrection',         '💀', C.SCROLL, R.LEGENDARY,'magic',  0, 'Si tu tombes à 0 HP ce tour, reviens à 50% HP. Usage unique. (✨6)','revive_50',6, 'self'),
 ];
@@ -197,7 +197,8 @@ export const RARITY_COLOR = {
 // Metadata for displaying range badges in the UI
 export const RANGE_META = {
   self:   { label: 'Soi',  color: '#666666' },
-  melee:  { label: '✊',   color: '#ff9955' },
+  melee:      { label: '✊',   color: '#ff9955' },
+  wall_melee: { label: 'Mur', color: '#cc88ff' },
   back:   { label: '↩',   color: '#cc8844' },
   r2:     { label: '●2',  color: '#55ccff' },
   r4:     { label: '●4',  color: '#44aaee' },

@@ -159,6 +159,9 @@ function Game({ characters, onRestart }) {
               : g.phase === 'voodoo_reflect' ? '🧿 Voodoo — renvoyer les dégâts ?'
               : g.phase === 'voyage_astral_select' ? '🌌 Voyage Astral — choisissez un monstre'
               : g.phase === 'voyage_astral_move' ? '🌌 Voyage Astral — choisissez la destination'
+              : g.phase === 'secretariat_move_choice' ? '📋 Secrétariat — ajuster le déplacement ?'
+              : g.phase === 'choosing_golem' ? '⛰️ Invocation — choisissez le niveau du Golem'
+              : g.phase === 'shop_couponing' ? '🏷️ Couponing — boutique'
               : g.phase}
           </span>
         </div>
@@ -394,6 +397,55 @@ function Game({ characters, onRestart }) {
           {g.phase === 'choosing_portal' && (<>
             <div style={{ color: '#cc88ff', fontSize: 13, padding: '8px 0' }}>🎩 Cliquez un portail surlighté pour choisir votre sortie</div>
             <Btn label="🎲 Sortie aléatoire" onClick={g.skipPortalChoice} />
+          </>)}
+          {g.phase === 'secretariat_move_choice' && g.pendingMoveRoll && (<>
+            <div style={{ color: '#aaffcc', fontSize: 13, padding: '8px 0' }}>
+              📋 Secrétariat — ajuster votre déplacement ?
+            </div>
+            <Btn
+              label={`-1 case (${Math.max(0, (g.pendingMoveRoll.roll + g.pendingMoveRoll.depBonus) - 1)})`}
+              onClick={() => g.secretariatAdjustMove(-1)}
+              disabled={(g.pendingMoveRoll.roll + g.pendingMoveRoll.depBonus) <= 0}
+            />
+            <Btn label={`Résultat normal (${Math.max(0, g.pendingMoveRoll.roll + g.pendingMoveRoll.depBonus)})`} onClick={() => g.secretariatAdjustMove(0)} primary />
+            <Btn label={`+1 case (${g.pendingMoveRoll.roll + g.pendingMoveRoll.depBonus + 1})`} onClick={() => g.secretariatAdjustMove(1)} />
+          </>)}
+          {g.phase === 'choosing_golem' && (<>
+            <div style={{ color: '#ffcc88', fontSize: 13, padding: '8px 0' }}>
+              ⛰️ Choisissez le niveau du Golem (Magie actuelle : {cp?.stats?.magie ?? 0})
+            </div>
+            {[
+              { level: 1, label: '⛰️ Golem de Terre — 6 PV, F3', cost: 1 },
+              { level: 3, label: '🪨 Golem de Pierre — 12 PV, F5', cost: 3 },
+              { level: 6, label: '✨ Golem d\'Or — 24 PV, F8', cost: 6 },
+            ].map(({ level, label, cost }) => (
+              <Btn
+                key={level}
+                label={`${label} (✨${cost})`}
+                onClick={() => g.summonGolem(level)}
+                primary={(cp?.stats?.magie ?? 0) >= cost}
+                disabled={(cp?.stats?.magie ?? 0) < cost}
+              />
+            ))}
+          </>)}
+          {g.phase === 'shop_couponing' && g.pendingShopOffer && (<>
+            <div style={{ color: '#55ff99', fontSize: 13, padding: '8px 0' }}>
+              🏷️ {g.pendingShopOffer.boughtCount === 0 ? `Premier achat : 1💰 (or disponible : ${cp?.gold ?? 0}💰)` : `Deuxième achat — prix normal (or : ${cp?.gold ?? 0}💰)`}
+            </div>
+            {g.pendingShopOffer.cards.map((c, i) => {
+              const cost = g.pendingShopOffer.boughtCount === 0 ? 1 : (c.goldValue ?? 2);
+              const canAfford = (cp?.gold ?? 0) >= cost;
+              return (
+                <Btn
+                  key={c.id + i}
+                  label={`${c.icon} ${c.name} — ${cost}💰${!canAfford ? ' ✗' : ''}`}
+                  onClick={() => g.couponingBuy(i)}
+                  primary={canAfford}
+                  disabled={!canAfford}
+                />
+              );
+            })}
+            <Btn label="⏭️ Quitter le magasin" onClick={g.couponingSkipShop} />
           </>)}
           {(g.phase === 'rolling_move' || g.phase === 'rolling_attack') && (
             <div style={{ color: '#ffcc44', fontSize: 13, padding: '8px 0' }}>🎲 Lancement du dé…</div>

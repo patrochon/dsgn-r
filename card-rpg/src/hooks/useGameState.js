@@ -54,6 +54,9 @@ function buildPlayer(charData, index, mapData) {
     frenzied: false,
     stunned: false,
     cursed: false,
+    tempHp: 0,
+    hunterTarget: null,
+    hunterStreak: 0,
     color: PLAYER_COLORS[index] ?? '#ffffff',
   };
 }
@@ -244,13 +247,23 @@ function physDmg(rawDmg, target, isAoe = false) {
   return Math.max(0, rawDmg - reduction);
 }
 
+function absorbDamage(player, dmg) {
+  const temp = player.tempHp ?? 0;
+  if (temp <= 0) return { player, remaining: dmg };
+  const absorbed = Math.min(temp, dmg);
+  return { player: { ...player, tempHp: temp - absorbed }, remaining: dmg - absorbed };
+}
+
 // Initiative: monster goes first if its attack > player's (force + magie)
-// Secrétariat passive: always goes first (monster never has initiative)
 function monsterGoesFirst(player, monster) {
-  if (player.spec?.passive === 'secretariat') return false;
   return monster.attack > ((player.stats?.force ?? 0) + (player.stats?.magie ?? 0));
 }
 
+const GOLEMS = {
+  1: { icon: '⛰️', name: 'Golem de Terre',  maxHp: 6,  attack: 3, defense: 0, pile: null, isGolem: true },
+  3: { icon: '🪨', name: 'Golem de Pierre', maxHp: 12, attack: 5, defense: 1, pile: null, isGolem: true },
+  6: { icon: '✨', name: 'Golem d\'Or',      maxHp: 24, attack: 8, defense: 2, pile: null, isGolem: true },
+};
 
 function getCrossedPlayers(startX, startY, endX, endY, allPlayers, currentIdx) {
   const crossed = [];
@@ -312,6 +325,8 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
   const [pendingNde, setPendingNde] = useState(null);
   const [pendingVoyageAstral, setPendingVoyageAstral] = useState(null);
   const [pendingMoveRoll, setPendingMoveRoll] = useState(null);
+  const [pendingGolem, setPendingGolem] = useState(null);
+  const [pendingShopOffer, setPendingShopOffer] = useState(null);
 
   const treasurePileRef = useRef({
     1: shuffleDeck(FULL_DECK.filter(c => c.rarity === 'common')),
@@ -425,6 +440,14 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       const magicCount = cp.inventory.filter(c => c.effect.type === 'passive' || c.effect.type === 'legendary').length;
       if (magicCount >= 2) {
         addLog(`❌ ${cp.name} ne peut pas porter plus de 2 objets magiques.`);
+        return false;
+      }
+    }
+    // Magic weapon magie requirement
+    if (card.effect.type === 'magic_attack' && (card.effect.magieCost ?? 0) > 0) {
+      const cp2 = players[currentIdx];
+      if ((cp2.stats.magie ?? 0) < card.effect.magieCost) {
+        addLog(`❌ ${cp2.name} n'a pas assez de Magie pour équiper ${card.icon} ${card.name} (requis : ${card.effect.magieCost}, actuel : ${cp2.stats.magie ?? 0}).`);
         return false;
       }
     }
@@ -577,6 +600,14 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
         return;
       }
 
+      // Secrétariat: can adjust movement roll by ±1
+      if (cp.spec?.passive === 'secretariat') {
+        setPendingMoveRoll({ roll: adjustedBase, wallPass, depBonus });
+        setPhase('secretariat_move_choice');
+        addLog(`🎲 ${cp.name} lance le dé : ${roll}${logSuffix} = ${adjustedBase + depBonus} cases. Secrétariat : ajuster de ±1 ?`);
+        return;
+      }
+
       // Optional deplacement bonus (Longs Bras, Zélés)
       if (optionalDep && depBonus > 0) {
         setPendingMoveRoll({ roll: adjustedBase, wallPass, depBonus });
@@ -667,7 +698,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     if (cp?.cls?.passive !== 'wiki' || cp?.wikiSwapped) return;
     setPlayers(prev => {
       const next = [...prev];
-      const p = { ...next[currentIdx], stats: { ...next[currentIdx].stats } };
+      let p = { ...next[currentIdx], stats: { ...next[currentIdx].stats } };
       const oldForce = p.stats.force;
       const oldMagie = p.stats.magie;
       p.stats.force = oldMagie;
@@ -817,6 +848,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
         teleported = true;
       }
 
+      const cp = players[currentIdx];
       // Update position + facing direction (from clicked tile relative to start)
       const moveDirX = tx !== cp.x ? Math.sign(tx - cp.x) : 0;
       const moveDirY = tx === cp.x ? Math.sign(ty - cp.y) : 0;
@@ -844,27 +876,38 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
         addLog(`${currentPlayer.name} se déplace en (${tx}, ${ty}).`);
       }
 
-      // Shop: draw 3 bonus cards on landing (4 for couponing, 0 for pacte)
+      // Shop: draw 3 bonus cards on landing; Couponing: buy mechanic
       if (grid[finalY][finalX] === T.SHOP && cp.spec?.passive !== 'pacte') {
-        const shopCards = cp.spec?.passive === 'couponing' ? 4 : 3;
-        setPlayers(prev => {
-          const next = [...prev];
-          const p = { ...next[currentIdx] };
-          let deck = [...p.deck];
-          let discard = [...p.discard];
-          if (deck.length < shopCards) { deck = [...deck, ...shuffleDeck(discard)]; discard = []; }
-          const drawn = deck.splice(0, shopCards);
-          p.hand = [...p.hand, ...drawn];
-          p.deck = deck;
-          p.discard = discard;
-          next[currentIdx] = p;
-          addLog(`🏪 ${p.name} visite le magasin et pioche ${shopCards} cartes !${shopCards === 4 ? ' 🏷️ Couponing !' : ''}`);
-          return next;
-        });
+        if (cp.spec?.passive === 'couponing') {
+          let offerDeck = [...cp.deck], offerDiscard = [...cp.discard];
+          if (offerDeck.length < 3) { offerDeck = [...offerDeck, ...shuffleDeck(offerDiscard)]; offerDiscard = []; }
+          const offerCards = offerDeck.splice(0, 3);
+          setPlayers(prev => {
+            const next = [...prev];
+            const p = { ...next[currentIdx], deck: offerDeck };
+            if (cp.deck.length < 3) p.discard = offerDiscard;
+            next[currentIdx] = p;
+            return next;
+          });
+          setPendingShopOffer({ cards: offerCards, boughtCount: 0 });
+          setPhase('shop_couponing');
+          addLog(`🏪 ${cp.name} (Couponing) visite le magasin — 1er achat : 1💰, 2ème : prix normal.`);
+        } else {
+          setPlayers(prev => {
+            const next = [...prev];
+            const p = { ...next[currentIdx] };
+            let deck = [...p.deck], discard = [...p.discard];
+            if (deck.length < 3) { deck = [...deck, ...shuffleDeck(discard)]; discard = []; }
+            const drawn = deck.splice(0, 3);
+            p.hand = [...p.hand, ...drawn]; p.deck = deck; p.discard = discard;
+            next[currentIdx] = p;
+            addLog(`🏪 ${p.name} visite le magasin et pioche 3 cartes !`);
+            return next;
+          });
+        }
       }
 
       const destKey = `${finalX},${finalY}`;
-      const cp = players[currentIdx];
       let turnEnded = false;
 
       // Helper: handle player death after damage
@@ -881,7 +924,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
 
       // — Monster encounter —
       const monsterThere = enemies[destKey];
-      if (monsterThere && !turnEnded) {
+      if (monsterThere && !turnEnded && !(monsterThere.isGolem && monsterThere.ownerIdx === currentIdx)) {
         if (cp.cls?.passive === 'messager') {
           const crossedIdxs = !teleported ? getCrossedPlayers(startX, startY, finalX, finalY, players, currentIdx) : [];
           setPendingMessager({ type: 'monster', destKey, monsterThere, finalX, finalY, budgetHere, newFacing, teleported, damageTakenThisMove, crossedIdxs });
@@ -1377,7 +1420,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
   }, [phase, highlightTiles, tilesBudget, hasMoved, currentIdx, selectedCard, currentPlayer, enemies, traps, chests, players, grid, pendingVoyageAstral]);
 
   // Map range string → numeric radius (for circular targeting)
-  const RANGE_NUMS = { melee: 1, back: 1, r2: 2, r4: 4, r5: 5, r6: 6, aoe1: 1, aoe2: 2 };
+  const RANGE_NUMS = { melee: 1, back: 1, r2: 2, r4: 4, r5: 5, r6: 6, aoe1: 1, aoe2: 2, wall_melee: 1 };
 
   // Show attack targets (adjacent players and enemies)
   const showAttackTargets = useCallback(() => {
@@ -1423,6 +1466,21 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
         while (lx >= 0 && ly >= 0 && ly < grid.length && lx < grid[0].length && grid[ly][lx] !== T.WALL) {
           if (isTarget(lx, ly)) tiles.push(`${lx},${ly}`);
           lx += cp.facing.dx; ly += cp.facing.dy;
+        }
+      }
+    } else if (cardRange === 'wall_melee') {
+      // Lame spectrale: melee range but can attack through walls
+      for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+        const nx = cp.x + dx, ny = cp.y + dy;
+        if (nx < 0 || ny < 0 || ny >= grid.length || nx >= grid[0].length) continue;
+        if (grid[ny][nx] !== T.WALL) {
+          if (isTarget(nx, ny)) tiles.push(`${nx},${ny}`);
+        } else {
+          // Wall tile: check through it (the tile beyond the wall)
+          const nx2 = nx + dx, ny2 = ny + dy;
+          if (nx2 >= 0 && ny2 >= 0 && ny2 < grid.length && nx2 < grid[0].length && grid[ny2][nx2] !== T.WALL) {
+            if (isTarget(nx2, ny2)) tiles.push(`${nx2},${ny2}`);
+          }
         }
       }
     } else {
@@ -1539,7 +1597,14 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       }
       const frenziedBonus = (!isMagic && cp.frenzied) ? 6 : 0;
       const baseStat = (isMagic ? effectiveMagie : cp.stats.force) + frenziedBonus;
-      let dmg = effectiveRoll + baseStat + Math.floor(cp.stats.destin / 3);
+      let hunterBonus = 0;
+      if (card?.effect?.special === 'hunter' && targetPlayerIdx >= 0) {
+        if (cp.hunterTarget === targetPlayerIdx && (cp.hunterStreak ?? 0) >= 1) {
+          hunterBonus = (cp.hunterStreak ?? 0) >= 2 ? 6 : 3;
+          addLog(`🪬 ${cp.name} (Hache du chasseur) bonus chasseur : +${hunterBonus} dégâts !`);
+        }
+      }
+      let dmg = effectiveRoll + baseStat + Math.floor(cp.stats.destin / 3) + hunterBonus;
       if (card) {
         if (card.effect.special === 'crit_5_6' && effectiveRoll >= 5) dmg = Math.floor(dmg * 1.5);
         if (card.effect.special === 'double_on_6' && effectiveRoll === 6) dmg *= 2;
@@ -1547,7 +1612,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
         if (card.effect.special === 'aim' && !hasMoved) { dmg += 2; addLog(`🎯 Visée : +2 Force (immobile).`); }
       }
       if (!isMagic && cp.frenzied) { dmg *= 2; addLog(`🩸 Frénésie — attaque double !`); }
-      const piercedArmor = card?.effect?.special === 'pierce_if_still' && !hasMoved;
+      const piercedArmor = (card?.effect?.special === 'pierce_if_still' && !hasMoved) || card?.effect?.special === 'ignore_armor';
       // Imperissable: AOE immunity
       const isAoeAtk = card?.effect?.range === 'aoe1' || card?.effect?.range === 'aoe2';
       if (isAoeAtk && targetPlayerIdx >= 0 && players[targetPlayerIdx]?.spec?.passive === 'imperissable') {
@@ -1593,7 +1658,10 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
         setPlayers(prev => {
           const next = [...prev];
           let t = { ...next[targetPlayerIdx] };
-          t.hp = Math.max(0, t.hp - actualDmg);
+          const { player: tAfterAbsorb, remaining: remainingDmg } = absorbDamage(t, actualDmg);
+          if (remainingDmg < actualDmg) addLog(`🔵 Bouclier Magique de ${t.name} absorbe ${actualDmg - remainingDmg} dégâts !`);
+          t = tAfterAbsorb;
+          t.hp = Math.max(0, t.hp - remainingDmg);
           if (t.hp <= 0) {
             if (t.spec?.passive === 'premier_soin' && !t.premierSoinUsed) {
               const reviveHp = rollDie();
@@ -1664,6 +1732,18 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
                 addLog(`🏹 ${t.name} est repoussé d'une case !`);
               }
             }
+          }
+          // Hunter streak update
+          if (card?.effect?.special === 'hunter') {
+            let att = { ...next[currentIdx] };
+            if (!t.isAlive) {
+              att.hunterTarget = null; att.hunterStreak = 0;
+            } else if (att.hunterTarget === targetPlayerIdx) {
+              att.hunterStreak = Math.min(2, (att.hunterStreak ?? 0) + 1);
+            } else {
+              att.hunterStreak = 1; att.hunterTarget = targetPlayerIdx;
+            }
+            next[currentIdx] = att;
           }
           next[targetPlayerIdx] = t;
           // Check win
@@ -1742,6 +1822,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
         const next = [...prev];
         const p = { ...next[currentIdx] };
         p.hp = Math.min(p.maxHp, p.hp + healAmt);
+        p.cursed = false;
         p.hand = p.hand.filter(c => c !== card);
         p.discard = [...p.discard, card];
         next[currentIdx] = p;
@@ -1812,6 +1893,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
         const next = [...prev];
         const p = { ...next[currentIdx] };
         p.slowMalus = 0;
+        p.cursed = false;
         p.hand = p.hand.filter(c => c !== card);
         p.discard = [...p.discard, card];
         next[currentIdx] = p;
@@ -1951,6 +2033,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       const next = [...prev];
       const p = { ...next[currentIdx] };
       p.hp = Math.min(p.maxHp, p.hp + healAmt);
+      p.cursed = false;
       next[currentIdx] = p;
       return next;
     });
@@ -1965,7 +2048,34 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     if (!cp.readyScroll) return;
     const card = cp.readyScroll;
     const isFreeze = card.effect.special === 'freeze';
+    const isShield = card.effect.special === 'shield10';
+    const isSummon = card.effect.special === 'summon';
     addLog(`📜 ${cp.name} lance ${card.icon} ${card.name}${card.effect.bonus > 0 ? ` : ${card.effect.bonus} dégâts magiques !` : ' !'}`);
+
+    if (isSummon) {
+      // Check for adjacent free tile
+      let hasAdj = false;
+      for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+        const nx = cp.x + dx, ny = cp.y + dy;
+        if (nx < 0 || ny < 0 || ny >= grid.length || nx >= grid[0].length) continue;
+        if (grid[ny][nx] === T.WALL) continue;
+        const k = `${nx},${ny}`;
+        if (!enemies[k] && !players.some(p => p.isAlive && p.x === nx && p.y === ny)) { hasAdj = true; break; }
+      }
+      if (!hasAdj) {
+        addLog(`⛰️ Pas de case libre adjacente pour invoquer un Golem !`);
+        return;
+      }
+      setPlayers(prev => {
+        const next = [...prev];
+        next[currentIdx] = { ...next[currentIdx], readyScroll: null, discard: [...next[currentIdx].discard, card], lastScroll: card };
+        return next;
+      });
+      setActionsLeft(prev => prev - 1);
+      setPhase('choosing_golem');
+      return;
+    }
+
     setPlayers(prev => {
       const next = [...prev];
       next[currentIdx] = { ...next[currentIdx], readyScroll: null, discard: [...next[currentIdx].discard, card], lastScroll: card };
@@ -1980,10 +2090,14 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
           }
         }
       }
+      if (isShield) {
+        next[currentIdx] = { ...next[currentIdx], tempHp: (next[currentIdx].tempHp ?? 0) + 18 };
+        addLog(`🔵 ${cp.name} gagne 18 PV temporaires !`);
+      }
       return next;
     });
     setActionsLeft(prev => prev - 1);
-  }, [actionsLeft, currentIdx, players]);
+  }, [actionsLeft, currentIdx, players, enemies, grid]);
 
   // Messager: fight the monster on current tile
   const messagerFight = useCallback(() => {
@@ -2454,6 +2568,108 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     setPhase('player_turn');
   }, [highlightTiles, currentIdx]);
 
+  // Secrétariat: adjust movement roll by ±1
+  const secretariatAdjustMove = useCallback((delta) => {
+    if (phase !== 'secretariat_move_choice') return;
+    const cp = players[currentIdx];
+    const { roll, wallPass, depBonus } = pendingMoveRoll;
+    const finalRange = Math.max(0, roll + depBonus + delta);
+    setPendingMoveRoll(null);
+    addLog(`📋 ${cp.name} (Secrétariat) ajuste son déplacement${delta !== 0 ? ` de ${delta > 0 ? '+' : ''}${delta}` : ''} = ${finalRange} case(s).`);
+    const hasPeluches = cp.race?.passive === 'peluches';
+    const { tiles, budgetAtTile } = runMoveDijkstra(cp.x, cp.y, finalRange, cp.facing, wallPass, hasPeluches, grid);
+    const otherBases = new Set(players.filter((p, i) => i !== currentIdx && p.isAlive).map(p => `${p.baseX},${p.baseY}`));
+    setTilesBudget(budgetAtTile);
+    setHighlightTiles(tiles.filter(t => !otherBases.has(t)));
+    setPhase('choosing_move');
+  }, [phase, currentIdx, players, pendingMoveRoll, grid]);
+
+  // Summon a Golem at an adjacent free tile
+  const summonGolem = useCallback((level) => {
+    if (phase !== 'choosing_golem') return;
+    const cp = players[currentIdx];
+    const golemData = GOLEMS[level];
+    if (!golemData) return;
+    if ((cp.stats.magie ?? 0) < level) {
+      addLog(`❌ Magie insuffisante pour ce niveau (requis : ${level}, actuel : ${cp.stats.magie}).`);
+      return;
+    }
+    const adjTiles = [];
+    for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+      const nx = cp.x + dx, ny = cp.y + dy;
+      if (nx < 0 || ny < 0 || ny >= grid.length || nx >= grid[0].length) continue;
+      if (grid[ny][nx] === T.WALL) continue;
+      const k = `${nx},${ny}`;
+      if (!enemies[k] && !players.some(p => p.isAlive && p.x === nx && p.y === ny)) adjTiles.push(k);
+    }
+    if (adjTiles.length === 0) {
+      addLog(`⛰️ Pas de case libre adjacente !`);
+      setPendingGolem(null);
+      setPhase('player_turn');
+      return;
+    }
+    const targetKey = adjTiles[0];
+    const [gx, gy] = targetKey.split(',').map(Number);
+    const golem = { ...golemData, hp: golemData.maxHp, ownerIdx: currentIdx };
+    setEnemies(prev => ({ ...prev, [targetKey]: golem }));
+    setPendingGolem(null);
+    addLog(`⛰️ ${cp.name} invoque un ${golemData.icon} ${golemData.name} en (${gx},${gy}) ! (PV:${golemData.maxHp}, F:${golemData.attack})`);
+    setPhase('player_turn');
+  }, [phase, currentIdx, players, grid, enemies]);
+
+  // Couponing shop: buy a card from the offer
+  const couponingBuy = useCallback((cardIndex) => {
+    if (phase !== 'shop_couponing' || !pendingShopOffer) return;
+    const { cards, boughtCount } = pendingShopOffer;
+    if (cardIndex < 0 || cardIndex >= cards.length) return;
+    const c = cards[cardIndex];
+    const cp = players[currentIdx];
+    const cost = boughtCount === 0 ? 1 : (c.goldValue ?? 2);
+    if ((cp.gold ?? 0) < cost) {
+      addLog(`❌ ${cp.name} n'a pas assez d'or (requis : ${cost}💰, disponible : ${cp.gold ?? 0}💰).`);
+      return;
+    }
+    addLog(`🏷️ ${cp.name} achète ${c.icon} ${c.name} pour ${cost}💰.`);
+    setPlayers(prev => {
+      const next = [...prev];
+      const p = { ...next[currentIdx] };
+      p.gold = (p.gold ?? 0) - cost;
+      p.hand = [...p.hand, c];
+      next[currentIdx] = p;
+      return next;
+    });
+    const remaining = cards.filter((_, i) => i !== cardIndex);
+    if (boughtCount >= 1 || remaining.length === 0) {
+      setPlayers(prev => {
+        const next = [...prev];
+        const p = { ...next[currentIdx] };
+        p.discard = [...p.discard, ...remaining];
+        next[currentIdx] = p;
+        return next;
+      });
+      setPendingShopOffer(null);
+      setPhase('player_turn');
+    } else {
+      setPendingShopOffer({ cards: remaining, boughtCount: 1 });
+      addLog(`🏪 Choisissez un deuxième article au prix normal.`);
+    }
+  }, [phase, pendingShopOffer, currentIdx, players]);
+
+  const couponingSkipShop = useCallback(() => {
+    if (phase !== 'shop_couponing' || !pendingShopOffer) return;
+    const cp = players[currentIdx];
+    setPlayers(prev => {
+      const next = [...prev];
+      const p = { ...next[currentIdx] };
+      p.discard = [...p.discard, ...pendingShopOffer.cards];
+      next[currentIdx] = p;
+      return next;
+    });
+    setPendingShopOffer(null);
+    setPhase('player_turn');
+    addLog(`🏪 ${cp.name} quitte le magasin.`);
+  }, [phase, pendingShopOffer, currentIdx, players]);
+
   // Fou portal selection at end of turn — then advance to next player
   const confirmFouPortal = useCallback((tx, ty) => {
     if (phase !== 'fou_portal') return;
@@ -2523,6 +2739,13 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     pendingAutodefense,
     pendingVoodoo,
     pendingVoyageAstral,
+    pendingMoveRoll,
+    pendingGolem,
+    pendingShopOffer,
+    secretariatAdjustMove,
+    summonGolem,
+    couponingBuy,
+    couponingSkipShop,
     prisonPayGold,
     skipPrisonSwap,
     wikiSwapStats,
