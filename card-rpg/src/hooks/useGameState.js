@@ -49,6 +49,10 @@ function buildPlayer(charData, index, mapData) {
     armorJustSwapped: false,
     prisonEffect: null,
     wikiSwapped: false,
+    slowMalus: 0,
+    tempDepBonus: 0,
+    frenzied: false,
+    stunned: false,
     color: PLAYER_COLORS[index] ?? '#ffffff',
   };
 }
@@ -353,6 +357,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
   const drawCards = useCallback(() => {
     const cp = players[currentIdx];
     const wasForcedImmobileJJ = cp?.forcedImmobileNextTurn === true;
+    const wasStunned = cp?.stunned === true;
     setPlayers(prev => {
       const next = [...prev];
       const p = { ...next[currentIdx] };
@@ -383,15 +388,24 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       p.weaponJustSwapped = false;
       p.armorJustSwapped = false;
       p.wikiSwapped = false;
+      p.slowMalus = 0;
+      p.tempDepBonus = 0;
+      p.frenzied = false;
+      p.stunned = false;
       next[currentIdx] = p;
       return next;
     });
     setMoveRerolled(false);
-    setActionsLeft(3); // 3 actions per turn: move, attack, class ability
-    if (wasForcedImmobileJJ) {
+    if (wasStunned) {
+      setActionsLeft(0);
+      setHasMoved(true);
+      addLog(`💫 ${cp.name} est étourdi — passe son tour !`);
+    } else if (wasForcedImmobileJJ) {
+      setActionsLeft(3);
       setHasMoved(true);
       addLog(`🥋 ${cp.name} est immobilisé ce tour (Jiu Jitsu) !`);
     } else {
+      setActionsLeft(3);
       setHasMoved(false);
     }
     setPhase('player_turn');
@@ -532,26 +546,29 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
 
       const depBonus = cp.stats.deplacement ?? 0;
       const optionalDep = cp.race?.passive === 'longs_bras' || cp.race?.passive === 'zeles';
+      const frenziedDepMalus = cp.frenzied ? 3 : 0;
+      const mandatoryMod = (cp.tempDepBonus ?? 0) - (cp.slowMalus ?? 0) - frenziedDepMalus;
+      const adjustedBase = baseRange + mandatoryMod;
 
       // Touffus: raw roll = 6 → choice between move or bonus action
       if (cp.race?.passive === 'touffus' && roll === 6) {
-        setPendingMoveRoll({ roll: baseRange, wallPass, depBonus });
+        setPendingMoveRoll({ roll: adjustedBase, wallPass, depBonus });
         setPhase('touffus_bonus_choice');
-        addLog(`🎲 ${cp.name} lance le dé : 6 — se déplacer (${Math.max(0, baseRange + depBonus)} cases) ou action bonus ?`);
+        addLog(`🎲 ${cp.name} lance le dé : 6 — se déplacer (${Math.max(0, adjustedBase + depBonus)} cases) ou action bonus ?`);
         return;
       }
 
       // Optional deplacement bonus (Longs Bras, Zélés)
       if (optionalDep && depBonus > 0) {
-        setPendingMoveRoll({ roll: baseRange, wallPass, depBonus });
+        setPendingMoveRoll({ roll: adjustedBase, wallPass, depBonus });
         setPhase('choosing_move_bonus');
-        addLog(`🎲 ${cp.name} lance le dé : ${roll}${logSuffix} = ${baseRange} cases. Bonus déplacement +${depBonus} disponible.`);
+        addLog(`🎲 ${cp.name} lance le dé : ${roll}${logSuffix} = ${adjustedBase} cases. Bonus déplacement +${depBonus} disponible.`);
         return;
       }
 
       // All others: add deplacement automatically
-      const finalRange = Math.max(0, baseRange + depBonus);
-      const logDep = depBonus !== 0 ? ` (dep ${depBonus > 0 ? '+' : ''}${depBonus})` : '';
+      const finalRange = Math.max(0, adjustedBase + depBonus);
+      const logDep = (adjustedBase !== baseRange || depBonus !== 0) ? ` (base ${baseRange}${mandatoryMod !== 0 ? `, modif ${mandatoryMod > 0 ? '+' : ''}${mandatoryMod}` : ''}${depBonus !== 0 ? `, dep ${depBonus > 0 ? '+' : ''}${depBonus}` : ''})` : '';
       addLog(`🎲 ${cp.name} lance le dé : ${roll}${logSuffix}${logDep} = ${finalRange} cases.${card?.effect?.type === 'move' ? ` [${card.name}]` : ''}`);
 
       const hasPeluches = cp.race?.passive === 'peluches';
@@ -1501,12 +1518,17 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
           addLog(`🖤 Cœur Noir réduit la Magie de ${cp.name} à 1 !`);
         }
       }
-      const baseStat = isMagic ? effectiveMagie : cp.stats.force;
+      const frenziedBonus = (!isMagic && cp.frenzied) ? 6 : 0;
+      const baseStat = (isMagic ? effectiveMagie : cp.stats.force) + frenziedBonus;
       let dmg = effectiveRoll + baseStat + Math.floor(cp.stats.destin / 3);
       if (card) {
         if (card.effect.special === 'crit_5_6' && effectiveRoll >= 5) dmg = Math.floor(dmg * 1.5);
         if (card.effect.special === 'double_on_6' && effectiveRoll === 6) dmg *= 2;
+        if (card.effect.special === 'burn' && effectiveRoll >= 5) { dmg = Math.floor(dmg * 1.5); addLog(`🔥 Brûlure : dégâts amplifiés !`); }
+        if (card.effect.special === 'aim' && !hasMoved) { dmg += 2; addLog(`🎯 Visée : +2 Force (immobile).`); }
       }
+      if (!isMagic && cp.frenzied) { dmg *= 2; addLog(`🩸 Frénésie — attaque double !`); }
+      const piercedArmor = card?.effect?.special === 'pierce_if_still' && !hasMoved;
       // Imperissable: AOE immunity
       const isAoeAtk = card?.effect?.range === 'aoe1' || card?.effect?.range === 'aoe2';
       if (isAoeAtk && targetPlayerIdx >= 0 && players[targetPlayerIdx]?.spec?.passive === 'imperissable') {
@@ -1531,8 +1553,9 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
           }
         }
         const armorPenalty = (target.armorJustSwapped && target.equippedArmor) ? (target.equippedArmor.effect.bonus ?? 0) : 0;
-        const defense = Math.floor((target.stats.force - armorPenalty) / 3);
-        if (armorPenalty > 0) addLog(`🛡️ ${target.name} vient de changer d'armure — protection inactive ce tour.`);
+        const defense = piercedArmor ? 0 : Math.floor((target.stats.force - armorPenalty) / 3);
+        if (piercedArmor) addLog(`🔰 Armure percée — défense de ${target.name} annulée !`);
+        else if (armorPenalty > 0) addLog(`🛡️ ${target.name} vient de changer d'armure — protection inactive ce tour.`);
         const isMagicAtk = card?.effect?.type === 'magic_attack';
         const rawActualDmg = Math.max(1, dmg - defense);
         const actualDmg = isMagicAtk ? rawActualDmg : physDmg(rawActualDmg, target);
@@ -1593,6 +1616,31 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
               }
             }
             next[currentIdx] = attacker;
+          }
+          // Weapon special effects (only if target survived)
+          if (t.isAlive) {
+            if (card?.effect?.special === 'stun_6' && effectiveRoll === 6) {
+              t = { ...t, stunned: true };
+              addLog(`💫 ${t.name} est étourdi — passera son prochain tour !`);
+            }
+            if (card?.effect?.special === 'disarm_6' && effectiveRoll === 6 && t.equippedWeapon) {
+              addLog(`⛓️ ${t.name} est désarmé ! ${t.equippedWeapon.icon} ${t.equippedWeapon.name} défaussé.`);
+              t = unequipCard(t, t.equippedWeapon);
+              t = { ...t, equippedWeapon: null };
+            }
+            if (card?.effect?.special === 'slow_enemy') {
+              t = { ...t, slowMalus: 4 };
+              addLog(`❄️ ${t.name} est ralenti — -4 Déplacement à son prochain tour !`);
+            }
+            if (card?.effect?.special === 'push_enemy') {
+              const pdx = t.x - cp.x, pdy = t.y - cp.y;
+              const pnx = t.x + Math.sign(pdx !== 0 ? pdx : 0);
+              const pny = t.y + Math.sign(pdy !== 0 ? pdy : (pdx === 0 ? 1 : 0));
+              if (pnx >= 0 && pny >= 0 && pny < grid.length && pnx < grid[0].length && grid[pny][pnx] !== T.WALL) {
+                t = { ...t, x: pnx, y: pny };
+                addLog(`🏹 ${t.name} est repoussé d'une case !`);
+              }
+            }
           }
           next[targetPlayerIdx] = t;
           // Check win
@@ -1691,6 +1739,40 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
           return next;
         });
         addLog(`${cp.name} utilise ${card.icon} ${card.name} : effet permanent !`);
+      } else if (special === 'gold_1d6') {
+        const goldGained = rollDie();
+        setPlayers(prev => {
+          const next = [...prev];
+          const p = { ...next[currentIdx] };
+          p.gold = (p.gold ?? 0) + goldGained;
+          p.hand = p.hand.filter(c => c !== card);
+          p.discard = [...p.discard, card];
+          next[currentIdx] = p;
+          return next;
+        });
+        addLog(`🍀 ${cp.name} utilise ${card.icon} ${card.name} : +${goldGained}💰 !`);
+      } else if (special === 'celerite') {
+        setPlayers(prev => {
+          const next = [...prev];
+          const p = { ...next[currentIdx] };
+          p.tempDepBonus = (p.tempDepBonus ?? 0) + 3;
+          p.hand = p.hand.filter(c => c !== card);
+          p.discard = [...p.discard, card];
+          next[currentIdx] = p;
+          return next;
+        });
+        addLog(`⚡ ${cp.name} utilise ${card.icon} ${card.name} : +3 Déplacement ce tour !`);
+      } else if (special === 'rage') {
+        setPlayers(prev => {
+          const next = [...prev];
+          const p = { ...next[currentIdx] };
+          p.frenzied = true;
+          p.hand = p.hand.filter(c => c !== card);
+          p.discard = [...p.discard, card];
+          next[currentIdx] = p;
+          return next;
+        });
+        addLog(`🩸 ${cp.name} entre en Frénésie : +6 Force, -3 Déplacement, attaque double ce tour !`);
       } else {
         setPlayers(prev => {
           const next = [...prev];
@@ -1706,6 +1788,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       setPlayers(prev => {
         const next = [...prev];
         const p = { ...next[currentIdx] };
+        p.slowMalus = 0;
         p.hand = p.hand.filter(c => c !== card);
         p.discard = [...p.discard, card];
         next[currentIdx] = p;
@@ -1858,14 +1941,22 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     const cp = players[currentIdx];
     if (!cp.readyScroll) return;
     const card = cp.readyScroll;
-    addLog(`📜 ${cp.name} lance ${card.icon} ${card.name} : ${card.effect.bonus} dégâts magiques !`);
+    const isFreeze = card.effect.special === 'freeze';
+    addLog(`📜 ${cp.name} lance ${card.icon} ${card.name}${card.effect.bonus > 0 ? ` : ${card.effect.bonus} dégâts magiques !` : ' !'}`);
     setPlayers(prev => {
       const next = [...prev];
-      const p = { ...next[currentIdx] };
-      p.readyScroll = null;
-      p.discard = [...p.discard, card];
-      p.lastScroll = card;
-      next[currentIdx] = p;
+      next[currentIdx] = { ...next[currentIdx], readyScroll: null, discard: [...next[currentIdx].discard, card], lastScroll: card };
+      if (isFreeze) {
+        const caster = next[currentIdx];
+        for (let i = 0; i < next.length; i++) {
+          if (i === currentIdx || !next[i].isAlive) continue;
+          const p = next[i];
+          if (Math.abs(p.x - caster.x) + Math.abs(p.y - caster.y) <= 2) {
+            next[i] = { ...p, slowMalus: 4 };
+            addLog(`❄️ ${p.name} est gelé — -4 Déplacement à son prochain tour !`);
+          }
+        }
+      }
       return next;
     });
     setActionsLeft(prev => prev - 1);

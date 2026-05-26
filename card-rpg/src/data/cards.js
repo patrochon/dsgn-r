@@ -113,7 +113,7 @@ const WEAPON_CARDS = [
 const MAGIC_WEAPON_CARDS = [
   card('epee_flamme',   'Épée flamboyante',  '🔥', C.MAGIC_WPN, R.RARE,      'magic_attack', 4, '+4 Force, +2 Magie. Brûle l\'ennemi : dégâts supplémentaires sur dé 5-6.',     'burn',        0, 'melee'),
   card('arc_tenebres',  'Arc des Ténèbres',  '🌑', C.MAGIC_WPN, R.RARE,      'magic_attack', 3, '+3 Force, +3 Magie. Maudit la cible (-2 à tous ses jets).',                     'curse',       0, 'r4'),
-  card('sceptre_givre', 'Sceptre de givre',  '❄️', C.MAGIC_WPN, R.RARE,      'magic_attack', 2, '+2 Force, +4 Magie. Ralentit l\'ennemi : -3 Déplacement pour 2 tours.',         'slow_enemy',  0, 'r2'),
+  card('sceptre_givre', 'Sceptre de givre',  '❄️', C.MAGIC_WPN, R.RARE,      'magic_attack', 2, 'Force requise 2. Ralentit l\'ennemi : -4 Déplacement à son prochain tour.',   'slow_enemy',  0, 'r2'),
   card('dague_venin',   'Dague venimeuse',   '🐍', C.MAGIC_WPN, R.RARE,      'magic_attack', 3, 'Force requise 3. +2 Destin. Critique automatique sur dé 5-6 (×1.5 dégâts).',  'crit_5_6',    0, 'melee'),
   card('hache_runique',  'Hache runique',    '🪬', C.MAGIC_WPN, R.RARE,      'magic_attack', 5, '+5 Force, +2 Destin. Active une rune aléatoire sur dé 4+.',                     'rune',        0, 'melee'),
   card('lame_spectrale','Lame spectrale',    '👻', C.MAGIC_WPN, R.LEGENDARY, 'magic_attack', 3, '+3 Force, +4 Magie. Ignore totalement l\'armure et la résistance.',             'ignore_armor',0, 'melee'),
@@ -124,22 +124,22 @@ const POTION_CARDS = [
   card('soin_mineur',  'Potion de soin mineur',  '🧪', C.POTION, R.COMMON,   'heal', 10, 'Restaure 10 HP. (✨1)',                                                         null,                             1, 'self'),
   card('soin_moyen',   'Potion de soin moyen',   '💚', C.POTION, R.COMMON,   'heal', 20, 'Restaure 20 HP. (✨2)',                                                         null,                             2, 'self'),
   card('soin_majeur',  'Potion de soin majeur',  '💊', C.POTION, R.UNCOMMON, 'heal', 30, 'Restaure 30 HP. (✨3)',                                                         null,                             3, 'self'),
-  card('force_brew',   'Potion de Force',         '💪', C.POTION, R.COMMON,   'buff',  3, '+3 Force pendant 1 combat. (✨1)',                                             'buff:force+3,duration:combat',   1, 'self'),
-  card('celerite',     'Potion de Célérité',      '⚡', C.POTION, R.COMMON,   'buff',  3, '+3 Déplacement pendant 1 tour. (✨1)',                                         'buff:deplacement+3,duration:turn',1, 'self'),
+  card('force_brew',   'Potion de Force',         '💪', C.POTION, R.COMMON,   'buff',  0, '+1 Force permanent. (✨1)',                                                    'perm:force+1',                   1, 'self'),
+  card('celerite',     'Potion de Célérité',      '⚡', C.POTION, R.COMMON,   'buff',  0, '+3 Déplacement ce tour. (✨1)',                                                 'celerite',                       1, 'self'),
   card('resistance',   'Potion de Résistance',    '🛡️', C.POTION, R.UNCOMMON, 'buff',  4, '+4 Force défensive pendant 1 combat. (✨2)',                                   'buff:defense+4,duration:combat', 2, 'self'),
-  card('chance_brew',  'Potion de Richesse',       '🍀', C.POTION, R.UNCOMMON, 'buff',  3, '+3 Richesse pendant 3 tours. (✨2)',                                           'buff:richesse+3,duration:3turns',2, 'self'),
+  card('chance_brew',  'Potion de Richesse',       '🍀', C.POTION, R.UNCOMMON, 'buff',  0, 'Obtient 1d6 pièces d\'or. (✨2)',                                              'gold_1d6',                       2, 'self'),
   card('antidote',     'Antidote',                '🌿', C.POTION, R.COMMON,   'cure',  0, 'Annule malédiction ou ralentissement. (✨1)',                                  'cure_all',                       1, 'self'),
-  card('magie_brew',   'Potion de Magie',         '🔮', C.POTION, R.UNCOMMON, 'buff',  5, '+5 Magie. Lance immédiatement un sort aléatoire. (✨2)',                       'buff:magie+5,cast_random',       2, 'self'),
+  card('magie_brew',   'Potion de Magie',         '🔮', C.POTION, R.UNCOMMON, 'buff',  0, '+1 Magie permanent. (✨2)',                                                    'perm:magie+1',                   2, 'self'),
   card('elixir_vie',   'Élixir de Vie',           '❤️', C.POTION, R.RARE,     'buff',  0, '+5 Vie permanent (augmente le HP max). (✨4)',                                 'perm:vie+5',                     4, 'self'),
   card('destin_brew',  'Potion de Destin',        '🌟', C.POTION, R.RARE,     'buff',  0, '+2 Destin permanent. (✨3)',                                                   'perm:destin+2',                  3, 'self'),
-  card('philtre_rage', 'Philtre de rage',         '🩸', C.POTION, R.RARE,     'buff',  6, '+6 Force pendant 1 combat. -3 Déplacement. Frénésie : attaque deux fois. (✨3)','buff:force+6,deplacement-3,frenzy',3,'self'),
+  card('philtre_rage', 'Philtre de rage',         '🩸', C.POTION, R.RARE,     'buff',  0, '+6 Force, -3 Déplacement, attaque double — ce tour uniquement. (✨3)',         'rage',                           3, 'self'),
 ];
 
 // ─── PARCHEMINS MAGIQUES (9) ──────────────────────────────────────────────────
 const SCROLL_CARDS = [
   card('boule_feu',    'Boule de Feu',         '🔥', C.SCROLL, R.UNCOMMON, 'magic',  8, "8 dégâts magiques à l'ennemi ciblé + 4 aux adjacents. (✨3)",    'aoe',        3, 'r4'),
   card('eclair',       'Éclair',               '⚡', C.SCROLL, R.UNCOMMON, 'magic',  6, 'Touche jusqu\'à 3 ennemis en ligne. 6 dégâts. (✨2)',             'chain',      2, 'line'),
-  card('gel',          'Nova de Givre',        '❄️', C.SCROLL, R.UNCOMMON, 'magic',  5, 'Gèle tous les ennemis proches : passent leur prochain tour. (✨2)','freeze',    2, 'aoe2'),
+  card('gel',          'Nova de Givre',        '❄️', C.SCROLL, R.UNCOMMON, 'magic',  0, 'Gèle tous les joueurs à portée 2 : -4 Déplacement à leur prochain tour. (✨2)','freeze', 2, 'aoe2'),
   card('invocation',   'Invocation',           '👾', C.SCROLL, R.RARE,     'magic',  0, 'Crée un allié combattant adjacent pendant 2 tours. (✨4)',        'summon',     4, 'melee'),
   card('soin_masse',   'Soin de masse',        '✨', C.SCROLL, R.UNCOMMON, 'magic', 15, 'Restaure 15 HP à tous les alliés adjacents. (✨3)',               'aoe_heal',   3, 'aoe1'),
   card('malediction',  'Malédiction',          '🧿', C.SCROLL, R.UNCOMMON, 'magic',  0, 'Réduit toutes les stats ennemies de 2 pendant 3 tours. (✨2)',    'debuff_all', 2, 'r4'),
