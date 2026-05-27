@@ -15,7 +15,7 @@ function rollDie() {
 function buildPlayer(charData, index, mapData) {
   const stats = charData.stats ?? { force: 1, magie: 1, vie: 6, deplacement: 0, richesse: 1, destin: 1, portee: 1, armor: 0 };
   if (stats.armor === undefined) stats.armor = 0;
-  const maxHp = 20 + stats.vie * 2;
+  const maxHp = stats.vie;
   const finalMaxHp = (charData.spec?.passive === 'imperissable') ? maxHp * 2 : maxHp;
   const start = mapData.playerStarts[index] ?? mapData.playerStarts[0];
   const deck = shuffleDeck([...FULL_DECK]);
@@ -100,9 +100,8 @@ function applyStatDeltas(player, deltas) {
   let p = { ...player, stats: { ...player.stats } };
   for (const { stat, val } of deltas) {
     if (stat === 'vie') {
-      const hpGain = val * 2;
-      p.maxHp += hpGain;
-      p.hp = Math.min(p.maxHp, p.hp + hpGain);
+      p.maxHp += val;
+      p.hp = Math.min(p.maxHp, p.hp + val);
     }
     if (p.stats[stat] !== undefined) {
       p.stats[stat] += val;

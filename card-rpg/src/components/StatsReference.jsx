@@ -116,7 +116,7 @@ const PASSIFS = [
   { id: 'voodoo',       src: '🧿 Spec',  label: 'Voodoo',         desc: 'Lie son sort à un autre joueur : les dégâts ou soins sont partagés entre les deux.' },
   { id: 'nde',          src: '💀 Spec',  label: 'Near Death Exp.',desc: 'En mourant, conserve son or et sa main. Revient avec un d6 HP à sa base. Consomme 1 Destin.' },
   { id: 'jiu_jutse',    src: '🥋 Spec',  label: 'Jiu Jitsu',      desc: 'Quand un adversaire se déplace vers le joueur, échange leur position. L\'adversaire subit ses propres dégâts de Force et est immobilisé.' },
-  { id: 'pacte',        src: '📜 Spec',  label: 'Pacte',          desc: 'Élimine automatiquement tout monstre rencontré. Ne peut pas entrer dans les magasins. Grimoire donne le même effet.' },
+  { id: 'pacte',        src: '📜 Spec',  label: 'Pacte',          desc: 'Lors d\'une rencontre avec un monstre, ce monstre est automatiquement tué (un seul monstre par rencontre). Les autres monstres sur la carte ne sont pas affectés.' },
   { id: 'ectomorphe',   src: '👻 Spec',  label: 'Ectomorphe',     desc: 'Ignore tous les pièges — les traverse sans les déclencher.' },
   { id: 'couponing',    src: '🏷️ Spec',  label: 'Couponing',      desc: 'Dans les magasins, 1er achat à 1💰, 2ème au prix normal. Voit 3 cartes à choisir au lieu d\'en piocher directement.' },
   { id: 'imperissable', src: '💎 Spec',  label: 'Impérissable',   desc: 'HP maximum doublé à la création. Immunisé aux dégâts de zone (AOE).' },

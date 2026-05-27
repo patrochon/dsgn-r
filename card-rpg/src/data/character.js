@@ -6,7 +6,7 @@ export const RACES = [
     name: 'Les Longs Bras',
     icon: '🦾',
     flavor: 'Créatures d\'une allonge démesurée. Ils frappent là où personne ne les attend.',
-    bonuses: { force: 1, vie: 3, deplacement: 1, portee: 1 },
+    bonuses: { force: 1, vie: 3, deplacement: 1 },
     passive: 'longs_bras',
   },
   {
@@ -14,7 +14,7 @@ export const RACES = [
     name: 'Les Chapeaux',
     icon: '🎩',
     flavor: 'Nul ne sait ce qui se cache sous leurs bords. Leur destin est écrit dans l\'ombre.',
-    bonuses: { magie: 1, richesse: 3 },
+    bonuses: { magie: 1, destin: 1, armor: 1 },
     passive: 'chapeaux',
   },
   {
@@ -22,7 +22,7 @@ export const RACES = [
     name: 'Les Cailloux',
     icon: '🪨',
     flavor: 'Lents, massifs, imperturbables. Ils encaissent tout et restent debout.',
-    bonuses: { vie: 6, destin: 1 },
+    bonuses: { force: 2, vie: 3 },
     passive: 'cailloux',
   },
   {
@@ -30,7 +30,7 @@ export const RACES = [
     name: 'Les Zélés',
     icon: '⚡',
     flavor: 'Débordants d\'énergie. Ils courent plus vite que leur propre ombre.',
-    bonuses: { deplacement: 1, richesse: 3 },
+    bonuses: { magie: 1, deplacement: 2 },
     passive: 'zeles',
   },
   {
@@ -38,7 +38,7 @@ export const RACES = [
     name: 'Les Peluches',
     icon: '🧸',
     flavor: 'Adorables en apparence, imprévisibles en pratique. La richesse les suit partout.',
-    bonuses: { richesse: 2, magie: 1 },
+    bonuses: { force: 1, richesse: 1, destin: 1 },
     passive: 'peluches',
   },
   {
@@ -46,7 +46,7 @@ export const RACES = [
     name: 'Les Touffus',
     icon: '🌿',
     flavor: 'Lents mais sages. Sur un résultat de 6, ils peuvent renoncer au mouvement pour une action bonus.',
-    bonuses: { destin: 1, magie: 2, deplacement: -1 },
+    bonuses: { magie: 2, deplacement: -1, destin: 1 },
     passive: 'touffus',
   },
 ];
