@@ -909,7 +909,8 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       }
 
       // Shop: draw 3 bonus cards on landing; Couponing: buy mechanic
-      if (grid[finalY][finalX] === T.SHOP && cp.spec?.passive !== 'pacte') {
+      const hasNoShops = cp.inventory.some(c => c.effect?.special?.includes('no_shops'));
+      if (grid[finalY][finalX] === T.SHOP && cp.spec?.passive !== 'pacte' && !hasNoShops) {
         if (cp.spec?.passive === 'couponing') {
           let offerDeck = [...cp.deck], offerDiscard = [...cp.discard];
           if (offerDeck.length < 3) { offerDeck = [...offerDeck, ...shuffleDeck(offerDiscard)]; offerDiscard = []; }

@@ -94,7 +94,7 @@ const ARMOR_CARDS = [
   card('porte_acier',      "Porte d'acier",          '🚪', C.ARMOR, R.LEGENDARY, 'defense', 6, '+10 Armure, -6 Dép. Force 6. Bloque le passage.',                       'stat:armor+10,deplacement-6,block_passage',      0, 'self'),
   card('scaphandrier',     'Scaphandrier',            '🤿', C.ARMOR, R.LEGENDARY, 'defense', 5, '+12 Armure, -5 Dép. Force 5. Immunisé déplacements forcés.',            'stat:armor+12,deplacement-5,immune_forced_move', 0, 'self'),
   card('chapeau_pointu',   'Le chapeau pointu',      '🎓', C.ARMOR, R.LEGENDARY, 'defense', 0, '+3 Armure, +4 Magie. Parchemin supplémentaire/tour.',                   'stat:armor+3,magie+4,extra_scroll',              0, 'self'),
-  card('couronne_rois',    'Couronne des Rois',      '👑', C.ARMOR, R.LEGENDARY, 'defense', 0, 'Armure légendaire (tête). +6 Armure, +3 Force, +3 Magie, +12 HP permanent.', 'stat:armor+6,force+3,magie+3,vie+6',        0, 'self'),
+  card('couronne_rois',    'Couronne des Rois',      '👑', C.ARMOR, R.LEGENDARY, 'defense', 0, 'Armure légendaire (tête). +6 Armure, +3 Force, +3 Magie, +6 HP permanent.', 'stat:armor+6,force+3,magie+3,vie+6',        0, 'self'),
 ];
 
 // ─── ARMEMENT NON MAGIQUE (12) ────────────────────────────────────────────────
