@@ -30,7 +30,7 @@ export const RACES = [
     name: 'Les Zélés',
     icon: '⚡',
     flavor: 'Débordants d\'énergie. Ils courent plus vite que leur propre ombre.',
-    bonuses: { deplacement: 3, richesse: 3 },
+    bonuses: { deplacement: 1, richesse: 3 },
     passive: 'zeles',
   },
   {
@@ -38,7 +38,7 @@ export const RACES = [
     name: 'Les Peluches',
     icon: '🧸',
     flavor: 'Adorables en apparence, imprévisibles en pratique. La richesse les suit partout.',
-    bonuses: { richesse: 6, magie: 1 },
+    bonuses: { richesse: 2, magie: 1 },
     passive: 'peluches',
   },
   {
@@ -81,7 +81,7 @@ export const CLASSES = [
     name: 'Le Messager',
     icon: '📨',
     flavor: 'Plus rapide que la rumeur. Il traverse les zones de combat sans même être vu.',
-    bonuses: { deplacement: 3 },
+    bonuses: { deplacement: 1 },
     passive: 'messager',
   },
   {
@@ -202,7 +202,7 @@ export const SPECS = [
 ];
 
 export const BASE_STATS = {
-  force: 1, magie: 1, vie: 6, deplacement: 0, richesse: 1, destin: 1, portee: 1,
+  force: 1, magie: 1, vie: 6, deplacement: 0, richesse: 1, destin: 1, portee: 1, armor: 0,
 };
 
 export function getSpecs() {

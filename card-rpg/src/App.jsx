@@ -8,9 +8,10 @@ import Inventory from './components/Inventory';
 import AllPlayersStatus from './components/AllPlayersStatus';
 import CharacterCreation from './CharacterCreation';
 import SpecEditor from './components/SpecEditor';
+import StatsReference from './components/StatsReference';
 
 // ─── Player count selection ────────────────────────────────────────────────────
-function PlayerCountSelect({ onSelect, onEditSpecs }) {
+function PlayerCountSelect({ onSelect, onEditSpecs, onStats }) {
   return (
     <div style={{
       minHeight: '100vh', background: '#08080f',
@@ -35,16 +36,28 @@ function PlayerCountSelect({ onSelect, onEditSpecs }) {
           ))}
         </div>
       </div>
-      <button
-        onClick={onEditSpecs}
-        style={{
-          background: 'transparent', border: '1px solid #2a2a3a', borderRadius: 8,
-          color: '#555', padding: '8px 20px', cursor: 'pointer', fontSize: 12,
-          transition: 'all 0.15s',
-        }}
-        onMouseOver={e => { e.currentTarget.style.color = '#88aaff'; e.currentTarget.style.borderColor = '#3a3a5a'; }}
-        onMouseOut={e => { e.currentTarget.style.color = '#555'; e.currentTarget.style.borderColor = '#2a2a3a'; }}
-      >✦ Modifier les spécialisations</button>
+      <div style={{ display: 'flex', gap: 10 }}>
+        <button
+          onClick={onEditSpecs}
+          style={{
+            background: 'transparent', border: '1px solid #2a2a3a', borderRadius: 8,
+            color: '#555', padding: '8px 20px', cursor: 'pointer', fontSize: 12,
+            transition: 'all 0.15s',
+          }}
+          onMouseOver={e => { e.currentTarget.style.color = '#88aaff'; e.currentTarget.style.borderColor = '#3a3a5a'; }}
+          onMouseOut={e => { e.currentTarget.style.color = '#555'; e.currentTarget.style.borderColor = '#2a2a3a'; }}
+        >✦ Modifier les spécialisations</button>
+        <button
+          onClick={onStats}
+          style={{
+            background: 'transparent', border: '1px solid #2a2a3a', borderRadius: 8,
+            color: '#555', padding: '8px 20px', cursor: 'pointer', fontSize: 12,
+            transition: 'all 0.15s',
+          }}
+          onMouseOver={e => { e.currentTarget.style.color = '#ffdd00'; e.currentTarget.style.borderColor = '#3a3a5a'; }}
+          onMouseOut={e => { e.currentTarget.style.color = '#555'; e.currentTarget.style.borderColor = '#2a2a3a'; }}
+        >📊 Référence stats</button>
+      </div>
     </div>
   );
 }
@@ -55,12 +68,20 @@ export default function App() {
   const [characters, setCharacters] = useState([]);
   const [setupIdx, setSetupIdx] = useState(0);
   const [editingSpecs, setEditingSpecs] = useState(false);
+  const [showStats, setShowStats] = useState(false);
 
   // Spec editor
   if (editingSpecs) return <SpecEditor onClose={() => setEditingSpecs(false)} />;
+  // Stats reference
+  if (showStats) return (
+    <div style={{ position: 'relative' }}>
+      <button onClick={() => setShowStats(false)} style={{ position: 'fixed', top: 12, right: 12, zIndex: 999, background: '#222', border: '1px solid #444', color: '#eee', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 13 }}>✕ Fermer</button>
+      <StatsReference />
+    </div>
+  );
 
   // Step 1: choose player count
-  if (!playerCount) return <PlayerCountSelect onSelect={setPlayerCount} onEditSpecs={() => setEditingSpecs(true)} />;
+  if (!playerCount) return <PlayerCountSelect onSelect={setPlayerCount} onEditSpecs={() => setEditingSpecs(true)} onStats={() => setShowStats(true)} />;
 
   // Step 2: create each character
   if (setupIdx < playerCount) {

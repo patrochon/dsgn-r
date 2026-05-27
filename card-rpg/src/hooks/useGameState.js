@@ -13,7 +13,8 @@ function rollDie() {
 }
 
 function buildPlayer(charData, index, mapData) {
-  const stats = charData.stats ?? { force: 1, magie: 1, vie: 6, deplacement: 0, richesse: 1, destin: 1 };
+  const stats = charData.stats ?? { force: 1, magie: 1, vie: 6, deplacement: 0, richesse: 1, destin: 1, portee: 1, armor: 0 };
+  if (stats.armor === undefined) stats.armor = 0;
   const maxHp = 20 + stats.vie * 2;
   const finalMaxHp = (charData.spec?.passive === 'imperissable') ? maxHp * 2 : maxHp;
   const start = mapData.playerStarts[index] ?? mapData.playerStarts[0];
@@ -37,6 +38,7 @@ function buildPlayer(charData, index, mapData) {
     readyScroll: null,
     equippedWeapon: null,
     equippedArmor: null,
+    equippedTrinkets: [],
     hand: deck.splice(0, 6),
     deck,
     discard: [],
@@ -47,6 +49,7 @@ function buildPlayer(charData, index, mapData) {
     forcedImmobileNextTurn: false,
     weaponJustSwapped: false,
     armorJustSwapped: false,
+    trinketSwappedThisTurn: false,
     prisonEffect: null,
     wikiSwapped: false,
     slowMalus: 0,
@@ -62,6 +65,7 @@ function buildPlayer(charData, index, mapData) {
     curseImmune: false,
     goldDoubleRemaining: 0,
     frenziedAttacks: 0,
+    kills: { pile1: 0, pile2: 0, pile3: 0 },
     color: PLAYER_COLORS[index] ?? '#ffffff',
   };
 }
@@ -128,16 +132,8 @@ function getCardDeltas(card, stats) {
 function unequipCard(p, card) {
   const deltas = getCardDeltas(card, p.stats);
   p = applyStatDeltas(p, deltas.map(d => ({ stat: d.stat, val: -d.val })));
-  if (card.effect.type === 'legendary') {
-    const special = card.effect.special ?? '';
-    if (special.includes('perm:vie+10') || special.includes('vie+10')) {
-      p.maxHp = Math.max(p.hp, p.maxHp - 20);
-    }
-    if (special.includes('force+5') && !deltas.find(d => d.stat === 'force')) {
-      p.stats = { ...p.stats, force: Math.max(0, (p.stats.force ?? 0) - 5) };
-    }
-  }
   p.inventory = p.inventory.filter(c => c !== card);
+  p.equippedTrinkets = (p.equippedTrinkets ?? []).filter(c => c !== card);
   return p;
 }
 
@@ -255,12 +251,13 @@ function runMoveDijkstra(fromX, fromY, budget, facing, wallPass, oneWallPass, gr
   return { tiles: [...tilesSet], budgetAtTile };
 }
 
-// Apply Cailloux passive: -1 per hit, immune if physicalImmune; imperissable immune to AOE
+// Apply armor + Cailloux passive; imperissable immune to AOE
 function physDmg(rawDmg, target, isAoe = false) {
   if (target?.physicalImmune) return 0;
   if (isAoe && target?.spec?.passive === 'imperissable') return 0;
-  const reduction = target?.race?.passive === 'cailloux' ? 1 : 0;
-  return Math.max(0, rawDmg - reduction);
+  const armorReduction = target?.stats?.armor ?? 0;
+  const caillouxReduction = target?.race?.passive === 'cailloux' ? 1 : 0;
+  return Math.max(0, rawDmg - armorReduction - caillouxReduction);
 }
 
 function absorbDamage(player, dmg) {
@@ -270,9 +267,9 @@ function absorbDamage(player, dmg) {
   return { player: { ...player, tempHp: temp - absorbed }, remaining: dmg - absorbed };
 }
 
-// Initiative: monster goes first if its attack > player's (force + magie)
+// Initiative: monster goes first if its attack > player's max(force, magie)
 function monsterGoesFirst(player, monster) {
-  return monster.attack > ((player.stats?.force ?? 0) + (player.stats?.magie ?? 0));
+  return monster.attack > Math.max(player.stats?.force ?? 0, player.stats?.magie ?? 0);
 }
 
 const GOLEMS = {
@@ -422,6 +419,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       }
       p.weaponJustSwapped = false;
       p.armorJustSwapped = false;
+      p.trinketSwappedThisTurn = false;
       p.wikiSwapped = false;
       p.slowMalus = 0;
       p.tempDepBonus = 0;
@@ -448,17 +446,32 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     setPhase('player_turn');
   }, [currentIdx, players]);
 
-  // Equip card — FREE, applies stat bonuses, one weapon + one armor slot, max 2 magic items
+  // Equip card — FREE, applies stat bonuses, one weapon + one armor slot, max 3 bibelots (1 swap/turn)
   const equipCard = useCallback((card) => {
     if (!card || !isEquippable(card)) return false;
     const isWeapon    = card.effect.type === 'attack' || card.effect.type === 'magic_attack';
     const isArmor     = card.effect.type === 'defense';
-    const isMagicItem = card.effect.type === 'passive' || card.effect.type === 'legendary';
+    const isTrinket   = card.category === 'bibelot';
+    const isMagicItem = (card.effect.type === 'passive' || card.effect.type === 'legendary') && !isTrinket;
 
-    // Magic item slot check (max 2)
+    const cp = players[currentIdx];
+
+    // Trinket (bibelot) slot check: max 3, 1 swap per turn
+    if (isTrinket) {
+      if (cp.trinketSwappedThisTurn) {
+        addLog(`❌ ${cp.name} ne peut échanger qu'un seul bibelot par tour.`);
+        return false;
+      }
+      const trinketCount = (cp.equippedTrinkets ?? []).length;
+      if (trinketCount >= 3) {
+        addLog(`❌ ${cp.name} ne peut pas porter plus de 3 bibelots. Retirez-en un d'abord.`);
+        return false;
+      }
+    }
+
+    // Magic item slot check (max 2, non-trinket passives/legendaries)
     if (isMagicItem) {
-      const cp = players[currentIdx];
-      const magicCount = cp.inventory.filter(c => c.effect.type === 'passive' || c.effect.type === 'legendary').length;
+      const magicCount = cp.inventory.filter(c => (c.effect.type === 'passive' || c.effect.type === 'legendary') && c.category !== 'bibelot').length;
       if (magicCount >= 2) {
         addLog(`❌ ${cp.name} ne peut pas porter plus de 2 objets magiques.`);
         return false;
@@ -466,17 +479,15 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     }
     // Magic weapon magie requirement
     if (card.effect.type === 'magic_attack' && (card.effect.magieCost ?? 0) > 0) {
-      const cp2 = players[currentIdx];
-      if ((cp2.stats.magie ?? 0) < card.effect.magieCost) {
-        addLog(`❌ ${cp2.name} n'a pas assez de Magie pour équiper ${card.icon} ${card.name} (requis : ${card.effect.magieCost}, actuel : ${cp2.stats.magie ?? 0}).`);
+      if ((cp.stats.magie ?? 0) < card.effect.magieCost) {
+        addLog(`❌ ${cp.name} n'a pas assez de Magie pour équiper ${card.icon} ${card.name} (requis : ${card.effect.magieCost}, actuel : ${cp.stats.magie ?? 0}).`);
         return false;
       }
     }
     // Armor force requirement
     if (isArmor && (card.effect.bonus ?? 0) > 0) {
-      const cp3 = players[currentIdx];
-      if ((cp3.stats.force ?? 0) < card.effect.bonus) {
-        addLog(`❌ ${cp3.name} n'a pas assez de Force pour équiper ${card.icon} ${card.name} (requis : ${card.effect.bonus}, actuel : ${cp3.stats.force ?? 0}).`);
+      if ((cp.stats.force ?? 0) < card.effect.bonus) {
+        addLog(`❌ ${cp.name} n'a pas assez de Force pour équiper ${card.icon} ${card.name} (requis : ${card.effect.bonus}, actuel : ${cp.stats.force ?? 0}).`);
         return false;
       }
     }
@@ -506,28 +517,20 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       const deltas = getCardDeltas(card, p.stats);
       p = applyStatDeltas(p, deltas);
 
-      // Special legendary bonuses
-      if (card.effect.type === 'legendary') {
-        const special = card.effect.special ?? '';
-        if (special.includes('perm:vie+10') || special.includes('vie+10')) {
-          p.maxHp += 20;
-          p.hp = Math.min(p.maxHp, p.hp + 20);
-        }
-        if (special.includes('force+5') && !deltas.find(d => d.stat === 'force')) {
-          p.stats.force = (p.stats.force ?? 0) + 5;
-        }
-      }
-
       p.hand = p.hand.filter(c => c !== card);
       p.discard = [...p.discard, card];
       p.inventory = [...p.inventory, card];
       if (isWeapon) p.equippedWeapon = card;
       if (isArmor)  p.equippedArmor  = card;
+      if (isTrinket) {
+        p.equippedTrinkets = [...(p.equippedTrinkets ?? []), card];
+        p.trinketSwappedThisTurn = true;
+      }
       next[currentIdx] = p;
       return next;
     });
-    const weaponSwapped = players[currentIdx]?.equippedWeapon != null && (card.effect.type === 'attack' || card.effect.type === 'magic_attack');
-    const armorSwapped  = players[currentIdx]?.equippedArmor != null && card.effect.type === 'defense';
+    const weaponSwapped = cp?.equippedWeapon != null && isWeapon;
+    const armorSwapped  = cp?.equippedArmor != null && isArmor;
     const swapNote = weaponSwapped ? ` Ne peut attaquer qu'au prochain tour.` : armorSwapped ? ` Protection inactive jusqu'au prochain tour.` : '';
     addLog(`${currentPlayer.name} équipe ${card.icon} ${card.name} (gratuit).${swapNote}`);
     setSelectedCard(null);
@@ -962,104 +965,158 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
           addLog(`📨 ${cp.name} tombe sur ${monsterThere.icon} ${monsterThere.name} — combattre ou passer ?`);
           return;
         }
-        // Pacte: auto-kill monster
-        if (cp.spec?.passive === 'pacte') {
-          const goldReward = monsterThere.attack ?? 1;
-          const treasureCard = drawFromTreasurePile(monsterThere.pile);
-          addLog(`📜 ${cp.name} (Pacte) élimine ${monsterThere.icon} ${monsterThere.name} automatiquement ! +${goldReward}💰${treasureCard ? ` + ${treasureCard.icon}` : ''}`);
-          if (monsterThere.pile === 1) {
-            const p2 = MONSTER_PILE_2[Math.floor(Math.random() * MONSTER_PILE_2.length)];
-            setEnemies(prev => ({ ...prev, [destKey]: { ...p2, hp: p2.maxHp } }));
-          } else if (monsterThere.pile === 2) {
-            const p3 = MONSTER_PILE_3[Math.floor(Math.random() * MONSTER_PILE_3.length)];
-            setEnemies(prev => ({ ...prev, [destKey]: { ...p3, hp: p3.maxHp } }));
-          } else {
-            setEnemies(prev => { const n = { ...prev }; delete n[destKey]; return n; });
-          }
-          setPlayers(prev => {
-            const next = [...prev];
-            let np = { ...next[currentIdx] };
-            const doubleG = (np.goldDoubleRemaining ?? 0) > 0;
-            np.gold = (np.gold ?? 0) + (doubleG ? goldReward * 2 : goldReward);
-            if (doubleG) { np.goldDoubleRemaining--; addLog(`🥂 Champagne ! Or doublé (${np.goldDoubleRemaining} restant(s))`); }
-            if (treasureCard) np.hand = [...np.hand, treasureCard];
-            next[currentIdx] = np;
-            return next;
-          });
-          // fall through — don't return, continue to check traps/chests
-        } else {
-        const roll = rollDie();
-        const pDmg = Math.max(1, roll + cp.stats.force + Math.floor(cp.stats.richesse / 2) - monsterThere.defense);
-        const mDmg = Math.max(1, monsterThere.attack - Math.floor(cp.stats.force / 3));
-        const rounds = Math.ceil(monsterThere.maxHp / pDmg);
-        const mFirst = monsterGoesFirst(cp, monsterThere);
-        const rawDmgTaken = mFirst ? rounds * mDmg : Math.max(0, (rounds - 1) * mDmg);
-        const dmgTaken = physDmg(rawDmgTaken, cp);
-        const won = cp.physicalImmune || cp.hp - dmgTaken > 0;
-        const goldReward = won ? (monsterThere.attack ?? 1) : 0;
-        const treasureCard = won ? drawFromTreasurePile(monsterThere.pile) : null;
-        const playerPower = (cp.stats.force ?? 0) + (cp.stats.magie ?? 0);
-        addLog(`⚔️ ${cp.name} affronte ${monsterThere.icon} ${monsterThere.name} (pile ${monsterThere.pile}) ! (dé:${roll})`);
-        addLog(mFirst
-          ? `⚠️ ${monsterThere.name} a l'initiative — ATK ${monsterThere.attack} > Force+Magie ${playerPower}`
-          : `⚡ ${cp.name} a l'initiative — Force+Magie ${playerPower} ≥ ATK ${monsterThere.attack}`);
-        // Pile 1 vaincu → pile 2 ; pile 2 vaincu → pile 3 ; pile 3 vaincu → case libre
-        if (won) {
-          if (monsterThere.pile === 1) {
+        // Helper: upgrade monster tile after kill
+        const upgradeMonsterTile = (pile) => {
+          if (pile === 1) {
             const p2 = MONSTER_PILE_2[Math.floor(Math.random() * MONSTER_PILE_2.length)];
             setEnemies(prev => ({ ...prev, [destKey]: { ...p2, hp: p2.maxHp } }));
             addLog(`💀 ${monsterThere.name} vaincu — un ${p2.icon} ${p2.name} surgit sur la case !`);
-          } else if (monsterThere.pile === 2) {
+          } else if (pile === 2) {
             const p3 = MONSTER_PILE_3[Math.floor(Math.random() * MONSTER_PILE_3.length)];
             setEnemies(prev => ({ ...prev, [destKey]: { ...p3, hp: p3.maxHp } }));
             addLog(`💀 ${monsterThere.name} vaincu — un ${p3.icon} ${p3.name} surgit sur la case !`);
           } else {
             setEnemies(prev => { const n = { ...prev }; delete n[destKey]; return n; });
           }
+        };
+
+        // Helper: apply kill loot (gold + stat gains)
+        const applyKillLoot = (np, pile) => {
+          const kills = { ...(np.kills ?? { pile1: 0, pile2: 0, pile3: 0 }) };
+          let goldGain = 0, forceGain = 0;
+          if (pile === 1) {
+            kills.pile1++;
+            goldGain = 2;
+            if (kills.pile1 % 3 === 0) forceGain = 1;
+          } else if (pile === 2) {
+            kills.pile2++;
+            goldGain = 4;
+            if (kills.pile2 % 2 === 0) forceGain = 1;
+          } else {
+            kills.pile3++;
+            goldGain = 6;
+            forceGain = 1;
+          }
+          const doubleG = (np.goldDoubleRemaining ?? 0) > 0;
+          const actualGold = doubleG ? goldGain * 2 : goldGain;
+          if (doubleG) np.goldDoubleRemaining--;
+          np.gold = (np.gold ?? 0) + actualGold;
+          np.kills = kills;
+          if (forceGain > 0) {
+            np.stats = { ...np.stats, force: (np.stats.force ?? 0) + forceGain };
+            addLog(`💪 ${np.name} gagne +${forceGain} Force (${pile === 1 ? kills.pile1 : pile === 2 ? kills.pile2 : kills.pile3} kills pile ${pile}) !`);
+          }
+          addLog(`💰 +${actualGold} pièces d'or${doubleG ? ' (×2 🥂)' : ''} (monstre pile ${pile})`);
+          return np;
+        };
+
+        // Auto-win: Pacte spec or Grimoire interdit
+        const hasAutoWin = cp.spec?.passive === 'pacte' || cp.inventory.some(c => c.effect?.special?.includes('auto_win_monsters'));
+        if (hasAutoWin) {
+          const treasureCard = drawFromTreasurePile(monsterThere.pile);
+          addLog(`📜 ${cp.name} (${cp.spec?.passive === 'pacte' ? 'Pacte' : 'Grimoire'}) élimine ${monsterThere.icon} ${monsterThere.name} automatiquement !${treasureCard ? ` + ${treasureCard.icon}` : ''}`);
+          upgradeMonsterTile(monsterThere.pile);
+          setPlayers(prev => {
+            const next = [...prev];
+            let np = { ...next[currentIdx], stats: { ...next[currentIdx].stats } };
+            np = applyKillLoot(np, monsterThere.pile);
+            if (treasureCard) np.hand = [...np.hand, treasureCard];
+            next[currentIdx] = np;
+            return next;
+          });
+          // fall through — continue to check traps/chests
         } else {
-          setEnemies(prev => { const n = { ...prev }; delete n[destKey]; return n; });
-        }
-        const nextPlayers = players.map((p, i) => {
-          if (i !== currentIdx) return p;
-          let np = { ...p, hp: Math.max(0, p.hp - dmgTaken) };
-          if (!won) {
-            if (np.hp <= 0 && np.spec?.passive === 'premier_soin' && !np.premierSoinUsed) {
-              const reviveHp = rollDie();
-              np = { ...np, hp: reviveHp, premierSoinUsed: true };
-              addLog(`🩹 Premier Soin : ${np.name} réssucite avec ${reviveHp} PV !`);
-            } else if (np.stats.destin > 0) {
-              const keepGold = np.spec?.passive === 'nde' ? np.gold : 0;
-              const keepHand = np.spec?.passive === 'nde' ? [...np.hand] : [];
-              const reviveHp = np.spec?.passive === 'nde' ? rollDie() : np.maxHp;
-              const newDeck = shuffleDeck([...FULL_DECK]);
-              if (np.spec?.passive === 'nde') addLog(`💀 NDE : ${np.name} renaît avec ${reviveHp} PV, conserve or et main !`);
-              np = { ...np, hp: reviveHp, x: np.baseX, y: np.baseY, gold: keepGold, hand: keepHand, deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, facing: null, stats: { ...np.stats, destin: np.stats.destin - 1 } };
+          // 1-round sequential combat
+          const roll = rollDie();
+          const playerMaxStat = Math.max(cp.stats.force ?? 0, cp.stats.magie ?? 0);
+          const pGoesFirst = playerMaxStat >= monsterThere.attack;
+          const playerAtk = Math.max(0, roll + (cp.stats.force ?? 0) - (monsterThere.defense ?? 0));
+          const monsterAtk = physDmg(monsterThere.attack, cp);
+
+          addLog(`⚔️ ${cp.name} affronte ${monsterThere.icon} ${monsterThere.name} (pile ${monsterThere.pile}) ! (dé:${roll})`);
+          addLog(pGoesFirst
+            ? `⚡ ${cp.name} a l'initiative — max(Force,Magie) ${playerMaxStat} ≥ ATK ${monsterThere.attack}`
+            : `⚠️ ${monsterThere.name} a l'initiative — ATK ${monsterThere.attack} > max(Force,Magie) ${playerMaxStat}`);
+
+          let monHp = monsterThere.hp ?? monsterThere.maxHp;
+          let plHp = cp.hp;
+
+          if (pGoesFirst) {
+            monHp = Math.max(0, monHp - playerAtk);
+            if (monHp > 0) plHp = Math.max(0, plHp - monsterAtk);
+          } else {
+            plHp = Math.max(0, plHp - monsterAtk);
+            if (plHp > 0) monHp = Math.max(0, monHp - playerAtk);
+          }
+
+          const playerWon = monHp <= 0;
+          const playerDied = plHp <= 0;
+
+          if (playerWon) {
+            const treasureCard = drawFromTreasurePile(monsterThere.pile);
+            upgradeMonsterTile(monsterThere.pile);
+            const dmgTaken = cp.hp - plHp;
+            damageTakenThisMove += dmgTaken;
+            const nextPlayers = players.map((p, i) => {
+              if (i !== currentIdx) return p;
+              let np = { ...p, hp: plHp, stats: { ...p.stats } };
+              np = applyKillLoot(np, monsterThere.pile);
+              if (treasureCard) np.hand = [...np.hand, treasureCard];
+              return np;
+            });
+            setPlayers(nextPlayers);
+            addLog(`✅ ${monsterThere.name} vaincu ! (dégâts: ${playerAtk}, reçus: ${dmgTaken})${treasureCard ? ` + ${treasureCard.icon} ${treasureCard.name}` : ''}`);
+          } else {
+            // Player died (or both alive — monster stays with reduced HP)
+            const dmgTaken = cp.hp - plHp;
+            damageTakenThisMove += dmgTaken;
+            if (playerDied) {
+              // Monster stays in place with reduced HP
+              setEnemies(prev => ({ ...prev, [destKey]: { ...monsterThere, hp: monHp } }));
+              const nextPlayers = players.map((p, i) => {
+                if (i !== currentIdx) return p;
+                let np = { ...p, hp: 0, stats: { ...p.stats } };
+                if (np.spec?.passive === 'premier_soin' && !np.premierSoinUsed) {
+                  const reviveHp = rollDie();
+                  np = { ...np, hp: reviveHp, premierSoinUsed: true };
+                  addLog(`🩹 Premier Soin : ${np.name} réssucite avec ${reviveHp} PV !`);
+                } else if (np.stats.destin > 0) {
+                  const keepGold = np.spec?.passive === 'nde' ? np.gold : 0;
+                  const keepHand = np.spec?.passive === 'nde' ? [...np.hand] : [];
+                  const reviveHp = np.spec?.passive === 'nde' ? rollDie() : np.maxHp;
+                  const newDeck = shuffleDeck([...FULL_DECK]);
+                  if (np.spec?.passive === 'nde') addLog(`💀 NDE : ${np.name} renaît avec ${reviveHp} PV, conserve or et main !`);
+                  np = { ...np, hp: reviveHp, x: np.baseX, y: np.baseY, gold: keepGold, hand: keepHand, deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, equippedTrinkets: [], facing: null, stats: { ...np.stats, destin: np.stats.destin - 1 } };
+                } else {
+                  np.isAlive = false; np.hp = 0;
+                }
+                return np;
+              });
+              setPlayers(nextPlayers);
+              addLog(`💀 ${cp.name} tombe face à ${monsterThere.name} ! (reçu: ${dmgTaken}, monstre à ${monHp} PV)`);
+              if (nextPlayers[currentIdx].isAlive) {
+                addLog(`✨ ${cp.name} renaît à sa base ! (${nextPlayers[currentIdx].stats.destin} vie(s) restante(s))`);
+                let ni = (currentIdx + 1) % nextPlayers.length;
+                while (!nextPlayers[ni]?.isAlive) ni = (ni + 1) % nextPlayers.length;
+                setCurrentIdx(ni); setActionsLeft(0); setHasMoved(false); setPhase('draw');
+                addLog(`--- Tour de ${nextPlayers[ni].name} ---`);
+                turnEnded = true;
+              } else {
+                addLog(`💀 ${cp.name} est définitivement éliminé !`);
+                turnEnded = handleDeath(nextPlayers);
+              }
             } else {
-              np.isAlive = false; np.hp = 0;
+              // Both survived — monster stays with reduced HP, player takes damage
+              setEnemies(prev => ({ ...prev, [destKey]: { ...monsterThere, hp: monHp } }));
+              setPlayers(prev => {
+                const next = [...prev];
+                next[currentIdx] = { ...next[currentIdx], hp: plHp };
+                return next;
+              });
+              addLog(`🤜 Combat nul — ${monsterThere.name} reste (${monHp} PV). ${cp.name} subit ${dmgTaken} dégâts.`);
             }
           }
-          if (won) {
-            np = { ...np, gold: (np.gold ?? 0) + goldReward };
-            if (treasureCard) np = { ...np, hand: [...np.hand, treasureCard] };
-          }
-          return np;
-        });
-        damageTakenThisMove += dmgTaken;
-        setPlayers(nextPlayers);
-        if (won) {
-          addLog(`✅ ${monsterThere.name} vaincu ! -${dmgTaken} PV, +${goldReward}💰${treasureCard ? ` + ${treasureCard.icon} ${treasureCard.name}` : ''}`);
-        } else if (nextPlayers[currentIdx].isAlive) {
-          addLog(`✨ ${cp.name} renaît à sa base ! (${nextPlayers[currentIdx].stats.destin} vie(s) restante(s))`);
-          let ni = (currentIdx + 1) % nextPlayers.length;
-          while (!nextPlayers[ni]?.isAlive) ni = (ni + 1) % nextPlayers.length;
-          setCurrentIdx(ni); setActionsLeft(0); setHasMoved(false); setPhase('draw');
-          addLog(`--- Tour de ${nextPlayers[ni].name} ---`);
-          turnEnded = true;
-        } else {
-          addLog(`💀 ${cp.name} est définitivement tué par ${monsterThere.name} !`);
-          turnEnded = handleDeath(nextPlayers);
-        }
-        } // end else (not pacte)
+        } // end else (not auto-win)
       }
 
       // — Trap —
@@ -1290,21 +1347,29 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       if (enemies[key]) {
         const m = enemies[key];
         const roll = rollDie();
-        const pDmg = Math.max(1, roll + cp.stats.force + Math.floor(cp.stats.richesse / 2) - m.defense);
-        const mDmg = Math.max(1, m.attack - Math.floor(cp.stats.force / 3));
-        const rounds = Math.ceil(m.maxHp / pDmg);
-        const mFirstLB = monsterGoesFirst(cp, m);
-        const rawLBDmg = mFirstLB ? rounds * mDmg : Math.max(0, (rounds - 1) * mDmg);
-        const dmgTaken = physDmg(rawLBDmg, cp);
-        const won = cp.physicalImmune || pDmg * rounds >= m.maxHp;
-        const goldRewardLB = won ? (m.attack ?? 1) : 0;
-        const treasureCardLB = won ? drawFromTreasurePile(m.pile) : null;
-        const playerPowerLB = (cp.stats.force ?? 0) + (cp.stats.magie ?? 0);
-        addLog(`🦾 ${cp.name} frappe ${m.icon} ${m.name} depuis la case adjacente !`);
-        addLog(mFirstLB
-          ? `⚠️ ${m.name} a l'initiative — ATK ${m.attack} > Force+Magie ${playerPowerLB}`
-          : `⚡ ${cp.name} a l'initiative — Force+Magie ${playerPowerLB} ≥ ATK ${m.attack}`);
-        if (won) {
+        const playerMaxStatLB = Math.max(cp.stats.force ?? 0, cp.stats.magie ?? 0);
+        const pGoesFirstLB = playerMaxStatLB >= m.attack;
+        const playerAtkLB = Math.max(0, roll + (cp.stats.force ?? 0) - (m.defense ?? 0));
+        const monsterAtkLB = physDmg(m.attack, cp);
+        addLog(`🦾 ${cp.name} frappe ${m.icon} ${m.name} depuis la case adjacente ! (dé:${roll})`);
+        addLog(pGoesFirstLB
+          ? `⚡ ${cp.name} a l'initiative — max(Force,Magie) ${playerMaxStatLB} ≥ ATK ${m.attack}`
+          : `⚠️ ${m.name} a l'initiative — ATK ${m.attack} > max(Force,Magie) ${playerMaxStatLB}`);
+        let monHpLB = m.hp ?? m.maxHp;
+        let plHpLB = cp.hp;
+        if (pGoesFirstLB) {
+          monHpLB = Math.max(0, monHpLB - playerAtkLB);
+          if (monHpLB > 0) plHpLB = Math.max(0, plHpLB - monsterAtkLB);
+        } else {
+          plHpLB = Math.max(0, plHpLB - monsterAtkLB);
+          if (plHpLB > 0) monHpLB = Math.max(0, monHpLB - playerAtkLB);
+        }
+        const wonLB = monHpLB <= 0;
+        const playerDiedLB = plHpLB <= 0;
+        const dmgTaken = cp.hp - plHpLB;
+
+        if (wonLB) {
+          const treasureCardLB = drawFromTreasurePile(m.pile);
           if (m.pile === 1) {
             const p2 = MONSTER_PILE_2[Math.floor(Math.random() * MONSTER_PILE_2.length)];
             setEnemies(prev => ({ ...prev, [key]: { ...p2, hp: p2.maxHp } }));
@@ -1316,13 +1381,33 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
           } else {
             setEnemies(prev => { const n = { ...prev }; delete n[key]; return n; });
           }
-          addLog(`✅ ${m.name} vaincu ! +${goldRewardLB}💰${treasureCardLB ? ` + ${treasureCardLB.icon} ${treasureCardLB.name}` : ''}`);
-        }
+          const nextPlayers = players.map((p, i) => {
+            if (i !== currentIdx) return p;
+            let np = { ...p, hp: plHpLB, stats: { ...p.stats } };
+            const killsLB = { ...(np.kills ?? { pile1: 0, pile2: 0, pile3: 0 }) };
+            let goldGainLB = 0, forceGainLB = 0;
+            if (m.pile === 1) { killsLB.pile1++; goldGainLB = 2; if (killsLB.pile1 % 3 === 0) forceGainLB = 1; }
+            else if (m.pile === 2) { killsLB.pile2++; goldGainLB = 4; if (killsLB.pile2 % 2 === 0) forceGainLB = 1; }
+            else { killsLB.pile3++; goldGainLB = 6; forceGainLB = 1; }
+            np.gold = (np.gold ?? 0) + goldGainLB;
+            np.kills = killsLB;
+            if (forceGainLB > 0) np.stats = { ...np.stats, force: (np.stats.force ?? 0) + forceGainLB };
+            if (treasureCardLB) np.hand = [...np.hand, treasureCardLB];
+            addLog(`💰 +${goldGainLB} pièces d'or (monstre pile ${m.pile})`);
+            if (forceGainLB > 0) addLog(`💪 ${np.name} gagne +${forceGainLB} Force !`);
+            return np;
+          });
+          setPlayers(nextPlayers);
+          addLog(`✅ ${m.name} vaincu ! (reçus: ${dmgTaken})${treasureCardLB ? ` + ${treasureCardLB.icon} ${treasureCardLB.name}` : ''}`);
+        } else {
+          if (playerDiedLB) {
+            setEnemies(prev => ({ ...prev, [key]: { ...m, hp: monHpLB } }));
+          }
         const nextPlayers = players.map((p, i) => {
           if (i !== currentIdx) return p;
-          let np = { ...p, hp: Math.max(0, p.hp - dmgTaken) };
-          if (!won) {
-            if (np.hp <= 0 && np.spec?.passive === 'premier_soin' && !np.premierSoinUsed) {
+          let np = { ...p, hp: Math.max(0, plHpLB), stats: { ...p.stats } };
+          if (playerDiedLB) {
+            if (np.spec?.passive === 'premier_soin' && !np.premierSoinUsed) {
               const reviveHp = rollDie();
               np = { ...np, hp: reviveHp, premierSoinUsed: true };
               addLog(`🩹 Premier Soin : ${np.name} réssucite avec ${reviveHp} PV !`);
@@ -1332,25 +1417,22 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
               const reviveHp = np.spec?.passive === 'nde' ? rollDie() : np.maxHp;
               const newDeck = shuffleDeck([...FULL_DECK]);
               if (np.spec?.passive === 'nde') addLog(`💀 NDE : ${np.name} renaît avec ${reviveHp} PV, conserve or et main !`);
-              np = { ...np, hp: reviveHp, x: np.baseX, y: np.baseY, gold: keepGold, hand: keepHand, deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, facing: null, stats: { ...np.stats, destin: np.stats.destin - 1 } };
+              np = { ...np, hp: reviveHp, x: np.baseX, y: np.baseY, gold: keepGold, hand: keepHand, deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, equippedTrinkets: [], facing: null, stats: { ...np.stats, destin: np.stats.destin - 1 } };
             } else {
               np.isAlive = false; np.hp = 0;
             }
           }
-          if (won) {
-            np = { ...np, gold: (np.gold ?? 0) + goldRewardLB };
-            if (treasureCardLB) np = { ...np, hand: [...np.hand, treasureCardLB] };
-          }
           return np;
         });
         setPlayers(nextPlayers);
-        if (!won) {
+        if (playerDiedLB) {
           if (nextPlayers[currentIdx].isAlive) {
             addLog(`✨ ${cp.name} renaît à sa base ! (${nextPlayers[currentIdx].stats.destin} vie(s) restante(s))`);
           } else {
             addLog(`💀 ${cp.name} est tué par ${m.name} !`);
           }
         }
+        } // end else (not wonLB)
       } else if (traps[key]) {
         const trap = traps[key];
         const roll = rollDie();
@@ -1810,14 +1892,14 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       } else if (targetEnemy) {
         const defense = targetEnemy.defense ?? 0;
         const actualDmg = Math.max(1, dmg - defense);
-        const mFirstAtk = monsterGoesFirst(cp, targetEnemy);
-        const playerPowerAtk = (cp.stats.force ?? 0) + (cp.stats.magie ?? 0);
+        const playerMaxStatAtk = Math.max(cp.stats.force ?? 0, cp.stats.magie ?? 0);
+        const mFirstAtk = targetEnemy.attack > playerMaxStatAtk;
         addLog(mFirstAtk
-          ? `⚠️ ${targetEnemy.name} a l'initiative — ATK ${targetEnemy.attack} > Force+Magie ${playerPowerAtk}`
-          : `⚡ ${cp.name} a l'initiative — Force+Magie ${playerPowerAtk} ≥ ATK ${targetEnemy.attack}`);
-        // Monster counter-attack if it goes first (and survives at least 1 round)
+          ? `⚠️ ${targetEnemy.name} a l'initiative — ATK ${targetEnemy.attack} > max(Force,Magie) ${playerMaxStatAtk}`
+          : `⚡ ${cp.name} a l'initiative — max(Force,Magie) ${playerMaxStatAtk} ≥ ATK ${targetEnemy.attack}`);
+        // Monster counter-attacks if it has initiative
         if (mFirstAtk) {
-          const counterDmg = physDmg(Math.max(1, targetEnemy.attack - Math.floor(cp.stats.force / 3)), cp);
+          const counterDmg = physDmg(targetEnemy.attack, cp);
           addLog(`💢 ${targetEnemy.name} contre-attaque : ${counterDmg} dégâts sur ${cp.name} !`);
           setPlayers(prev => {
             const next = [...prev];
@@ -1828,18 +1910,35 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
           });
         }
         addLog(`${cp.name} attaque ${targetEnemy.name} : dé=${roll}, dégâts=${actualDmg}`);
-        const newHp = targetEnemy.hp - actualDmg;
+        const newHp = (targetEnemy.hp ?? targetEnemy.maxHp) - actualDmg;
         if (newHp <= 0) {
-          const goldRewardAtk = targetEnemy.attack ?? 1;
           const treasureCardAtk = drawFromTreasurePile(targetEnemy.pile);
-          addLog(`✅ ${targetEnemy.name} est vaincu ! +${goldRewardAtk}💰${treasureCardAtk ? ` + ${treasureCardAtk.icon} ${treasureCardAtk.name}` : ''}`);
-          setEnemies(prev => { const n = { ...prev }; delete n[key]; return n; });
+          if (targetEnemy.pile === 1) {
+            const p2 = MONSTER_PILE_2[Math.floor(Math.random() * MONSTER_PILE_2.length)];
+            setEnemies(prev => ({ ...prev, [key]: { ...p2, hp: p2.maxHp } }));
+            addLog(`💀 ${targetEnemy.name} vaincu — un ${p2.icon} ${p2.name} surgit !`);
+          } else if (targetEnemy.pile === 2) {
+            const p3 = MONSTER_PILE_3[Math.floor(Math.random() * MONSTER_PILE_3.length)];
+            setEnemies(prev => ({ ...prev, [key]: { ...p3, hp: p3.maxHp } }));
+            addLog(`💀 ${targetEnemy.name} vaincu — un ${p3.icon} ${p3.name} surgit !`);
+          } else {
+            setEnemies(prev => { const n = { ...prev }; delete n[key]; return n; });
+          }
           setPlayers(prev => {
             const next = [...prev];
-            let np = { ...next[currentIdx] };
+            let np = { ...next[currentIdx], stats: { ...next[currentIdx].stats } };
+            const kills = { ...(np.kills ?? { pile1: 0, pile2: 0, pile3: 0 }) };
+            let goldGain = 0, forceGain = 0;
+            if (targetEnemy.pile === 1) { kills.pile1++; goldGain = 2; if (kills.pile1 % 3 === 0) forceGain = 1; }
+            else if (targetEnemy.pile === 2) { kills.pile2++; goldGain = 4; if (kills.pile2 % 2 === 0) forceGain = 1; }
+            else { kills.pile3++; goldGain = 6; forceGain = 1; }
             const doubleGold = (np.goldDoubleRemaining ?? 0) > 0;
-            np.gold = (np.gold ?? 0) + (doubleGold ? goldRewardAtk * 2 : goldRewardAtk);
-            if (doubleGold) { np.goldDoubleRemaining--; addLog(`🥂 Champagne ! Or doublé : +${goldRewardAtk * 2}💰 (${np.goldDoubleRemaining} restant(s))`); }
+            const actualGold = doubleGold ? goldGain * 2 : goldGain;
+            if (doubleGold) { np.goldDoubleRemaining--; addLog(`🥂 Champagne ! Or doublé (${np.goldDoubleRemaining} restant(s))`); }
+            np.gold = (np.gold ?? 0) + actualGold;
+            np.kills = kills;
+            if (forceGain > 0) { np.stats.force = (np.stats.force ?? 0) + forceGain; addLog(`💪 ${np.name} gagne +${forceGain} Force !`); }
+            addLog(`✅ ${targetEnemy.name} vaincu ! +${actualGold}💰${treasureCardAtk ? ` + ${treasureCardAtk.icon} ${treasureCardAtk.name}` : ''}`);
             if (treasureCardAtk) np.hand = [...np.hand, treasureCardAtk];
             np.nextAttackBonus = 0;
             if ((cp.frenziedAttacks ?? 0) > 0) np.frenziedAttacks = cp.frenziedAttacks - 1;
@@ -2240,22 +2339,53 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     let damageTakenThisMove = pm.damageTakenThisMove ?? 0;
     let turnEnded = false;
 
+    // 1-round sequential combat (same logic as main monster encounter)
     const roll = rollDie();
-    const pDmg = Math.max(1, roll + cp.stats.force + Math.floor(cp.stats.richesse / 2) - monsterThere.defense);
-    const mDmg = Math.max(1, monsterThere.attack - Math.floor(cp.stats.force / 3));
-    const rounds = Math.ceil(monsterThere.maxHp / pDmg);
-    const mFirst = monsterGoesFirst(cp, monsterThere);
-    const rawDmgTaken = mFirst ? rounds * mDmg : Math.max(0, (rounds - 1) * mDmg);
-    const dmgTaken = physDmg(rawDmgTaken, cp);
-    const won = cp.physicalImmune || cp.hp - dmgTaken > 0;
-    const goldReward = won ? (monsterThere.attack ?? 1) : 0;
-    const treasureCard = won ? drawFromTreasurePile(monsterThere.pile) : null;
-    const playerPower = (cp.stats.force ?? 0) + (cp.stats.magie ?? 0);
+    const playerMaxStat = Math.max(cp.stats.force ?? 0, cp.stats.magie ?? 0);
+    const pGoesFirst = playerMaxStat >= monsterThere.attack;
+    const playerAtk = Math.max(0, roll + (cp.stats.force ?? 0) - (monsterThere.defense ?? 0));
+    const monsterAtk = physDmg(monsterThere.attack, cp);
+
     addLog(`⚔️ ${cp.name} affronte ${monsterThere.icon} ${monsterThere.name} (pile ${monsterThere.pile}) ! (dé:${roll})`);
-    addLog(mFirst
-      ? `⚠️ ${monsterThere.name} a l'initiative — ATK ${monsterThere.attack} > Force+Magie ${playerPower}`
-      : `⚡ ${cp.name} a l'initiative — Force+Magie ${playerPower} ≥ ATK ${monsterThere.attack}`);
-    if (won) {
+    addLog(pGoesFirst
+      ? `⚡ ${cp.name} a l'initiative — max(Force,Magie) ${playerMaxStat} ≥ ATK ${monsterThere.attack}`
+      : `⚠️ ${monsterThere.name} a l'initiative — ATK ${monsterThere.attack} > max(Force,Magie) ${playerMaxStat}`);
+
+    let monHp = monsterThere.hp ?? monsterThere.maxHp;
+    let plHp = cp.hp;
+
+    if (pGoesFirst) {
+      monHp = Math.max(0, monHp - playerAtk);
+      if (monHp > 0) plHp = Math.max(0, plHp - monsterAtk);
+    } else {
+      plHp = Math.max(0, plHp - monsterAtk);
+      if (plHp > 0) monHp = Math.max(0, monHp - playerAtk);
+    }
+
+    const playerWon = monHp <= 0;
+    const playerDied = plHp <= 0;
+
+    const applyKillLootM = (np, pile) => {
+      const kills = { ...(np.kills ?? { pile1: 0, pile2: 0, pile3: 0 }) };
+      let goldGain = 0, forceGain = 0;
+      if (pile === 1) { kills.pile1++; goldGain = 2; if (kills.pile1 % 3 === 0) forceGain = 1; }
+      else if (pile === 2) { kills.pile2++; goldGain = 4; if (kills.pile2 % 2 === 0) forceGain = 1; }
+      else { kills.pile3++; goldGain = 6; forceGain = 1; }
+      const doubleG = (np.goldDoubleRemaining ?? 0) > 0;
+      const actualGold = doubleG ? goldGain * 2 : goldGain;
+      if (doubleG) np.goldDoubleRemaining--;
+      np.gold = (np.gold ?? 0) + actualGold;
+      np.kills = kills;
+      if (forceGain > 0) {
+        np.stats = { ...np.stats, force: (np.stats.force ?? 0) + forceGain };
+        addLog(`💪 ${np.name} gagne +${forceGain} Force (${pile === 1 ? kills.pile1 : pile === 2 ? kills.pile2 : kills.pile3} kills pile ${pile}) !`);
+      }
+      addLog(`💰 +${actualGold} pièces d'or${doubleG ? ' (×2 🥂)' : ''} (monstre pile ${pile})`);
+      return np;
+    };
+
+    if (playerWon) {
+      const treasureCard = drawFromTreasurePile(monsterThere.pile);
       if (monsterThere.pile === 1) {
         const p2 = MONSTER_PILE_2[Math.floor(Math.random() * MONSTER_PILE_2.length)];
         setEnemies(prev => ({ ...prev, [destKey]: { ...p2, hp: p2.maxHp } }));
@@ -2267,14 +2397,25 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       } else {
         setEnemies(prev => { const n = { ...prev }; delete n[destKey]; return n; });
       }
-    } else {
-      setEnemies(prev => { const n = { ...prev }; delete n[destKey]; return n; });
-    }
-    const nextPlayers = players.map((p, i) => {
-      if (i !== currentIdx) return p;
-      let np = { ...p, hp: Math.max(0, p.hp - dmgTaken) };
-      if (!won) {
-        if (np.hp <= 0 && np.spec?.passive === 'premier_soin' && !np.premierSoinUsed) {
+      const dmgTaken = cp.hp - plHp;
+      damageTakenThisMove += dmgTaken;
+      const nextPlayers = players.map((p, i) => {
+        if (i !== currentIdx) return p;
+        let np = { ...p, hp: plHp, stats: { ...p.stats } };
+        np = applyKillLootM(np, monsterThere.pile);
+        if (treasureCard) np.hand = [...np.hand, treasureCard];
+        return np;
+      });
+      setPlayers(nextPlayers);
+      addLog(`✅ ${monsterThere.name} vaincu ! (dégâts: ${playerAtk}, reçus: ${dmgTaken})${treasureCard ? ` + ${treasureCard.icon} ${treasureCard.name}` : ''}`);
+    } else if (playerDied) {
+      const dmgTaken = cp.hp - plHp;
+      damageTakenThisMove += dmgTaken;
+      setEnemies(prev => ({ ...prev, [destKey]: { ...monsterThere, hp: monHp } }));
+      const nextPlayers = players.map((p, i) => {
+        if (i !== currentIdx) return p;
+        let np = { ...p, hp: 0, stats: { ...p.stats } };
+        if (np.spec?.passive === 'premier_soin' && !np.premierSoinUsed) {
           const reviveHp = rollDie();
           np = { ...np, hp: reviveHp, premierSoinUsed: true };
           addLog(`🩹 Premier Soin : ${np.name} réssucite avec ${reviveHp} PV !`);
@@ -2284,39 +2425,44 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
           const reviveHp = np.spec?.passive === 'nde' ? rollDie() : np.maxHp;
           const newDeck = shuffleDeck([...FULL_DECK]);
           if (np.spec?.passive === 'nde') addLog(`💀 NDE : ${np.name} renaît avec ${reviveHp} PV, conserve or et main !`);
-          np = { ...np, hp: reviveHp, x: np.baseX, y: np.baseY, gold: keepGold, hand: keepHand, deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, facing: null, stats: { ...np.stats, destin: np.stats.destin - 1 } };
+          np = { ...np, hp: reviveHp, x: np.baseX, y: np.baseY, gold: keepGold, hand: keepHand, deck: newDeck, discard: [], inventory: [], readyScroll: null, equippedWeapon: null, equippedArmor: null, equippedTrinkets: [], facing: null, stats: { ...np.stats, destin: np.stats.destin - 1 } };
         } else {
           np.isAlive = false; np.hp = 0;
         }
-      }
-      if (won) {
-        np = { ...np, gold: (np.gold ?? 0) + goldReward };
-        if (treasureCard) np = { ...np, hand: [...np.hand, treasureCard] };
-      }
-      return np;
-    });
-    damageTakenThisMove += dmgTaken;
-    setPlayers(nextPlayers);
-    if (won) {
-      addLog(`✅ ${monsterThere.name} vaincu ! -${dmgTaken} PV, +${goldReward}💰${treasureCard ? ` + ${treasureCard.icon} ${treasureCard.name}` : ''}`);
-    } else if (nextPlayers[currentIdx].isAlive) {
-      addLog(`✨ ${cp.name} renaît à sa base ! (${nextPlayers[currentIdx].stats.destin} vie(s) restante(s))`);
-      let ni = (currentIdx + 1) % nextPlayers.length;
-      while (!nextPlayers[ni]?.isAlive) ni = (ni + 1) % nextPlayers.length;
-      setCurrentIdx(ni); setActionsLeft(0); setHasMoved(false); setPhase('draw');
-      addLog(`--- Tour de ${nextPlayers[ni].name} ---`);
-      turnEnded = true;
-    } else {
-      addLog(`💀 ${cp.name} est définitivement tué par ${monsterThere.name} !`);
-      const alive = nextPlayers.filter(p => p.isAlive);
-      if (alive.length === 1) { setWinner(alive[0]); setPhase('win'); }
-      else {
+        return np;
+      });
+      setPlayers(nextPlayers);
+      addLog(`💀 ${cp.name} tombe face à ${monsterThere.name} ! (monstre à ${monHp} PV)`);
+      if (nextPlayers[currentIdx].isAlive) {
+        addLog(`✨ ${cp.name} renaît à sa base ! (${nextPlayers[currentIdx].stats.destin} vie(s) restante(s))`);
         let ni = (currentIdx + 1) % nextPlayers.length;
         while (!nextPlayers[ni]?.isAlive) ni = (ni + 1) % nextPlayers.length;
         setCurrentIdx(ni); setActionsLeft(0); setHasMoved(false); setPhase('draw');
         addLog(`--- Tour de ${nextPlayers[ni].name} ---`);
+        turnEnded = true;
+      } else {
+        addLog(`💀 ${cp.name} est définitivement éliminé !`);
+        const alive = nextPlayers.filter(p => p.isAlive);
+        if (alive.length === 1) { setWinner(alive[0]); setPhase('win'); }
+        else {
+          let ni = (currentIdx + 1) % nextPlayers.length;
+          while (!nextPlayers[ni]?.isAlive) ni = (ni + 1) % nextPlayers.length;
+          setCurrentIdx(ni); setActionsLeft(0); setHasMoved(false); setPhase('draw');
+          addLog(`--- Tour de ${nextPlayers[ni].name} ---`);
+        }
+        turnEnded = true;
       }
-      turnEnded = true;
+    } else {
+      // Both survived — monster stays with reduced HP
+      const dmgTaken = cp.hp - plHp;
+      damageTakenThisMove += dmgTaken;
+      setEnemies(prev => ({ ...prev, [destKey]: { ...monsterThere, hp: monHp } }));
+      setPlayers(prev => {
+        const next = [...prev];
+        next[currentIdx] = { ...next[currentIdx], hp: plHp };
+        return next;
+      });
+      addLog(`🤜 Combat nul — ${monsterThere.name} reste (${monHp} PV). ${cp.name} subit ${dmgTaken} dégâts.`);
     }
     if (!turnEnded) {
       if (crossedIdxs && crossedIdxs.length > 0) {

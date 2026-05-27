@@ -73,27 +73,28 @@ const MOVE_CARDS = [
   card('blink',       'Blink',               '🌀', C.MOVE, R.RARE,     'move', 0, 'Échange ta position avec un ennemi adjacent (dé ≥ 3).',                'blink',       0, 'self'),
 ];
 
-// ─── ARMURES (18) ─────────────────────────────────────────────────────────────
+// ─── ARMURES (20) — bonus = Points d'Armure (réduction de dégâts reçus) ──────
 const ARMOR_CARDS = [
-  card('vetes_matelasses', 'Vêtements matelassés',  '🧥', C.ARMOR, R.COMMON,   'defense', 2, '+3 Vie. Force requise 2.',                                               'stat:vie+3',                                    0, 'self'),
-  card('robe_chambre',     'Robe de chambre',        '👘', C.ARMOR, R.COMMON,   'defense', 0, '+2 Vie, +1 Déplacement.',                                               'stat:vie+2,deplacement+1',                      0, 'self'),
-  card('manteau_motard',   'Manteau de motard',      '🏍️', C.ARMOR, R.COMMON,   'defense', 3, '+4 Vie, +1 Richesse. Force requise 3.',                                 'stat:vie+4,richesse+1',                         0, 'self'),
-  card('kit_jogging',      'Kit de jogging',         '🏃', C.ARMOR, R.COMMON,   'defense', 0, '+3 Déplacement.',                                                       'stat:deplacement+3',                            0, 'self'),
-  card('cape_resistance',  'Cape de résistance',     '🧣', C.ARMOR, R.COMMON,   'defense', 0, '+1 Vie, +2 Déplacement.',                                               'stat:vie+1,deplacement+2',                      0, 'self'),
-  card('couvert_poubelle', 'Couvert de poubelle',    '🗑️', C.ARMOR, R.COMMON,   'defense', 2, '+4 Vie. Force requise 2.',                                              'stat:vie+4',                                    0, 'self'),
-  card('kit_motocross',    'Kit de motocross',       '🏁', C.ARMOR, R.UNCOMMON, 'defense', 3, '+6 Vie. Force requise 3.',                                              'stat:vie+6',                                    0, 'self'),
-  card('jambieres_hockey', 'Jambières de hockey',    '🦿', C.ARMOR, R.UNCOMMON, 'defense', 3, '+9 Vie, -3 Déplacement. Force requise 3.',                             'stat:vie+9,deplacement-3',                      0, 'self'),
-  card('gants_boxe',       'Gants de boxe',          '🥊', C.ARMOR, R.UNCOMMON, 'defense', 0, '+2 Vie. +1 Force en corps à corps.',                                   'stat:vie+2,melee_force_bonus',                  0, 'self'),
-  card('casque_baseball',  'Casque de baseball',     '⛑️', C.ARMOR, R.UNCOMMON, 'defense', 3, '+5 Vie. Force requise 3. Immunise contre l\'étourdissement.',          'stat:vie+5,no_stun',                            0, 'self'),
-  card('plastron_acier',   "Plastron d'acier",       '🧲', C.ARMOR, R.RARE,     'defense', 4, '+12 Vie. Force requise 4.',                                             'stat:vie+12',                                   0, 'self'),
-  card('bouclier_acier',   "Bouclier d'acier",       '🔵', C.ARMOR, R.RARE,     'defense', 4, '+6 Vie. Force requise 4.',                                              'stat:vie+6',                                    0, 'self'),
-  card('equip_football',   'Équipement de football', '🏈', C.ARMOR, R.RARE,     'defense', 3, '+18 Vie. Force requise 3.',                                             'stat:vie+18',                                   0, 'self'),
-  card('cotte_plates',     'Cotte de plates',        '🏰', C.ARMOR, R.RARE,     'defense', 5, '+21 Vie, -3 Déplacement. Force requise 5.',                            'stat:vie+21,deplacement-3',                     0, 'self'),
-  card('armure_elfique',   'Armure elfique',         '🌿', C.ARMOR, R.RARE,     'defense', 2, '+15 Vie, +1 Déplacement. Force requise 2.',                            'stat:vie+15,deplacement+1',                     0, 'self'),
-  card('chaine_bling',     'Chaîne bling bling',     '⛓️', C.ARMOR, R.RARE,     'defense', 0, '+10 Vie, +5 Richesse.',                                                 'stat:vie+10,richesse+5',                        0, 'self'),
-  card('porte_acier',      "Porte d'acier",          '🚪', C.ARMOR, R.LEGENDARY,'defense', 6, '+30 Vie, -6 Dép. Force 6. Bloque le passage des adversaires.',         'stat:vie+30,deplacement-6,block_passage',       0, 'self'),
-  card('scaphandrier',     'Scaphandrier',           '🤿', C.ARMOR, R.LEGENDARY,'defense', 5, '+36 Vie, -5 Dép. Force 5. Immunisé contre les déplacements forcés.',   'stat:vie+36,deplacement-5,immune_forced_move',  0, 'self'),
-  card('chapeau_pointu',   'Le chapeau pointu',      '🎓', C.ARMOR, R.LEGENDARY,'defense', 0, '+10 Vie, +4 Magie. Peut utiliser un parchemin supplémentaire par tour.','stat:vie+10,magie+4,extra_scroll',              0, 'self'),
+  card('vetes_matelasses', 'Vêtements matelassés',  '🧥', C.ARMOR, R.COMMON,    'defense', 2, '+1 Armure. Force requise 2.',                                             'stat:armor+1',                                   0, 'self'),
+  card('robe_chambre',     'Robe de chambre',        '👘', C.ARMOR, R.COMMON,    'defense', 0, '+1 Armure, +1 Déplacement.',                                             'stat:armor+1,deplacement+1',                     0, 'self'),
+  card('manteau_motard',   'Manteau de motard',      '🏍️', C.ARMOR, R.COMMON,   'defense', 3, '+2 Armure, +1 Richesse. Force requise 3.',                               'stat:armor+2,richesse+1',                        0, 'self'),
+  card('kit_jogging',      'Kit de jogging',         '🏃', C.ARMOR, R.COMMON,    'defense', 0, '+3 Déplacement.',                                                        'stat:deplacement+3',                             0, 'self'),
+  card('cape_resistance',  'Cape de résistance',     '🧣', C.ARMOR, R.COMMON,    'defense', 0, '+1 Armure, +2 Déplacement.',                                             'stat:armor+1,deplacement+2',                     0, 'self'),
+  card('couvert_poubelle', 'Couvert de poubelle',    '🗑️', C.ARMOR, R.COMMON,   'defense', 2, '+2 Armure. Force requise 2.',                                            'stat:armor+2',                                   0, 'self'),
+  card('kit_motocross',    'Kit de motocross',       '🏁', C.ARMOR, R.UNCOMMON,  'defense', 3, '+3 Armure. Force requise 3.',                                            'stat:armor+3',                                   0, 'self'),
+  card('jambieres_hockey', 'Jambières de hockey',    '🦿', C.ARMOR, R.UNCOMMON,  'defense', 3, '+4 Armure, -3 Déplacement. Force requise 3.',                           'stat:armor+4,deplacement-3',                     0, 'self'),
+  card('gants_boxe',       'Gants de boxe',          '🥊', C.ARMOR, R.UNCOMMON,  'defense', 0, '+1 Armure. +1 Force en corps à corps.',                                 'stat:armor+1,melee_force_bonus',                 0, 'self'),
+  card('casque_baseball',  'Casque de baseball',     '⛑️', C.ARMOR, R.UNCOMMON,  'defense', 3, '+3 Armure. Force requise 3. Immunise contre l\'étourdissement.',        'stat:armor+3,no_stun',                           0, 'self'),
+  card('plastron_acier',   "Plastron d'acier",       '🧲', C.ARMOR, R.RARE,      'defense', 4, '+6 Armure. Force requise 4.',                                            'stat:armor+6',                                   0, 'self'),
+  card('bouclier_acier',   "Bouclier d'acier",       '🔵', C.ARMOR, R.RARE,      'defense', 4, '+4 Armure. Force requise 4.',                                            'stat:armor+4',                                   0, 'self'),
+  card('equip_football',   'Équipement de football', '🏈', C.ARMOR, R.RARE,      'defense', 3, '+7 Armure. Force requise 3.',                                            'stat:armor+7',                                   0, 'self'),
+  card('cotte_plates',     'Cotte de plates',        '🏰', C.ARMOR, R.RARE,      'defense', 5, '+8 Armure, -3 Déplacement. Force requise 5.',                           'stat:armor+8,deplacement-3',                     0, 'self'),
+  card('armure_elfique',   'Armure elfique',         '🌿', C.ARMOR, R.RARE,      'defense', 2, '+5 Armure, +1 Déplacement. Force requise 2.',                           'stat:armor+5,deplacement+1',                     0, 'self'),
+  card('chaine_bling',     'Chaîne bling bling',     '⛓️', C.ARMOR, R.RARE,     'defense', 0, '+3 Armure, +5 Richesse.',                                                'stat:armor+3,richesse+5',                        0, 'self'),
+  card('porte_acier',      "Porte d'acier",          '🚪', C.ARMOR, R.LEGENDARY, 'defense', 6, '+10 Armure, -6 Dép. Force 6. Bloque le passage.',                       'stat:armor+10,deplacement-6,block_passage',      0, 'self'),
+  card('scaphandrier',     'Scaphandrier',            '🤿', C.ARMOR, R.LEGENDARY, 'defense', 5, '+12 Armure, -5 Dép. Force 5. Immunisé déplacements forcés.',            'stat:armor+12,deplacement-5,immune_forced_move', 0, 'self'),
+  card('chapeau_pointu',   'Le chapeau pointu',      '🎓', C.ARMOR, R.LEGENDARY, 'defense', 0, '+3 Armure, +4 Magie. Parchemin supplémentaire/tour.',                   'stat:armor+3,magie+4,extra_scroll',              0, 'self'),
+  card('couronne_rois',    'Couronne des Rois',      '👑', C.ARMOR, R.LEGENDARY, 'defense', 0, 'Armure légendaire (tête). +6 Armure, +3 Force, +3 Magie, +12 HP permanent.', 'stat:armor+6,force+3,magie+3,vie+6',        0, 'self'),
 ];
 
 // ─── ARMEMENT NON MAGIQUE (12) ────────────────────────────────────────────────
@@ -161,18 +162,16 @@ const SCROLL_CARDS = [
 
 // ─── OBJETS RARES (6) ─────────────────────────────────────────────────────────
 const RARE_CARDS = [
-  card('pierre_ancetre','Pierre de l\'Ancêtre', '🪨', C.RARE, R.RARE, 'passive', 2, '+2 Magie permanent. Les dés < 2 comptent comme 2.',                                                                                              'perm:magie+2,min_roll2',                      0, 'self'),
-  card('anneau_chaos',  'Anneau du Chaos',      '💫', C.RARE, R.RARE, 'passive', 0, 'Lors du déplacement, au choix du joueur, un résultat de 1 ou 2 peut faire reculer.',                                                            'chaos_deploy_choice',                         0, 'self'),
-  card('flute_vent',    'Flûte du vent',        '🪈', C.RARE, R.RARE, 'passive', 0, 'Lors du déplacement, si le dé donne 5 ou 6, peut choisir de retourner à sa base.',                                                             'wind_return_base',                            0, 'self'),
-  card('cape_invis',    "Cape d'Invisibilité",  '🌫️', C.RARE, R.RARE, 'passive', 0, 'Évite 1 combat ou 1 piège par tour (au choix du joueur).',                                                                                      'perm:avoid_combat_or_trap',                   0, 'self'),
-  card('orbe_vision',   'Orbe de Vision',       '🔭', C.RARE, R.RARE, 'passive', 0, '+1 Richesse permanent. Peut ouvrir un coffre dans un rayon de 6 cases.',                                                                        'perm:richesse+1,open_chest_r6',               0, 'self'),
-  card('grimoire',      'Grimoire interdit',    '📖', C.RARE, R.RARE, 'passive', 3, '+3 Magie, -2 Force permanent. Après une victoire contre un monstre, le butin est conservé mais le monstre ne rapporte pas de récompense au tour suivant.', 'perm:magie+3,force-2,win_no_reward_next', 0, 'self'),
+  card('pierre_ancetre','Pierre de l\'Ancêtre', '🪨', C.RARE, R.RARE, 'passive', 0, 'Tous les "1" sur n\'importe quel jet de dé sont remplacés par "2".',                                                                            'min_roll_1to2',                               0, 'self'),
+  card('anneau_chaos',  'Anneau du Chaos',      '💫', C.RARE, R.RARE, 'passive', 0, 'Lors du jet de déplacement, les résultats 1 et 2 font automatiquement reculer.',                                                               'move_1_2_backward',                           0, 'self'),
+  card('flute_vent',    'Flûte du vent',        '🪈', C.RARE, R.RARE, 'passive', 0, 'Lors du jet de déplacement, si un des dés montre 5 ou 6, peut choisir de retourner à sa base.',                                               'wind_return_5_6',                             0, 'self'),
+  card('cape_invis',    "Cape d'Invisibilité",  '🌫️', C.RARE, R.RARE, 'passive', 0, 'Évite 1 combat ou 1 piège par tour (au choix du joueur).',                                                                                     'avoid_combat_or_trap',                        0, 'self'),
+  card('orbe_vision',   'Orbe de Vision',       '🔭', C.RARE, R.RARE, 'passive', 0, '+1 Richesse permanent. Peut ouvrir un coffre dans un rayon de 6 cases.',                                                                       'perm:richesse+1,open_chest_r6',               0, 'self'),
+  card('grimoire',      'Grimoire interdit',    '📖', C.RARE, R.RARE, 'passive', 0, '+2 Magie, -1 Force permanent. Gagne automatiquement contre tous les monstres. Ne peut plus entrer dans les magasins.',                         'perm:magie+2,force-1,auto_win_monsters,no_shops', 0, 'self'),
 ];
 
-// ─── OBJETS LÉGENDAIRES (3) ───────────────────────────────────────────────────
+// ─── OBJETS LÉGENDAIRES (1) ───────────────────────────────────────────────────
 const LEGENDARY_CARDS = [
-  card('couronne_rois', 'Couronne des Rois',  '👑', C.LEGENDARY, R.LEGENDARY, 'legendary', 0, '+3 Force, +3 Magie, +12 HP permanent. Réduit de 6 tous les dommages reçus.',                                                       'perm:force+3,magie+3,vie+12,dmg_reduce6',   0, 'self'),
-  card('oeil_destin',   "L'Œil du Destin",   '👁️', C.LEGENDARY, R.LEGENDARY, 'legendary', 0, '+1 Destin. Au déplacement, lance 2 dés et choisit le meilleur résultat.',                                                          'perm:destin+1,move_roll_pick_best',         0, 'self'),
   card('coeur_dragon',  'Cœur de Dragon',    '🐉', C.LEGENDARY, R.LEGENDARY, 'legendary', 0, '+20 HP permanent. Peut utiliser l\'effet Boule de Feu une fois par tour, en plus des parchemins en sa possession.',                 'perm:vie+20,free_fireball_per_turn',        0, 'self'),
 ];
 
@@ -195,7 +194,8 @@ const TRINKET_CARDS = [
   card('lunettes_reve',      'Lunettes du Rêve',              '🥽', C.TRINKET, R.RARE,     'passive', 3, '+3 Magie. [Set Esprits] Voir Plume de Nevermore pour le bonus de set.',                                                                        'perm:magie+3,set:esprits',           0, 'self'),
   card('tattoo_dansant',     'Tattoo Dansant',                '💃', C.TRINKET, R.RARE,     'passive', 4, '+4 Force. [Set Guerrier Sacré] Voir Collier de Coquillages Sacrés pour le bonus de set.',                                                     'perm:force+4,set:guerrier_sacre',    0, 'self'),
   card('sac_sable',          'Sac de Sable',                  '👝', C.TRINKET, R.RARE,     'passive', 5, '+5 Magie. [Set Esprits] Voir Plume de Nevermore pour le bonus de set.',                                                                        'perm:magie+5,set:esprits',           0, 'self'),
-  card('hamecon_sacre',      "L'Hameçon Sacré",               '🪝', C.TRINKET, R.RARE,     'passive', 5, '+5 Force. [Set Guerrier Sacré] Voir Collier de Coquillages Sacrés pour le bonus de set.',                                                     'perm:force+5,set:guerrier_sacre',    0, 'self'),
+  card('hamecon_sacre',      "L'Hameçon Sacré",               '🪝', C.TRINKET, R.RARE,      'passive', 5, '+5 Force. [Set Guerrier Sacré] Voir Collier de Coquillages Sacrés pour le bonus de set.',                                                    'perm:force+5,set:guerrier_sacre',    0, 'self'),
+  card('oeil_destin',        "L'Œil",                         '👁️', C.TRINKET, R.LEGENDARY, 'passive', 0, 'Bibelot magique. Lance 2 fois et choisit le résultat de son choix pour tous ses jets.',                                                           'reroll_choice',                      0, 'self'),
 ];
 
 // ─── BONUS DE DÉPLACEMENT (35) ────────────────────────────────────────────────
@@ -247,6 +247,8 @@ export const MOVE_BONUS_CARDS = [
   mb('mb_escalade','Escalade',            '🧗',   'special:wall',   'Surmonte un mur.'),
   mb('mb_portail','Portail vers la ville','🏠',   'special:return_base','Retourne immédiatement à ta base.'),
 ];
+
+export { MOVE_CARDS, ARMOR_CARDS, WEAPON_CARDS, MAGIC_WEAPON_CARDS, POTION_CARDS, SCROLL_CARDS, RARE_CARDS, LEGENDARY_CARDS, TRINKET_CARDS };
 
 export const FULL_DECK = [
   ...MOVE_CARDS,
