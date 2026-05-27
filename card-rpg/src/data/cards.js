@@ -13,14 +13,16 @@
 //   'global' : toute la carte
 
 const C = {
-  MOVE:       { key: 'deplacement',  color: '#55ccff', label: 'Déplacement' },
-  ARMOR:      { key: 'armure',       color: '#aaaaee', label: 'Armure'       },
-  WEAPON:     { key: 'arme',         color: '#ff9955', label: 'Arme'         },
-  MAGIC_WPN:  { key: 'arme_magique', color: '#ff55ff', label: 'Arme Magique' },
-  POTION:     { key: 'potion',       color: '#55ff99', label: 'Potion'        },
-  SCROLL:     { key: 'parchemin',    color: '#ffcc44', label: 'Parchemin'     },
-  RARE:       { key: 'objet_rare',   color: '#ff8844', label: 'Objet Rare'   },
-  LEGENDARY:  { key: 'legendaire',   color: '#ffdd00', label: 'Légendaire'   },
+  MOVE:       { key: 'deplacement',       color: '#55ccff', label: 'Déplacement'       },
+  ARMOR:      { key: 'armure',            color: '#aaaaee', label: 'Armure'            },
+  WEAPON:     { key: 'arme',              color: '#ff9955', label: 'Arme'              },
+  MAGIC_WPN:  { key: 'arme_magique',      color: '#ff55ff', label: 'Arme Magique'      },
+  POTION:     { key: 'potion',            color: '#55ff99', label: 'Potion'            },
+  SCROLL:     { key: 'parchemin',         color: '#ffcc44', label: 'Parchemin'         },
+  RARE:       { key: 'objet_rare',        color: '#ff8844', label: 'Objet Rare'        },
+  LEGENDARY:  { key: 'legendaire',        color: '#ffdd00', label: 'Légendaire'        },
+  TRINKET:    { key: 'bibelot',           color: '#88cc88', label: 'Bibelot'           },
+  MOVE_BONUS: { key: 'bonus_deplacement', color: '#77ddff', label: 'Bonus Déplacement' },
 };
 
 const R = { COMMON: 'common', UNCOMMON: 'uncommon', RARE: 'rare', LEGENDARY: 'legendary' };
@@ -118,6 +120,10 @@ const MAGIC_WEAPON_CARDS = [
   card('sceptre_givre', 'Sceptre de givre',  '❄️', C.MAGIC_WPN, R.RARE,      'magic_attack', 2, 'Force requise 2. Ralentit l\'ennemi : -4 Déplacement à son prochain tour.',   'slow_enemy',  0, 'r2'),
   card('dague_venin',   'Dague venimeuse',   '🐍', C.MAGIC_WPN, R.RARE,      'magic_attack', 3, 'Force requise 3. +2 Destin. Critique automatique sur dé 5-6 (×1.5 dégâts).',  'crit_5_6',    0, 'melee'),
   card('lame_spectrale','Lame spectrale',    '👻', C.MAGIC_WPN, R.LEGENDARY, 'magic_attack', 3, 'Force requise 3, Magie requise 4. Ignore armure et résistance. Attaque à travers les murs.', 'ignore_armor', 4, 'wall_melee'),
+  card('epee_sang',     'Épée de sang',           '🩸', C.MAGIC_WPN, R.RARE, 'magic_attack', 6, 'Force requise 4, Magie requise 2. Corps-à-corps. 6 dégâts magiques ; le joueur relance tous les dés = 6.',                       'reroll_6',    2, 'melee'),
+  card('arc_necro',     'Arc des Nécromanciens',  '💀', C.MAGIC_WPN, R.RARE, 'magic_attack', 6, 'Force requise 3, Magie requise 4. Portée 6 cases. 6 dégâts magiques ; la cible tombe à 1 Magie au prochain tour.',              'target_mag1', 4, 'r6'),
+  card('telecommande',  'La Télécommande',        '📡', C.MAGIC_WPN, R.RARE, 'passive',       0, 'Magie requise 5. Peut relancer son jet de déplacement une fois par tour.',                                                      'reroll_move', 5, 'self'),
+  card('sceptre_enchant',"Sceptre d'enchantement",'🔮', C.MAGIC_WPN, R.RARE, 'magic_attack', 6, 'Force requise 2, Magie requise 4. Portée 2 cases. 6 dégâts ; la cible remet une carte de son choix à l\'attaquant.',            'steal_card',  4, 'r2'),
 ];
 
 // ─── POTIONS (12) ─────────────────────────────────────────────────────────────
@@ -136,34 +142,110 @@ const POTION_CARDS = [
   card('biere_viking',   'Bière de viking',            '🍺', C.POTION, R.RARE,     'buff',  0, '×2 dégâts sur les 3 prochaines attaques physiques. (✨3)',                                 'frenzied_3',        3, 'self'),
 ];
 
-// ─── PARCHEMINS MAGIQUES (9) ──────────────────────────────────────────────────
+// ─── PARCHEMINS MAGIQUES (13) ─────────────────────────────────────────────────
 const SCROLL_CARDS = [
-  card('boule_feu',    'Boule de Feu',         '🔥', C.SCROLL, R.UNCOMMON, 'magic',  8, "8 dégâts magiques à l'ennemi ciblé + 4 aux adjacents. (✨3)",    'aoe',        3, 'r4'),
-  card('eclair',       'Éclair',               '⚡', C.SCROLL, R.UNCOMMON, 'magic',  6, 'Touche jusqu\'à 3 ennemis en ligne. 6 dégâts. (✨2)',             'chain',      2, 'line'),
-  card('gel',          'Nova de Givre',        '❄️', C.SCROLL, R.UNCOMMON, 'magic',  0, 'Gèle tous les joueurs à portée 2 : -4 Déplacement à leur prochain tour. (✨2)','freeze', 2, 'aoe2'),
-  card('invocation',   'Invocation — Golem',   '⛰️', C.SCROLL, R.RARE,     'magic',  0, 'Convoque un Golem adjacent. 1✨=Golem de Terre (6PV/F3), 3✨=Golem de Pierre (12PV/F5), 6✨=Golem d\'Or (24PV/F8). (✨1/3/6)', 'summon', 1, 'melee'),
-  card('soin_masse',   'Soin de masse',        '✨', C.SCROLL, R.UNCOMMON, 'magic', 15, 'Restaure 15 HP à tous les alliés adjacents. (✨3)',               'aoe_heal',   3, 'aoe1'),
-  card('malediction',  'Malédiction',          '🧿', C.SCROLL, R.UNCOMMON, 'magic',  0, 'Réduit toutes les stats ennemies de 2 pendant 3 tours. (✨2)',    'debuff_all', 2, 'r4'),
-  card('bouclier_mag', 'Bouclier Magique',     '🔵', C.SCROLL, R.RARE,     'magic',  0, 'Donne 18 points de vie temporaires. (✨3)',                       'shield10',   3, 'self'),
-  card('vision',       'Vision prophétique',   '👁️', C.SCROLL, R.RARE,     'magic',  0, 'Révèle toute la carte. +2 Richesse pour ce tour. (✨2)',          'reveal_map', 2, 'global'),
-  card('resurrection', 'Résurrection',         '💀', C.SCROLL, R.LEGENDARY,'magic',  0, 'Si tu tombes à 0 HP ce tour, reviens à 50% HP. Usage unique. (✨6)','revive_50',6, 'self'),
+  card('boulette_feu',  'Boulette de Feu',        '🔥', C.SCROLL, R.COMMON,   'magic', 6, '6 dégâts magiques. Portée 4. Auto-dégâts 3 si cible < 3 cases. (✨4)',           'fireball',       4, 'r4'),
+  card('eclair',        'Éclair',                  '⚡', C.SCROLL, R.COMMON,   'magic', 4, '4 dégâts magiques. Portée 6. (✨2)',                                               null,             2, 'r6'),
+  card('nova_givre',    'Nova de Givre',           '❄️', C.SCROLL, R.UNCOMMON, 'magic', 2, '2 dégâts devant et derrière + gèle les ennemis proches. (✨2)',                   'nova_front_back', 2, 'auto'),
+  card('soin_scroll',   'Soin',                   '✨', C.SCROLL, R.COMMON,   'magic', 0, 'Restaure 15 HP. (✨3)',                                                            'heal_15',        3, 'self'),
+  card('tempete_lames', 'Tempête de lames',        '🌀', C.SCROLL, R.UNCOMMON, 'magic', 0, 'Dégâts physiques : 2 cases=2 dmg, 3 cases=4 dmg, 4 cases=6 dmg. (✨3)',           'blade_storm',    3, 'r4'),
+  card('confusion',     'Confusion',               '😵', C.SCROLL, R.UNCOMMON, 'magic', 0, 'La cible s\'auto-attaque une fois (dégâts = sa Force). Portée 2. (✨4)',           'confusion',      4, 'r2'),
+  card('malediction',   'Malédiction',             '🧿', C.SCROLL, R.UNCOMMON, 'magic', 0, 'Maudit la cible (dé impair sur son prochain dépl. = dégâts). Portée 2. (✨3)',    'curse',          3, 'r2'),
+  card('proj_magiques', 'Projectiles magiques',    '🌟', C.SCROLL, R.UNCOMMON, 'magic', 0, 'Portée et dégâts = puissance choisie (2 à 6). (✨2-6)',                            'proj_scalable',  2, 'r2'),
+  card('telekinesie',   'Télékinésie',             '🔮', C.SCROLL, R.RARE,     'magic', 0, 'Repousse la cible de 4/5/6 cases (devant ou derrière). (✨4/5/6)',                'tele_scalable',  4, 'r4'),
+  card('invocation',    'Invocation — Golem',      '⛰️', C.SCROLL, R.RARE,     'magic', 0, 'Convoque un Golem. 4✨=Terre (6PV/F3), 5✨=Pierre (12PV/F5), 6✨=Or (24PV/F8). (✨4/5/6)', 'summon', 4, 'melee'),
+  card('bouclier_mag',  'Bouclier Magique',        '🔵', C.SCROLL, R.RARE,     'magic', 0, 'Donne 18 points de vie temporaires. (✨3)',                                        'shield10',       3, 'self'),
+  card('vision',        'Vision prophétique',      '👁️', C.SCROLL, R.UNCOMMON, 'magic', 0, 'Révèle les mains de tous les joueurs adverses. (✨2)',                             'reveal_hands',   2, 'global'),
+  card('resurrection',  'Résurrection',            '💀', C.SCROLL, R.LEGENDARY,'magic', 0, 'Si tu tombes à 0 HP ce tour, reviens à 50% HP. Usage unique. (✨6)',               'revive_50',      6, 'self'),
 ];
 
 // ─── OBJETS RARES (6) ─────────────────────────────────────────────────────────
 const RARE_CARDS = [
-  card('pierre_ancetre','Pierre de l\'Ancêtre', '🪨', C.RARE, R.RARE, 'passive', 0, '+3 Destin, +2 Magie permanent. Les dés < 2 comptent comme 2.',       'perm:destin+3,magie+2,min_roll2',   0, 'self'),
-  card('anneau_chaos',  'Anneau du Chaos',      '💫', C.RARE, R.RARE, 'passive', 0, '+4 Richesse permanent. À chaque tour : effet aléatoire.',             'perm:richesse+4,chaos_effect',       0, 'self'),
-  card('bottes_fantome','Bottes du Fantôme',    '👻', C.RARE, R.RARE, 'passive', 0, '+4 Déplacement permanent. Traverse les murs à volonté.',              'perm:deplacement+4,wall_walk',       0, 'self'),
-  card('cape_invis',    "Cape d'Invisibilité",  '🌫️', C.RARE, R.RARE, 'passive', 0, 'Évite automatiquement 1 combat par tour (choix du joueur).',          'perm:avoid_combat',                  0, 'self'),
-  card('orbe_vision',   'Orbe de Vision',       '🔭', C.RARE, R.RARE, 'passive', 0, 'Voit les ennemis et items à travers les murs. +2 Richesse.',          'perm:richesse+2,see_through',        0, 'self'),
-  card('grimoire',      'Grimoire interdit',    '📖', C.RARE, R.RARE, 'passive', 0, '+5 Magie permanent. Lance un sort gratuit par combat (portée 2).',    'perm:magie+5,free_spell',            0, 'self'),
+  card('pierre_ancetre','Pierre de l\'Ancêtre', '🪨', C.RARE, R.RARE, 'passive', 2, '+2 Magie permanent. Les dés < 2 comptent comme 2.',                                                                                              'perm:magie+2,min_roll2',                      0, 'self'),
+  card('anneau_chaos',  'Anneau du Chaos',      '💫', C.RARE, R.RARE, 'passive', 0, 'Lors du déplacement, au choix du joueur, un résultat de 1 ou 2 peut faire reculer.',                                                            'chaos_deploy_choice',                         0, 'self'),
+  card('flute_vent',    'Flûte du vent',        '🪈', C.RARE, R.RARE, 'passive', 0, 'Lors du déplacement, si le dé donne 5 ou 6, peut choisir de retourner à sa base.',                                                             'wind_return_base',                            0, 'self'),
+  card('cape_invis',    "Cape d'Invisibilité",  '🌫️', C.RARE, R.RARE, 'passive', 0, 'Évite 1 combat ou 1 piège par tour (au choix du joueur).',                                                                                      'perm:avoid_combat_or_trap',                   0, 'self'),
+  card('orbe_vision',   'Orbe de Vision',       '🔭', C.RARE, R.RARE, 'passive', 0, '+1 Richesse permanent. Peut ouvrir un coffre dans un rayon de 6 cases.',                                                                        'perm:richesse+1,open_chest_r6',               0, 'self'),
+  card('grimoire',      'Grimoire interdit',    '📖', C.RARE, R.RARE, 'passive', 3, '+3 Magie, -2 Force permanent. Après une victoire contre un monstre, le butin est conservé mais le monstre ne rapporte pas de récompense au tour suivant.', 'perm:magie+3,force-2,win_no_reward_next', 0, 'self'),
 ];
 
 // ─── OBJETS LÉGENDAIRES (3) ───────────────────────────────────────────────────
 const LEGENDARY_CARDS = [
-  card('couronne_rois', 'Couronne des Rois',   '👑', C.LEGENDARY, R.LEGENDARY, 'legendary', 0, 'Toutes les stats +3 permanent. Les ennemis proches ont 10% de chance de fuir.','perm:all+3,enemy_flee10',           0, 'aoe2'),
-  card('oeil_destin',   "L'Œil du Destin",    '👁️', C.LEGENDARY, R.LEGENDARY, 'legendary', 0, "Rejoue n'importe quel dé jusqu'à 3 fois par partie. +3 Destin.",               'perm:destin+3,reroll3',             0, 'global'),
-  card('coeur_dragon',  'Cœur de Dragon',     '🐉', C.LEGENDARY, R.LEGENDARY, 'legendary', 0, '+20 HP max, +5 Force. Immunité au feu. Régénère 2 HP/tour.',                    'perm:vie+10,force+5,immune_fire,regen2', 0, 'self'),
+  card('couronne_rois', 'Couronne des Rois',  '👑', C.LEGENDARY, R.LEGENDARY, 'legendary', 0, '+3 Force, +3 Magie, +12 HP permanent. Réduit de 6 tous les dommages reçus.',                                                       'perm:force+3,magie+3,vie+12,dmg_reduce6',   0, 'self'),
+  card('oeil_destin',   "L'Œil du Destin",   '👁️', C.LEGENDARY, R.LEGENDARY, 'legendary', 0, '+1 Destin. Au déplacement, lance 2 dés et choisit le meilleur résultat.',                                                          'perm:destin+1,move_roll_pick_best',         0, 'self'),
+  card('coeur_dragon',  'Cœur de Dragon',    '🐉', C.LEGENDARY, R.LEGENDARY, 'legendary', 0, '+20 HP permanent. Peut utiliser l\'effet Boule de Feu une fois par tour, en plus des parchemins en sa possession.',                 'perm:vie+20,free_fireball_per_turn',        0, 'self'),
+];
+
+// ─── BIBELOTS (18) ────────────────────────────────────────────────────────────
+const TRINKET_CARDS = [
+  card('pierre_friction',    'Pierre de Friction',            '🔸', C.TRINKET, R.UNCOMMON, 'passive', 1, '+1 Force. Accumule 1 charge par dégât reçu (max 10) ; dépense tout sur le prochain coup.',                                                'perm:force+1,charge_on_hit10',       0, 'self'),
+  card('bague_comptage',     'Bague de Comptage',             '💍', C.TRINKET, R.UNCOMMON, 'passive', 0, '+3 pièces d\'or supplémentaires à chaque ouverture d\'un trésor.',                                                                          'perm:chest_gold+3',                  0, 'self'),
+  card('dent_bonheur',       'Dent Porte-Bonheur',            '🦷', C.TRINKET, R.UNCOMMON, 'passive', 1, '+1 Destin. Les dés de 2 comptent comme 3.',                                                                                                  'perm:destin+1,roll2_as3',            0, 'self'),
+  card('ecaille_iguane',     "Écaille d'Iguane",              '🦎', C.TRINKET, R.COMMON,   'passive', 1, '+1 Force.',                                                                                                                                   'perm:force+1',                       0, 'self'),
+  card('meche_cheveux',      'Mèche de Cheveux',              '✂️', C.TRINKET, R.COMMON,   'passive', 1, '+1 Magie.',                                                                                                                                   'perm:magie+1',                       0, 'self'),
+  card('semelle_clouee',     'Semelle Clouée',                '👟', C.TRINKET, R.COMMON,   'passive', 1, '+1 Déplacement, +1 Force.',                                                                                                                   'perm:deplacement+1,force+1',         0, 'self'),
+  card('bol_tibetain',       'Bol Tibétain',                  '🔔', C.TRINKET, R.UNCOMMON, 'passive', 3, '+3 HP permanent. Régénère 1 HP si aucun dégât reçu au tour précédent.',                                                                      'perm:vie+3,regen1_no_dmg',           0, 'self'),
+  card('faux_ongles',        'Faux Ongles Crasseux',          '💅', C.TRINKET, R.UNCOMMON, 'passive', 0, 'Si l\'attaque physique sur un joueur fait ≤3 dégâts, la cible devient immobile au prochain tour.',                                           'perm:immobilize_low_phys',           0, 'self'),
+  card('sel_guerre',         'Sel de Guerre',                 '🧂', C.TRINKET, R.UNCOMMON, 'passive', 1, '+1 Force. +3 dégâts contre une cible immobile.',                                                                                             'perm:force+1,bonus3_vs_immobile',    0, 'self'),
+  card('bougie_noire',       'Bougie Noire',                  '🕯️', C.TRINKET, R.UNCOMMON, 'passive', 1, '+1 Magie. Accumule 1 charge par tour sans dégât reçu (max 10) ; dépense tout sur les prochains dégâts magiques.',                            'perm:magie+1,charge_no_dmg10',       0, 'self'),
+  card('lasso',              'Lasso',                         '🧵', C.TRINKET, R.RARE,     'passive', 0, 'Si tu termines ton tour à ≤3 cases d\'un adversaire, il devient immobile à son prochain tour.',                                              'perm:lasso_immobilize3',             0, 'self'),
+  card('galet_echo',         "Galet d'Écho",                  '🔘', C.TRINKET, R.RARE,     'passive', 1, '+1 Magie. Réduit de 1 le coût magique des parchemins, armes et armures.',                                                                     'perm:magie+1,reduce_mag_cost1',      0, 'self'),
+  card('plume_nevermore',    'Plume de Nevermore',            '🪶', C.TRINKET, R.RARE,     'passive', 2, '+2 Magie. [Set Esprits] Avec Lunettes du Rêve + Sac de Sable : avance ou recule à guise, +Magie aux dommages magiques, +2 Destin, renvoie les adversaires adjacents à leur base.', 'perm:magie+2,set:esprits', 0, 'self'),
+  card('collier_coquillages','Collier de Coquillages Sacrés', '🪸', C.TRINKET, R.RARE,     'passive', 2, '+2 Force. [Set Guerrier Sacré] Avec Tattoo Dansant + Hameçon Sacré : lance 3 dés de déplacement, +Force aux dommages physiques, +2 Destin, ne déclenche plus les pièges.', 'perm:force+2,set:guerrier_sacre', 0, 'self'),
+  card('lunettes_reve',      'Lunettes du Rêve',              '🥽', C.TRINKET, R.RARE,     'passive', 3, '+3 Magie. [Set Esprits] Voir Plume de Nevermore pour le bonus de set.',                                                                        'perm:magie+3,set:esprits',           0, 'self'),
+  card('tattoo_dansant',     'Tattoo Dansant',                '💃', C.TRINKET, R.RARE,     'passive', 4, '+4 Force. [Set Guerrier Sacré] Voir Collier de Coquillages Sacrés pour le bonus de set.',                                                     'perm:force+4,set:guerrier_sacre',    0, 'self'),
+  card('sac_sable',          'Sac de Sable',                  '👝', C.TRINKET, R.RARE,     'passive', 5, '+5 Magie. [Set Esprits] Voir Plume de Nevermore pour le bonus de set.',                                                                        'perm:magie+5,set:esprits',           0, 'self'),
+  card('hamecon_sacre',      "L'Hameçon Sacré",               '🪝', C.TRINKET, R.RARE,     'passive', 5, '+5 Force. [Set Guerrier Sacré] Voir Collier de Coquillages Sacrés pour le bonus de set.',                                                     'perm:force+5,set:guerrier_sacre',    0, 'self'),
+];
+
+// ─── BONUS DE DÉPLACEMENT (35) ────────────────────────────────────────────────
+function mb(id, name, icon, effectCode, desc) {
+  return {
+    id, name, icon,
+    category: C.MOVE_BONUS.key, catColor: C.MOVE_BONUS.color, catLabel: C.MOVE_BONUS.label,
+    rarity: R.COMMON,
+    effect: { type: 'move_bonus', special: effectCode, bonus: 0, magieCost: 0, range: 'self' },
+    desc,
+    goldValue: 0,
+  };
+}
+
+export const MOVE_BONUS_CARDS = [
+  mb('mb_1',      '1',                    '①',   'fixed:1',        'Déplace de 1 case exactement.'),
+  mb('mb_2',      '2',                    '②',   'fixed:2',        'Déplace de 2 cases exactement.'),
+  mb('mb_3',      '3',                    '③',   'fixed:3',        'Déplace de 3 cases exactement.'),
+  mb('mb_4',      '4',                    '④',   'fixed:4',        'Déplace de 4 cases exactement.'),
+  mb('mb_5',      '5',                    '⑤',   'fixed:5',        'Déplace de 5 cases exactement.'),
+  mb('mb_6',      '6',                    '⑥',   'fixed:6',        'Déplace de 6 cases exactement.'),
+  mb('mb_p1',     '+1',                   '🔼',   'add:1',          'Ajoute 1 au jet de déplacement.'),
+  mb('mb_p2',     '+2',                   '🔼',   'add:2',          'Ajoute 2 au jet de déplacement.'),
+  mb('mb_p3',     '+3',                   '🔼',   'add:3',          'Ajoute 3 au jet de déplacement.'),
+  mb('mb_p4',     '+4',                   '🔼',   'add:4',          'Ajoute 4 au jet de déplacement.'),
+  mb('mb_p5',     '+5',                   '🔼',   'add:5',          'Ajoute 5 au jet de déplacement.'),
+  mb('mb_p6',     '+6',                   '🔼',   'add:6',          'Ajoute 6 au jet de déplacement.'),
+  mb('mb_p1d',    '+1 Dé',               '🎲',   'add_die:1',      'Ajoute 1 dé au déplacement.'),
+  mb('mb_p2d',    '+2 Dés',              '🎲',   'add_die:2',      'Ajoute 2 dés au déplacement.'),
+  mb('mb_m1',     '-1',                   '🔽',   'sub:1',          'Recule de 1 case.'),
+  mb('mb_m2',     '-2',                   '🔽',   'sub:2',          'Recule de 2 cases.'),
+  mb('mb_m3',     '-3',                   '🔽',   'sub:3',          'Recule de 3 cases.'),
+  mb('mb_m4',     '-4',                   '🔽',   'sub:4',          'Recule de 4 cases.'),
+  mb('mb_m5',     '-5',                   '🔽',   'sub:5',          'Recule de 5 cases.'),
+  mb('mb_m6',     '-6',                   '🔽',   'sub:6',          'Recule de 6 cases.'),
+  mb('mb_pair',   'Pair',                 '🔢',   'cond:even',      'Déplacement vaut 2, 4 ou 6.'),
+  mb('mb_impair', 'Impaire',              '🔢',   'cond:odd',       'Déplacement vaut 1, 3 ou 5.'),
+  mb('mb_bas',    'Bas',                  '⬇️',   'cond:low',       'Déplacement vaut 1, 2 ou 3.'),
+  mb('mb_haut',   'Haut',                 '⬆️',   'cond:high',      'Déplacement vaut 4, 5 ou 6.'),
+  mb('mb_petit',  'Petit',                '🔡',   'cond:tiny',      'Déplacement vaut 1 ou 2.'),
+  mb('mb_fort',   'Fort',                 '💪',   'cond:strong',    'Déplacement vaut 5 ou 6.'),
+  mb('mb_bizarre','Bizarre',              '🌀',   'special:back2',  'Recule de 2 cases.'),
+  mb('mb_inverse','Inversé',              '🔄',   'special:negate', 'Recule du résultat obtenu.'),
+  mb('mb_milieu', 'Milieu',               '🎯',   'cond:mid',       'Déplacement vaut 3 ou 4.'),
+  mb('mb_gsplit', 'Gros Split',           '↕️',   'cond:bigsplit',  'Déplacement vaut 1 ou 6.'),
+  mb('mb_psplit', 'Petit Split',          '↔️',   'cond:smallsplit','Déplacement vaut 3 ou 5.'),
+  mb('mb_x2',     '×2',                  '✌️',   'multiply:2',     'Double le résultat du dé.'),
+  mb('mb_x3',     '×3',                  '🤟',   'multiply:3',     'Triple le résultat du dé.'),
+  mb('mb_escalade','Escalade',            '🧗',   'special:wall',   'Surmonte un mur.'),
+  mb('mb_portail','Portail vers la ville','🏠',   'special:return_base','Retourne immédiatement à ta base.'),
 ];
 
 export const FULL_DECK = [
@@ -175,17 +257,20 @@ export const FULL_DECK = [
   ...SCROLL_CARDS,
   ...RARE_CARDS,
   ...LEGENDARY_CARDS,
+  ...TRINKET_CARDS,
 ];
 
 export const DECK_BY_CATEGORY = {
-  deplacement:  MOVE_CARDS,
-  armure:       ARMOR_CARDS,
-  arme:         WEAPON_CARDS,
-  arme_magique: MAGIC_WEAPON_CARDS,
-  potion:       POTION_CARDS,
-  parchemin:    SCROLL_CARDS,
-  objet_rare:   RARE_CARDS,
-  legendaire:   LEGENDARY_CARDS,
+  deplacement:       MOVE_CARDS,
+  armure:            ARMOR_CARDS,
+  arme:              WEAPON_CARDS,
+  arme_magique:      MAGIC_WEAPON_CARDS,
+  potion:            POTION_CARDS,
+  parchemin:         SCROLL_CARDS,
+  objet_rare:        RARE_CARDS,
+  legendaire:        LEGENDARY_CARDS,
+  bibelot:           TRINKET_CARDS,
+  bonus_deplacement: MOVE_BONUS_CARDS,
 };
 
 export const RARITY_COLOR = {
