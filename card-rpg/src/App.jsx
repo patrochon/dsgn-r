@@ -183,7 +183,7 @@ function Game({ characters, onRestart }) {
               : g.phase === 'secretariat_move_choice' ? '📋 Secrétariat — ajuster le déplacement ?'
               : g.phase === 'choosing_golem' ? '⛰️ Invocation — choisissez le niveau du Golem'
               : g.phase === 'shop_couponing' ? '🏷️ Couponing — boutique'
-              : g.phase === 'discard_overflow' ? '🃏 Main pleine — défaussez une carte'
+              : g.phase === 'discard_overflow' ? '🃏 Fin de tour — défaussez jusqu\'à 6 cartes'
               : g.phase}
           </span>
         </div>
@@ -474,7 +474,7 @@ function Game({ characters, onRestart }) {
           )}
           {g.phase === 'discard_overflow' && (
             <div style={{ background: '#3a1a00', border: '1px solid #ff6633', borderRadius: 8, padding: '8px 10px', fontSize: 13, color: '#ffaa66' }}>
-              ⚠️ Vous avez {cp?.hand?.length} cartes en main. Cliquez une carte pour la défausser.
+              ⚠️ Vous avez {cp?.hand?.length} cartes — défaussez-en {(cp?.hand?.length ?? 0) - 6} (cliquez sur une carte).
             </div>
           )}
         </div>

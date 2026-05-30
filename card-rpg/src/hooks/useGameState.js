@@ -2836,7 +2836,8 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       setPendingNextIdx(next);
       setActionsLeft(0); setHasMoved(false); setSelectedCard(null); setHighlightTiles([]);
       setPhase('discard_overflow');
-      addLog(`${updPlayers[currentIdx].name} a ${updPlayers[currentIdx].hand.length} cartes — défaussez-en une avant de passer le tour.`);
+      const excess = updPlayers[currentIdx].hand.length - HAND_LIMIT;
+      addLog(`${updPlayers[currentIdx].name} a ${updPlayers[currentIdx].hand.length} cartes — défaussez-en ${excess} pour repasser à ${HAND_LIMIT}.`);
       return;
     }
 
@@ -2852,20 +2853,27 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
 
   const discardOverflowCard = useCallback((card) => {
     const nextIdx = pendingNextIdx ?? 0;
+    const newHand = players[currentIdx].hand.filter(c => c !== card);
+    const stillOver = newHand.length > HAND_LIMIT;
     setPlayers(prev => {
       const next = [...prev];
       const p = { ...next[currentIdx] };
-      p.hand = p.hand.filter(c => c !== card);
+      p.hand = newHand;
       p.discard = [...p.discard, card];
       next[currentIdx] = p;
       return next;
     });
     addLog(`${players[currentIdx].name} défausse ${card.icon} ${card.name}.`);
-    setPendingNextIdx(null);
-    setCurrentIdx(nextIdx);
-    setActionsLeft(0); setHasMoved(false); setSelectedCard(null); setHighlightTiles([]);
-    setPhase('draw');
-    addLog(`--- Tour de ${players[nextIdx].name} ---`);
+    if (stillOver) {
+      const remaining = newHand.length - HAND_LIMIT;
+      addLog(`${players[currentIdx].name} a encore ${newHand.length} cartes — défaussez encore ${remaining}.`);
+    } else {
+      setPendingNextIdx(null);
+      setCurrentIdx(nextIdx);
+      setActionsLeft(0); setHasMoved(false); setSelectedCard(null); setHighlightTiles([]);
+      setPhase('draw');
+      addLog(`--- Tour de ${players[nextIdx].name} ---`);
+    }
   }, [currentIdx, players, pendingNextIdx]);
 
   const skipPassive = useCallback(() => {
