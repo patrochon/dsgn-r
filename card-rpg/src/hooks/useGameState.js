@@ -298,7 +298,12 @@ function getCrossedPlayers(startX, startY, endX, endY, allPlayers, currentIdx) {
 }
 
 export function useGameState(characters) {
-  const [mapData] = useState(() => MULTIPLAYER_MAPS[Math.floor(Math.random() * MULTIPLAYER_MAPS.length)]);
+  const [mapData] = useState(() => {
+    const count = characters?.length ?? 2;
+    const pool = MULTIPLAYER_MAPS.filter(m => !m.playerCount || m.playerCount.includes(count));
+    const src = pool.length > 0 ? pool : MULTIPLAYER_MAPS;
+    return src[Math.floor(Math.random() * src.length)];
+  });
   const [mapName] = useState(() => mapData.name);
   const [grid] = useState(() => mapData.grid.map(r => [...r]));
 const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useState(() => generateInitialTiles(mapData));
