@@ -143,7 +143,7 @@ export function isEquippable(card) {
 
 // Check if card is usable (costs action)
 export function isUsable(card) {
-  return ['heal', 'buff', 'cure', 'magic'].includes(card?.effect?.type);
+  return ['heal', 'buff', 'cure', 'magic', 'gold'].includes(card?.effect?.type);
 }
 
 function generateInitialTiles(mapData) {
@@ -332,6 +332,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
   const [log, setLog] = useState(['Bienvenue dans la partie multijoueur !', 'Joueur 1 commence — tirez vos cartes.']);
   const [winner, setWinner] = useState(null);
   const [pendingMessager, setPendingMessager] = useState(null);
+  const [pendingNextIdx, setPendingNextIdx] = useState(null);
   const [pendingAutodefense, setPendingAutodefense] = useState(null);
   const [pendingVoodoo, setPendingVoodoo] = useState(null);
   const [pendingNde, setPendingNde] = useState(null);
@@ -399,13 +400,12 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       if (doubleIncome) { p.goldDoubleRemaining--; }
       p.gold = (p.gold ?? 0) + actualIncome;
       addLog(`💰 ${p.name} reçoit ${actualIncome} pièce(s) d'or${doubleIncome ? ' (×2 🥂)' : ''}. Total: ${p.gold}`);
-      // Draw exactly 1 card per turn (up to hand limit)
-      const needed = p.hand.length < HAND_LIMIT ? 1 : 0;
-      if (needed > 0) {
+      // Toujours tirer exactement 1 carte par tour (peut passer à 7 en main)
+      {
         let deck = [...p.deck];
         let discard = [...p.discard];
-        if (deck.length < needed) { deck = [...deck, ...shuffleDeck(discard)]; discard = []; }
-        const drawn = deck.splice(0, needed);
+        if (deck.length < 1) { deck = [...deck, ...shuffleDeck(discard)]; discard = []; }
+        const drawn = deck.splice(0, 1);
         // Potion limit: max 2 potions in hand
         const potionsInHand = p.hand.filter(c => c.category === 'potion').length;
         const kept   = drawn.filter(c => c.category !== 'potion' || potionsInHand < 2);
@@ -2153,6 +2153,18 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
           return next;
         });
       }
+    } else if (card.effect.type === 'gold') {
+      const goldAmt = card.effect.bonus;
+      setPlayers(prev => {
+        const next = [...prev];
+        const p = { ...next[currentIdx] };
+        p.gold = (p.gold ?? 0) + goldAmt;
+        p.hand = p.hand.filter(c => c !== card);
+        p.discard = [...p.discard, card];
+        next[currentIdx] = p;
+        return next;
+      });
+      addLog(`${cp.name} utilise ${card.icon} ${card.name} : +${goldAmt} 💰 (total : ${(cp.gold ?? 0) + goldAmt})`);
     }
 
     setSelectedCard(null);
@@ -2806,8 +2818,6 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       }
     }
 
-    setPlayers(updPlayers);
-
     let next = currentIdx;
     let attempts = 0;
     do {
@@ -2815,6 +2825,17 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       attempts++;
     } while (!updPlayers[next].isAlive && attempts < updPlayers.length);
 
+    // Défausse obligatoire si main > 6 cartes en fin de tour
+    if ((updPlayers[currentIdx]?.hand?.length ?? 0) > HAND_LIMIT) {
+      setPlayers(updPlayers);
+      setPendingNextIdx(next);
+      setActionsLeft(0); setHasMoved(false); setSelectedCard(null); setHighlightTiles([]);
+      setPhase('discard_overflow');
+      addLog(`${updPlayers[currentIdx].name} a ${updPlayers[currentIdx].hand.length} cartes — défaussez-en une avant de passer le tour.`);
+      return;
+    }
+
+    setPlayers(updPlayers);
     setCurrentIdx(next);
     setActionsLeft(0);
     setHasMoved(false);
@@ -2823,6 +2844,24 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     setPhase('draw');
     addLog(`--- Tour de ${updPlayers[next].name} ---`);
   }, [currentIdx, players, hasMoved, traps, grid]);
+
+  const discardOverflowCard = useCallback((card) => {
+    const nextIdx = pendingNextIdx ?? 0;
+    setPlayers(prev => {
+      const next = [...prev];
+      const p = { ...next[currentIdx] };
+      p.hand = p.hand.filter(c => c !== card);
+      p.discard = [...p.discard, card];
+      next[currentIdx] = p;
+      return next;
+    });
+    addLog(`${players[currentIdx].name} défausse ${card.icon} ${card.name}.`);
+    setPendingNextIdx(null);
+    setCurrentIdx(nextIdx);
+    setActionsLeft(0); setHasMoved(false); setSelectedCard(null); setHighlightTiles([]);
+    setPhase('draw');
+    addLog(`--- Tour de ${players[nextIdx].name} ---`);
+  }, [currentIdx, players, pendingNextIdx]);
 
   const skipPassive = useCallback(() => {
     setHighlightTiles([]);
@@ -3029,6 +3068,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     skipPortalChoice,
     useItem,
     endTurn,
+    discardOverflowCard,
     winner,
     isEquippable,
     isUsable,

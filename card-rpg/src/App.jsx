@@ -183,6 +183,7 @@ function Game({ characters, onRestart }) {
               : g.phase === 'secretariat_move_choice' ? '📋 Secrétariat — ajuster le déplacement ?'
               : g.phase === 'choosing_golem' ? '⛰️ Invocation — choisissez le niveau du Golem'
               : g.phase === 'shop_couponing' ? '🏷️ Couponing — boutique'
+              : g.phase === 'discard_overflow' ? '🃏 Main pleine — défaussez une carte'
               : g.phase}
           </span>
         </div>
@@ -471,6 +472,11 @@ function Game({ characters, onRestart }) {
           {(g.phase === 'rolling_move' || g.phase === 'rolling_attack') && (
             <div style={{ color: '#ffcc44', fontSize: 13, padding: '8px 0' }}>🎲 Lancement du dé…</div>
           )}
+          {g.phase === 'discard_overflow' && (
+            <div style={{ background: '#3a1a00', border: '1px solid #ff6633', borderRadius: 8, padding: '8px 10px', fontSize: 13, color: '#ffaa66' }}>
+              ⚠️ Vous avez {cp?.hand?.length} cartes en main. Cliquez une carte pour la défausser.
+            </div>
+          )}
         </div>
 
         {/* Card hand */}
@@ -479,9 +485,12 @@ function Game({ characters, onRestart }) {
         </div>
         <CardHand
           hand={cp?.hand ?? []}
-          selected={g.selectedCard}
-          onSelect={card => g.setSelectedCard(g.selectedCard === card ? null : card)}
-          disabled={g.phase !== 'player_turn'}
+          selected={g.phase === 'discard_overflow' ? null : g.selectedCard}
+          onSelect={card => {
+            if (g.phase === 'discard_overflow') { g.discardOverflowCard(card); return; }
+            g.setSelectedCard(g.selectedCard === card ? null : card);
+          }}
+          disabled={g.phase !== 'player_turn' && g.phase !== 'discard_overflow'}
         />
       </div>
 

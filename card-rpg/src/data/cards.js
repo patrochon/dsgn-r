@@ -28,6 +28,7 @@ const C = {
 const R = { COMMON: 'common', UNCOMMON: 'uncommon', RARE: 'rare', LEGENDARY: 'legendary' };
 
 function goldValue(rarity, effectType, bonus, magieCost) {
+  if (effectType === 'gold') return bonus;
   if (rarity === 'legendary') return 6;
   if (effectType === 'magic') {
     if (magieCost >= 6) return 6;
@@ -170,6 +171,15 @@ const RARE_CARDS = [
   card('grimoire',      'Grimoire interdit',    '📖', C.RARE, R.RARE, 'passive', 0, '+2 Magie, -1 Force permanent. Gagne automatiquement contre tous les monstres. Ne peut plus entrer dans les magasins.',                         'perm:magie+2,force-1,auto_win_monsters,no_shops', 0, 'self'),
 ];
 
+// ─── MONNAIE (4) ─────────────────────────────────────────────────────────────
+const C_GOLD = { key: 'monnaie', color: '#f0cc44', label: 'Monnaie' };
+const GOLD_CARDS = [
+  card('or_1',  '1 Pièce d\'Or',    '🪙', C_GOLD, R.COMMON,   'gold',  1,  'Jouez pour gagner immédiatement 1 pièce d\'or.',   null, 0, 'self'),
+  card('or_3',  '3 Pièces d\'Or',   '💰', C_GOLD, R.COMMON,   'gold',  3,  'Jouez pour gagner immédiatement 3 pièces d\'or.',  null, 0, 'self'),
+  card('or_6',  '6 Pièces d\'Or',   '💎', C_GOLD, R.UNCOMMON, 'gold',  6,  'Jouez pour gagner immédiatement 6 pièces d\'or.',  null, 0, 'self'),
+  card('or_10', '10 Pièces d\'Or',  '👑', C_GOLD, R.RARE,     'gold',  10, 'Jouez pour gagner immédiatement 10 pièces d\'or.', null, 0, 'self'),
+];
+
 // ─── OBJETS LÉGENDAIRES (1) ───────────────────────────────────────────────────
 const LEGENDARY_CARDS = [
   card('coeur_dragon',  'Cœur de Dragon',    '🐉', C.LEGENDARY, R.LEGENDARY, 'legendary', 0, '+20 HP permanent. Peut utiliser l\'effet Boule de Feu une fois par tour, en plus des parchemins en sa possession.',                 'perm:vie+20,free_fireball_per_turn',        0, 'self'),
@@ -199,56 +209,56 @@ const TRINKET_CARDS = [
 ];
 
 // ─── BONUS DE DÉPLACEMENT (35) ────────────────────────────────────────────────
-function mb(id, name, icon, effectCode, desc) {
+function mb(id, name, icon, effectCode, desc, goldVal = 0) {
   return {
     id, name, icon,
     category: C.MOVE_BONUS.key, catColor: C.MOVE_BONUS.color, catLabel: C.MOVE_BONUS.label,
     rarity: R.COMMON,
     effect: { type: 'move_bonus', special: effectCode, bonus: 0, magieCost: 0, range: 'self' },
     desc,
-    goldValue: 0,
+    goldValue: goldVal,
   };
 }
 
 export const MOVE_BONUS_CARDS = [
-  mb('mb_1',      '1',                    '①',   'fixed:1',        'Déplace de 1 case exactement.'),
-  mb('mb_2',      '2',                    '②',   'fixed:2',        'Déplace de 2 cases exactement.'),
-  mb('mb_3',      '3',                    '③',   'fixed:3',        'Déplace de 3 cases exactement.'),
-  mb('mb_4',      '4',                    '④',   'fixed:4',        'Déplace de 4 cases exactement.'),
-  mb('mb_5',      '5',                    '⑤',   'fixed:5',        'Déplace de 5 cases exactement.'),
-  mb('mb_6',      '6',                    '⑥',   'fixed:6',        'Déplace de 6 cases exactement.'),
-  mb('mb_p1',     '+1',                   '🔼',   'add:1',          'Ajoute 1 au jet de déplacement.'),
-  mb('mb_p2',     '+2',                   '🔼',   'add:2',          'Ajoute 2 au jet de déplacement.'),
-  mb('mb_p3',     '+3',                   '🔼',   'add:3',          'Ajoute 3 au jet de déplacement.'),
-  mb('mb_p4',     '+4',                   '🔼',   'add:4',          'Ajoute 4 au jet de déplacement.'),
-  mb('mb_p5',     '+5',                   '🔼',   'add:5',          'Ajoute 5 au jet de déplacement.'),
-  mb('mb_p6',     '+6',                   '🔼',   'add:6',          'Ajoute 6 au jet de déplacement.'),
-  mb('mb_p1d',    '+1 Dé',               '🎲',   'add_die:1',      'Ajoute 1 dé au déplacement.'),
-  mb('mb_p2d',    '+2 Dés',              '🎲',   'add_die:2',      'Ajoute 2 dés au déplacement.'),
-  mb('mb_m1',     '-1',                   '🔽',   'sub:1',          'Recule de 1 case.'),
-  mb('mb_m2',     '-2',                   '🔽',   'sub:2',          'Recule de 2 cases.'),
-  mb('mb_m3',     '-3',                   '🔽',   'sub:3',          'Recule de 3 cases.'),
-  mb('mb_m4',     '-4',                   '🔽',   'sub:4',          'Recule de 4 cases.'),
-  mb('mb_m5',     '-5',                   '🔽',   'sub:5',          'Recule de 5 cases.'),
-  mb('mb_m6',     '-6',                   '🔽',   'sub:6',          'Recule de 6 cases.'),
-  mb('mb_pair',   'Pair',                 '🔢',   'cond:even',      'Déplacement vaut 2, 4 ou 6.'),
-  mb('mb_impair', 'Impaire',              '🔢',   'cond:odd',       'Déplacement vaut 1, 3 ou 5.'),
-  mb('mb_bas',    'Bas',                  '⬇️',   'cond:low',       'Déplacement vaut 1, 2 ou 3.'),
-  mb('mb_haut',   'Haut',                 '⬆️',   'cond:high',      'Déplacement vaut 4, 5 ou 6.'),
-  mb('mb_petit',  'Petit',                '🔡',   'cond:tiny',      'Déplacement vaut 1 ou 2.'),
-  mb('mb_fort',   'Fort',                 '💪',   'cond:strong',    'Déplacement vaut 5 ou 6.'),
-  mb('mb_bizarre','Bizarre',              '🌀',   'special:back2',  'Recule de 2 cases.'),
-  mb('mb_inverse','Inversé',              '🔄',   'special:negate', 'Recule du résultat obtenu.'),
-  mb('mb_milieu', 'Milieu',               '🎯',   'cond:mid',       'Déplacement vaut 3 ou 4.'),
-  mb('mb_gsplit', 'Gros Split',           '↕️',   'cond:bigsplit',  'Déplacement vaut 1 ou 6.'),
-  mb('mb_psplit', 'Petit Split',          '↔️',   'cond:smallsplit','Déplacement vaut 3 ou 5.'),
-  mb('mb_x2',     '×2',                  '✌️',   'multiply:2',     'Double le résultat du dé.'),
-  mb('mb_x3',     '×3',                  '🤟',   'multiply:3',     'Triple le résultat du dé.'),
-  mb('mb_escalade','Escalade',            '🧗',   'special:wall',   'Surmonte un mur.'),
-  mb('mb_portail','Portail vers la ville','🏠',   'special:return_base','Retourne immédiatement à ta base.'),
+  mb('mb_1',      '1',                    '①',   'fixed:1',           'Déplace de 1 case exactement.',     1),
+  mb('mb_2',      '2',                    '②',   'fixed:2',           'Déplace de 2 cases exactement.',    1),
+  mb('mb_3',      '3',                    '③',   'fixed:3',           'Déplace de 3 cases exactement.',    1),
+  mb('mb_4',      '4',                    '④',   'fixed:4',           'Déplace de 4 cases exactement.',    2),
+  mb('mb_5',      '5',                    '⑤',   'fixed:5',           'Déplace de 5 cases exactement.',    2),
+  mb('mb_6',      '6',                    '⑥',   'fixed:6',           'Déplace de 6 cases exactement.',    2),
+  mb('mb_p1',     '+1',                   '🔼',   'add:1',             'Ajoute 1 au jet de déplacement.',   1),
+  mb('mb_p2',     '+2',                   '🔼',   'add:2',             'Ajoute 2 au jet de déplacement.',   1),
+  mb('mb_p3',     '+3',                   '🔼',   'add:3',             'Ajoute 3 au jet de déplacement.',   1),
+  mb('mb_p4',     '+4',                   '🔼',   'add:4',             'Ajoute 4 au jet de déplacement.',   2),
+  mb('mb_p5',     '+5',                   '🔼',   'add:5',             'Ajoute 5 au jet de déplacement.',   2),
+  mb('mb_p6',     '+6',                   '🔼',   'add:6',             'Ajoute 6 au jet de déplacement.',   2),
+  mb('mb_p1d',    '+1 Dé',               '🎲',   'add_die:1',          'Ajoute 1 dé au déplacement.',      2),
+  mb('mb_p2d',    '+2 Dés',              '🎲',   'add_die:2',          'Ajoute 2 dés au déplacement.',     3),
+  mb('mb_m1',     '-1',                   '🔽',   'sub:1',             'Recule de 1 case.',                 0),
+  mb('mb_m2',     '-2',                   '🔽',   'sub:2',             'Recule de 2 cases.',                0),
+  mb('mb_m3',     '-3',                   '🔽',   'sub:3',             'Recule de 3 cases.',                0),
+  mb('mb_m4',     '-4',                   '🔽',   'sub:4',             'Recule de 4 cases.',                0),
+  mb('mb_m5',     '-5',                   '🔽',   'sub:5',             'Recule de 5 cases.',                0),
+  mb('mb_m6',     '-6',                   '🔽',   'sub:6',             'Recule de 6 cases.',                0),
+  mb('mb_pair',   'Pair',                 '🔢',   'cond:even',         'Déplacement vaut 2, 4 ou 6.',       1),
+  mb('mb_impair', 'Impaire',              '🔢',   'cond:odd',          'Déplacement vaut 1, 3 ou 5.',       1),
+  mb('mb_bas',    'Bas',                  '⬇️',  'cond:low',          'Déplacement vaut 1, 2 ou 3.',       1),
+  mb('mb_haut',   'Haut',                 '⬆️',  'cond:high',         'Déplacement vaut 4, 5 ou 6.',       1),
+  mb('mb_petit',  'Petit',                '🔡',   'cond:tiny',         'Déplacement vaut 1 ou 2.',           1),
+  mb('mb_fort',   'Fort',                 '💪',   'cond:strong',       'Déplacement vaut 5 ou 6.',          1),
+  mb('mb_bizarre','Bizarre',              '🌀',   'special:back2',     'Recule de 2 cases.',                0),
+  mb('mb_inverse','Inversé',              '🔄',   'special:negate',    'Recule du résultat obtenu.',        0),
+  mb('mb_milieu', 'Milieu',               '🎯',   'cond:mid',          'Déplacement vaut 3 ou 4.',          1),
+  mb('mb_gsplit', 'Gros Split',           '↕️',  'cond:bigsplit',     'Déplacement vaut 1 ou 6.',          1),
+  mb('mb_psplit', 'Petit Split',          '↔️',  'cond:smallsplit',   'Déplacement vaut 3 ou 5.',          1),
+  mb('mb_x2',     '×2',                  '✌️',  'multiply:2',        'Double le résultat du dé.',          2),
+  mb('mb_x3',     '×3',                  '🤟',   'multiply:3',        'Triple le résultat du dé.',          3),
+  mb('mb_escalade','Escalade',            '🧗',   'special:wall',      'Surmonte un mur.',                  2),
+  mb('mb_portail','Portail vers la ville','🏠',   'special:return_base','Retourne immédiatement à ta base.',3),
 ];
 
-export { MOVE_CARDS, ARMOR_CARDS, WEAPON_CARDS, MAGIC_WEAPON_CARDS, POTION_CARDS, SCROLL_CARDS, RARE_CARDS, LEGENDARY_CARDS, TRINKET_CARDS };
+export { MOVE_CARDS, ARMOR_CARDS, WEAPON_CARDS, MAGIC_WEAPON_CARDS, POTION_CARDS, SCROLL_CARDS, RARE_CARDS, LEGENDARY_CARDS, TRINKET_CARDS, GOLD_CARDS };
 
 export const FULL_DECK = [
   ...MOVE_CARDS,
@@ -260,6 +270,7 @@ export const FULL_DECK = [
   ...RARE_CARDS,
   ...LEGENDARY_CARDS,
   ...TRINKET_CARDS,
+  ...GOLD_CARDS,
 ];
 
 export const DECK_BY_CATEGORY = {
@@ -272,6 +283,7 @@ export const DECK_BY_CATEGORY = {
   objet_rare:        RARE_CARDS,
   legendaire:        LEGENDARY_CARDS,
   bibelot:           TRINKET_CARDS,
+  monnaie:           GOLD_CARDS,
   bonus_deplacement: MOVE_BONUS_CARDS,
 };
 
