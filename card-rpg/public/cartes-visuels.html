@@ -273,7 +273,7 @@ const SECTIONS = [
   },
   {
     label: 'Armure', color: '#aaaaee', key: 'armure',
-    desc: 'Équipements défensifs. S'équipent en inventaire.',
+    desc: "Équipements défensifs. S'équipent en inventaire.",
     cards: [
       { id:'vetes_matelasses',name:'Vêtements matelassés', icon:'🧥', r:R.COMMON,    desc:'+1 Armure. Force req. 2.' },
       { id:'robe_chambre',    name:'Robe de chambre',      icon:'👘', r:R.COMMON,    desc:'+1 Armure, +1 Déplacement.' },
@@ -299,7 +299,7 @@ const SECTIONS = [
   },
   {
     label: 'Arme', color: '#ff9955', key: 'arme',
-    desc: 'Armes physiques. S'équipent et définissent ton attaque.',
+    desc: "Armes physiques. S'équipent et définissent ton attaque.",
     cards: [
       { id:'canif',       name:'Canif',              icon:'🗡️', r:R.COMMON,    desc:'Force req. 1. ×2 dégâts sur dé 6. +1 Richesse.' },
       { id:'epee_courte', name:'Épée courte',        icon:'⚔️', r:R.COMMON,    desc:'Force req. 2. Équilibrée, aucun malus.' },
@@ -489,10 +489,9 @@ function renderSection(section) {
 }
 
 document.getElementById('app').innerHTML = SECTIONS.map(renderSection).join('');
-</script>
 
-<!-- Category template preview at top -->
-<script>
+// ── Design system banner ─────────────────────────────────────────────────
+
 // Insert a "design system" banner at the very top
 const banner = document.createElement('div');
 banner.style.cssText = 'margin-bottom:56px;';
