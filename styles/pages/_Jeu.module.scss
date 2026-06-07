@@ -1,0 +1,21 @@
+.jeuMain {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 0;
+}
+
+.gameWrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.gameFrame {
+  width: 100%;
+  flex: 1;
+  border: none;
+  min-height: calc(100vh - 80px); // 80px = approximate header height
+  display: block;
+  background: #0a0a14;
+}

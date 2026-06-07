@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DÉTOPIA — Aperçu Visuel des Cartes</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d0d18;
+    color: #eee;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    padding: 32px 24px 64px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 22px;
+    letter-spacing: 6px;
+    color: #88aaff;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+  }
+  .subtitle {
+    text-align: center;
+    color: #444;
+    font-size: 12px;
+    letter-spacing: 2px;
+    margin-bottom: 48px;
+  }
+
+  /* ── Rarity legend ─────────────────────────── */
+  .legend {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 48px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: #888;
+  }
+  .legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid;
+  }
+
+  /* ── Section ───────────────────────────────── */
+  .section {
+    margin-bottom: 56px;
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #1a1a2e;
+  }
+  .section-swatch {
+    width: 16px;
+    height: 40px;
+    border-radius: 4px;
+  }
+  .section-title {
+    font-size: 14px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .section-count {
+    font-size: 11px;
+    color: #444;
+    margin-left: auto;
+  }
+
+  /* ── Card grid ─────────────────────────────── */
+  .card-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+
+  /* ── Card ──────────────────────────────────── */
+  .card {
+    width: 140px;
+    height: 140px;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    cursor: default;
+    transition: transform 0.15s, box-shadow 0.15s;
+    position: relative;
+  }
+  .card:hover {
+    transform: translateY(-4px) scale(1.04);
+    z-index: 10;
+  }
+  .card.rarity-common  { box-shadow: 0 2px 8px rgba(0,0,0,0.5); border: 2px solid rgba(180,180,180,0.25); }
+  .card.rarity-uncommon{ box-shadow: 0 2px 12px rgba(68,136,255,0.4); border: 2px solid #4488ff; }
+  .card.rarity-rare    { box-shadow: 0 2px 16px rgba(160,80,255,0.5); border: 2px solid #a050ff; }
+  .card.rarity-legendary { box-shadow: 0 0 20px rgba(255,220,0,0.6), 0 2px 12px rgba(0,0,0,0.5); border: 3px solid #ffdd00; }
+
+  .card-art {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .card-art::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.12);
+  }
+  .card-icon {
+    font-size: 44px;
+    line-height: 1;
+    filter: grayscale(1) brightness(0.08) contrast(3);
+    position: relative;
+    z-index: 1;
+    transition: filter 0.15s;
+  }
+  .card:hover .card-icon {
+    filter: grayscale(0) brightness(1) contrast(1);
+  }
+  .card-rarity-gem {
+    position: absolute;
+    top: 6px;
+    right: 7px;
+    font-size: 7px;
+    opacity: 0.7;
+  }
+  .card-cost {
+    position: absolute;
+    top: 5px;
+    left: 7px;
+    font-size: 8px;
+    font-weight: 700;
+    color: rgba(0,0,0,0.55);
+    letter-spacing: 0.5px;
+  }
+
+  .card-body {
+    height: 48px;
+    background: rgba(0,0,0,0.82);
+    padding: 5px 8px 4px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .card-name {
+    font-size: 9px;
+    font-weight: 700;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+  }
+  .card-desc {
+    font-size: 7.5px;
+    color: rgba(255,255,255,0.42);
+    line-height: 1.3;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .card-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 3px;
+  }
+  .card-type {
+    font-size: 7px;
+    color: rgba(255,255,255,0.3);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .card-gold {
+    font-size: 7px;
+    color: rgba(255,200,50,0.55);
+  }
+
+  /* ── Tooltip on hover ──────────────────────── */
+  .card[data-desc]:hover::after {
+    content: attr(data-desc);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 180px;
+    background: #111122;
+    color: #cce;
+    border: 1px solid #3344aa;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 9.5px;
+    line-height: 1.5;
+    z-index: 100;
+    pointer-events: none;
+    white-space: normal;
+    box-shadow: 0 4px 16px rgba(0,0,20,0.8);
+  }
+
+  /* ── Print ─────────────────────────────────── */
+  @media print {
+    body { background: white; color: black; padding: 16px; }
+    .card { break-inside: avoid; }
+    .card:hover { transform: none; }
+    .card-icon { filter: grayscale(1) brightness(0.1) contrast(3); }
+    .card-body { background: #222; }
+    h1 { color: #334; }
+  }
+</style>
+</head>
+<body>
+
+<h1>DÉTOPIA</h1>
+<div class="subtitle">Aperçu visuel — Toutes les cartes par type</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="border-color:rgba(180,180,180,0.5)"></div>Commun</div>
+  <div class="legend-item"><div class="legend-dot" style="border-color:#4488ff"></div>Peu commun</div>
+  <div class="legend-item"><div class="legend-dot" style="border-color:#a050ff"></div>Rare</div>
+  <div class="legend-item"><div class="legend-dot" style="border-color:#ffdd00"></div>Légendaire</div>
+  <div class="legend-item" style="margin-left:20px"><span>💡</span> Survoler = couleurs originales + description</div>
+</div>
+
+<div id="app"></div>
+
+<script>
+const R = { COMMON:'common', UNCOMMON:'uncommon', RARE:'rare', LEGENDARY:'legendary' };
+const RARITY_GEM = { common:'·', uncommon:'◆', rare:'◆◆', legendary:'★' };
+const RARITY_COLOR = { common:'rgba(180,180,180,0.5)', uncommon:'#4488ff', rare:'#a050ff', legendary:'#ffdd00' };
+
+// darken a hex color for gradient
+function darken(hex, amt=40) {
+  let r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  return `rgb(${Math.max(0,r-amt)},${Math.max(0,g-amt)},${Math.max(0,b-amt)})`;
+}
+
+const SECTIONS = [
+  {
+    label: 'Déplacement', color: '#55ccff', key: 'deplacement',
+    desc: 'Cartes jouées pour modifier ou améliorer ton mouvement ce tour.',
+    cards: [
+      { id:'sprint',     name:'Sprint',              icon:'💨', r:R.COMMON,    desc:'Dé + 3 cases de mouvement.' },
+      { id:'charge',     name:'Charge',              icon:'⚡', r:R.COMMON,    desc:'Dé + 2 cases. Si tu atteins un ennemi, +2 Force ce tour.' },
+      { id:'glissade',   name:'Glissade',            icon:'🌊', r:R.COMMON,    desc:'Dé + 2 cases en diagonale autorisée.' },
+      { id:'retraite',   name:'Retraite tactique',   icon:'🔙', r:R.COMMON,    desc:'Recule de dé + 2 cases. Esquive la prochaine attaque.' },
+      { id:'roulade',    name:'Roulade',             icon:'🔄', r:R.COMMON,    desc:'Dé + 1 case. Immunité aux dégâts ce tour si 4+.' },
+      { id:'foulees',    name:'Foulées légères',     icon:'🦶', r:R.COMMON,    desc:"Dé + 2 cases. Ne déclenche pas d'ennemis adjacents." },
+      { id:'bond',       name:'Bond',                icon:'🐇', r:R.UNCOMMON,  desc:'Saute par-dessus 3 cases (ignore obstacles).' },
+      { id:'course',     name:'Course effrénée',     icon:'🏃', r:R.UNCOMMON,  desc:'Déplacement = dé × 2 cases.' },
+      { id:'ailes_vent', name:'Ailes du vent',       icon:'🕊️', r:R.UNCOMMON,  desc:'Ignore le dé. Déplace-toi de 6 cases exactement.' },
+      { id:'escalade',   name:'Escalade',            icon:'🧗', r:R.UNCOMMON,  desc:"Traverse un mur. Dé + 3 cases de l'autre côté." },
+      { id:'teleport_ct',name:'Téléportation courte',icon:'✨', r:R.RARE,      desc:"Si dé ≥ 4, téléporte-toi sur n'importe quelle case visible." },
+      { id:'blink',      name:'Blink',               icon:'🌀', r:R.RARE,      desc:'Échange ta position avec un ennemi adjacent (dé ≥ 3).' },
+    ]
+  },
+  {
+    label: 'Armure', color: '#aaaaee', key: 'armure',
+    desc: "Équipements défensifs. S'équipent en inventaire.",
+    cards: [
+      { id:'vetes_matelasses',name:'Vêtements matelassés', icon:'🧥', r:R.COMMON,    desc:'+1 Armure. Force req. 2.' },
+      { id:'robe_chambre',    name:'Robe de chambre',      icon:'👘', r:R.COMMON,    desc:'+1 Armure, +1 Déplacement.' },
+      { id:'manteau_motard',  name:'Manteau de motard',    icon:'🏍️', r:R.COMMON,    desc:'+2 Armure, +1 Richesse. Force req. 3.' },
+      { id:'kit_jogging',     name:'Kit de jogging',       icon:'🏃', r:R.COMMON,    desc:'+3 Déplacement.' },
+      { id:'cape_resistance', name:'Cape de résistance',   icon:'🧣', r:R.COMMON,    desc:'+1 Armure, +2 Déplacement.' },
+      { id:'couvert_poubelle',name:'Couvert de poubelle',  icon:'🗑️', r:R.COMMON,    desc:'+2 Armure. Force req. 2.' },
+      { id:'kit_motocross',   name:'Kit de motocross',     icon:'🏁', r:R.UNCOMMON,  desc:'+3 Armure. Force req. 3.' },
+      { id:'jambieres_hockey',name:'Jambières de hockey',  icon:'🦿', r:R.UNCOMMON,  desc:'+4 Armure, -3 Déplacement.' },
+      { id:'gants_boxe',      name:'Gants de boxe',        icon:'🥊', r:R.UNCOMMON,  desc:'+1 Armure. +1 Force en corps à corps.' },
+      { id:'casque_baseball', name:'Casque de baseball',   icon:'⛑️', r:R.UNCOMMON,  desc:"+3 Armure. Immunise contre l'étourdissement." },
+      { id:'plastron_acier',  name:"Plastron d'acier",     icon:'🧲', r:R.RARE,      desc:'+6 Armure. Force req. 4.' },
+      { id:'bouclier_acier',  name:"Bouclier d'acier",     icon:'🔵', r:R.RARE,      desc:'+4 Armure. Force req. 4.' },
+      { id:'equip_football',  name:'Équip. de football',   icon:'🏈', r:R.RARE,      desc:'+7 Armure. Force req. 3.' },
+      { id:'cotte_plates',    name:'Cotte de plates',      icon:'🏰', r:R.RARE,      desc:'+8 Armure, -3 Déplacement.' },
+      { id:'armure_elfique',  name:'Armure elfique',       icon:'🌿', r:R.RARE,      desc:'+5 Armure, +1 Déplacement.' },
+      { id:'chaine_bling',    name:'Chaîne bling bling',   icon:'⛓️', r:R.RARE,      desc:'+3 Armure, +5 Richesse.' },
+      { id:'porte_acier',     name:"Porte d'acier",        icon:'🚪', r:R.LEGENDARY, desc:'+10 Armure, -6 Dép. Bloque le passage.' },
+      { id:'scaphandrier',    name:'Scaphandrier',          icon:'🤿', r:R.LEGENDARY, desc:'+12 Armure, -5 Dép. Immunisé dépl. forcés.' },
+      { id:'chapeau_pointu',  name:'Le Chapeau Pointu',    icon:'🎓', r:R.LEGENDARY, desc:'+3 Armure, +4 Magie. Parchemin supp./tour.' },
+      { id:'couronne_rois',   name:'Couronne des Rois',    icon:'👑', r:R.LEGENDARY, desc:'+6 Armure, +3 Force, +3 Magie, +6 HP.' },
+    ]
+  },
+  {
+    label: 'Arme', color: '#ff9955', key: 'arme',
+    desc: "Armes physiques. S'équipent et définissent ton attaque.",
+    cards: [
+      { id:'canif',       name:'Canif',              icon:'🗡️', r:R.COMMON,    desc:'Force req. 1. ×2 dégâts sur dé 6. +1 Richesse.' },
+      { id:'epee_courte', name:'Épée courte',        icon:'⚔️', r:R.COMMON,    desc:'Force req. 2. Équilibrée, aucun malus.' },
+      { id:'hache_main',  name:'Hache de main',      icon:'🪓', r:R.COMMON,    desc:'Force req. 2. Lançable à 2 cases — détruite après.' },
+      { id:'baton_combat',name:'Bâton de combat',    icon:'🏑', r:R.COMMON,    desc:'Force req. 1. +1 Magie. Frappe derrière gratuit.' },
+      { id:'lance',       name:'Lance',              icon:'🏹', r:R.COMMON,    desc:"Force req. 2. Portée 2 cases. Repousse l'ennemi." },
+      { id:'epee_longue', name:'Épée longue',        icon:'🔱', r:R.UNCOMMON,  desc:'Force req. 3. Aucun déplacement ce tour.' },
+      { id:'hache_guerre',name:'Hache de guerre',    icon:'⚒️', r:R.UNCOMMON,  desc:"Force req. 3. Perce 2 pts d'armure." },
+      { id:'arc_court',   name:'Arc court',          icon:'🏹', r:R.UNCOMMON,  desc:'Force req. 3. Portée 3–4 cases.' },
+      { id:'fleau',       name:"Fléau d'armes",      icon:'⛓️', r:R.UNCOMMON,  desc:'Force req. 3. Désarme sur dé 6.' },
+      { id:'marteau',     name:'Marteau de guerre',  icon:'🔨', r:R.UNCOMMON,  desc:'Force req. 5. Étourdit sur dé 6.' },
+      { id:'arc_long',    name:'Arc long',           icon:'🎯', r:R.RARE,      desc:'Force req. 5. Portée 3–6 cases. +2 Force si immobile.' },
+      { id:'arbalete',    name:'Arbalète',           icon:'🔰', r:R.RARE,      desc:'Force req. 5. Portée 2–5. Perce armure si immobile.' },
+      { id:'hache_chasseur',name:'Hache du chasseur',icon:'🪬', r:R.RARE,      desc:'Force req. 3. +3/+6 dégâts sur même cible consécutive.' },
+    ]
+  },
+  {
+    label: 'Arme Magique', color: '#ff55ff', key: 'arme_magique',
+    desc: 'Armes enchantées. Combinent Force et Magie.',
+    cards: [
+      { id:'epee_flamme',   name:'Épée flamboyante',         icon:'🔥', r:R.RARE,      desc:"Brûle l'ennemi : dégâts supp. sur dé 5-6." },
+      { id:'arc_tenebres',  name:'Arc des Ténèbres',         icon:'🌑', r:R.RARE,      desc:'Maudit la cible : dégâts magiques sur dé impair.' },
+      { id:'sceptre_givre', name:'Sceptre de givre',         icon:'❄️', r:R.RARE,      desc:'-4 Déplacement à la cible au prochain tour.' },
+      { id:'dague_venin',   name:'Dague venimeuse',          icon:'🐍', r:R.RARE,      desc:'Critique automatique sur dé 5-6.' },
+      { id:'epee_sang',     name:'Épée de sang',             icon:'🩸', r:R.RARE,      desc:'6 dégâts magiques ; relance dés = 6.' },
+      { id:'arc_necro',     name:'Arc des Nécromanciens',    icon:'💀', r:R.RARE,      desc:'Portée 6. 6 dégâts ; cible passe à 1 Magie.' },
+      { id:'telecommande',  name:'La Télécommande',          icon:'📡', r:R.RARE,      desc:'Relance le jet de déplacement 1x/tour.' },
+      { id:'sceptre_enchant',name:"Sceptre d'enchantement", icon:'🔮', r:R.RARE,      desc:"Portée 2. 6 dégâts ; vole 1 carte à l'adversaire." },
+      { id:'lame_spectrale',name:'Lame spectrale',           icon:'👻', r:R.LEGENDARY, desc:'Ignore armure. Attaque à travers les murs.' },
+    ]
+  },
+  {
+    label: 'Potion', color: '#55ff99', key: 'potion',
+    desc: 'Consommables. Jouez depuis la main pour soins ou buffs.',
+    cards: [
+      { id:'verre_eau',     name:"Verre d'eau",              icon:'💧', r:R.COMMON,    desc:'Restaure 10 HP.' },
+      { id:'grand_verre',   name:"Grand verre d'eau",        icon:'🥤', r:R.COMMON,    desc:'Restaure 20 HP.' },
+      { id:'jus_vert',      name:'Verre de jus vert',        icon:'🥦', r:R.COMMON,    desc:'Restaure 5 HP. Immunise contre malédictions.' },
+      { id:'shake_prot',    name:"Shake de prot'",           icon:'🥛', r:R.COMMON,    desc:'+3 dégâts sur la prochaine attaque.' },
+      { id:'double_allonge',name:'Double allongé noir',      icon:'☕', r:R.COMMON,    desc:'+3 Déplacement sur le prochain mouvement.' },
+      { id:'gros_smoothie', name:'Gros smoothie',            icon:'🍵', r:R.UNCOMMON,  desc:'Restaure 30 HP.' },
+      { id:'antibiotique',  name:"Cuillère d'antibiotique",  icon:'🧴', r:R.UNCOMMON,  desc:'+12 PV temporaires. Immunise malédictions.' },
+      { id:'champagne',     name:'Coupe de champagne',       icon:'🥂', r:R.UNCOMMON,  desc:"Double les 3 prochains gains d'or." },
+      { id:'jus_etoile',    name:"Verre de jus d'étoile",   icon:'⭐', r:R.UNCOMMON,  desc:'+6 dégâts sur la prochaine attaque.' },
+      { id:'lait_licorne',  name:'Verre de lait de licorne', icon:'🦄', r:R.RARE,      desc:'+18 Vie permanent (HP max augmente).' },
+      { id:'sang_dragon',   name:'Verre de sang de dragon',  icon:'🐉', r:R.RARE,      desc:'+1 Destin permanent.' },
+      { id:'biere_viking',  name:'Bière de viking',          icon:'🍺', r:R.RARE,      desc:'×2 dégâts sur les 3 prochaines attaques.' },
+    ]
+  },
+  {
+    label: 'Parchemin', color: '#ffcc44', key: 'parchemin',
+    desc: 'Sorts. Coûtent de la Magie (✨). Effets puissants.',
+    cards: [
+      { id:'boulette_feu',  name:'Boulette de Feu',       icon:'🔥', r:R.COMMON,    desc:'6 dégâts magiques. Portée 4.' },
+      { id:'eclair',        name:'Éclair',                 icon:'⚡', r:R.COMMON,    desc:'4 dégâts magiques. Portée 6.' },
+      { id:'soin_scroll',   name:'Soin',                   icon:'✨', r:R.COMMON,    desc:'Restaure 15 HP.' },
+      { id:'nova_givre',    name:'Nova de Givre',          icon:'❄️', r:R.UNCOMMON,  desc:'2 dégâts + gèle les ennemis proches.' },
+      { id:'tempete_lames', name:'Tempête de lames',       icon:'🌀', r:R.UNCOMMON,  desc:'Dégâts physiques en zone 2-4 cases.' },
+      { id:'confusion',     name:'Confusion',              icon:'😵', r:R.UNCOMMON,  desc:"La cible s'auto-attaque. Portée 2." },
+      { id:'malediction',   name:'Malédiction',            icon:'🧿', r:R.UNCOMMON,  desc:'Maudit la cible. Portée 2.' },
+      { id:'proj_magiques', name:'Projectiles magiques',   icon:'🌟', r:R.UNCOMMON,  desc:'Portée et dégâts = puissance choisie.' },
+      { id:'vision',        name:'Vision prophétique',     icon:'👁️', r:R.UNCOMMON,  desc:'Révèle les mains de tous les adversaires.' },
+      { id:'telekinesie',   name:'Télékinésie',            icon:'🔮', r:R.RARE,      desc:'Repousse la cible de 4/5/6 cases.' },
+      { id:'invocation',    name:'Invocation — Golem',     icon:'⛰️', r:R.RARE,      desc:'Convoque un Golem (Terre/Pierre/Or).' },
+      { id:'bouclier_mag',  name:'Bouclier Magique',       icon:'🔵', r:R.RARE,      desc:'Donne 18 points de vie temporaires.' },
+      { id:'resurrection',  name:'Résurrection',           icon:'💀', r:R.LEGENDARY, desc:'Si 0 HP ce tour, reviens à 50% HP. Usage unique.' },
+    ]
+  },
+  {
+    label: 'Objet Rare', color: '#ff8844', key: 'objet_rare',
+    desc: 'Passifs puissants. Effets permanents une fois équipés.',
+    cards: [
+      { id:'pierre_ancetre',name:"Pierre de l'Ancêtre",   icon:'🪨', r:R.RARE,      desc:'Tous les "1" sur dé deviennent "2".' },
+      { id:'anneau_chaos',  name:'Anneau du Chaos',        icon:'💫', r:R.RARE,      desc:'Résultats 1-2 font automatiquement reculer.' },
+      { id:'flute_vent',    name:'Flûte du vent',          icon:'🪈', r:R.RARE,      desc:'Dé 5-6 : peut retourner à sa base.' },
+      { id:'cape_invis',    name:"Cape d'Invisibilité",    icon:'🌫️', r:R.RARE,      desc:'Évite 1 combat ou 1 piège par tour.' },
+      { id:'orbe_vision',   name:'Orbe de Vision',         icon:'🔭', r:R.RARE,      desc:'+1 Richesse. Ouvre coffre à portée 6.' },
+      { id:'grimoire',      name:'Grimoire interdit',      icon:'📖', r:R.RARE,      desc:'+2 Magie, -1 Force. Gagne vs monstres. Pas de shop.' },
+    ]
+  },
+  {
+    label: 'Légendaire', color: '#ffdd00', key: 'legendaire',
+    desc: 'Unique. Effet de jeu massif. 1 exemplaire dans le deck.',
+    cards: [
+      { id:'coeur_dragon',  name:'Cœur de Dragon',        icon:'🐉', r:R.LEGENDARY, desc:'+20 HP permanent. Boule de Feu gratuite/tour.' },
+    ]
+  },
+  {
+    label: 'Bibelot', color: '#88cc88', key: 'bibelot',
+    desc: 'Trinkets passifs. Sets = bonus de set si combinés.',
+    cards: [
+      { id:'pierre_friction',    name:'Pierre de Friction',           icon:'🔸', r:R.UNCOMMON,  desc:'+1 Force. Accumule charges par dégât.' },
+      { id:'bague_comptage',     name:'Bague de Comptage',            icon:'💍', r:R.UNCOMMON,  desc:'+3 or supplémentaires par trésor ouvert.' },
+      { id:'dent_bonheur',       name:'Dent Porte-Bonheur',           icon:'🦷', r:R.UNCOMMON,  desc:'+1 Destin. Dés 2 comptent comme 3.' },
+      { id:'ecaille_iguane',     name:"Écaille d'Iguane",             icon:'🦎', r:R.COMMON,    desc:'+1 Force.' },
+      { id:'meche_cheveux',      name:'Mèche de Cheveux',             icon:'✂️', r:R.COMMON,    desc:'+1 Magie.' },
+      { id:'semelle_clouee',     name:'Semelle Clouée',               icon:'👟', r:R.COMMON,    desc:'+1 Déplacement, +1 Force.' },
+      { id:'bol_tibetain',       name:'Bol Tibétain',                 icon:'🔔', r:R.UNCOMMON,  desc:'+3 HP. Régénère 1 HP si aucun dégât reçu.' },
+      { id:'faux_ongles',        name:'Faux Ongles Crasseux',         icon:'💅', r:R.UNCOMMON,  desc:'Attaque ≤3 dégâts → immobilise la cible.' },
+      { id:'sel_guerre',         name:'Sel de Guerre',                icon:'🧂', r:R.UNCOMMON,  desc:'+1 Force. +3 dégâts vs cible immobile.' },
+      { id:'bougie_noire',       name:'Bougie Noire',                 icon:'🕯️', r:R.UNCOMMON,  desc:'+1 Magie. Accumule charges sans dégât.' },
+      { id:'lasso',              name:'Lasso',                        icon:'🧵', r:R.RARE,      desc:'≤3 cases d\'un adversaire → il devient immobile.' },
+      { id:'galet_echo',         name:"Galet d'Écho",                 icon:'🔘', r:R.RARE,      desc:'+1 Magie. -1 coût magique des cartes.' },
+      { id:'plume_nevermore',    name:'Plume de Nevermore',           icon:'🪶', r:R.RARE,      desc:'[Set Esprits] +2 Magie.' },
+      { id:'collier_coquillages',name:'Collier de Coquillages',       icon:'🪸', r:R.RARE,      desc:'[Set Guerrier] +2 Force.' },
+      { id:'lunettes_reve',      name:'Lunettes du Rêve',             icon:'🥽', r:R.RARE,      desc:'[Set Esprits] +3 Magie.' },
+      { id:'tattoo_dansant',     name:'Tattoo Dansant',               icon:'💃', r:R.RARE,      desc:'[Set Guerrier] +4 Force.' },
+      { id:'sac_sable',          name:'Sac de Sable',                 icon:'👝', r:R.RARE,      desc:'[Set Esprits] +5 Magie.' },
+      { id:'hamecon_sacre',      name:"L'Hameçon Sacré",              icon:'🪝', r:R.RARE,      desc:'[Set Guerrier] +5 Force.' },
+      { id:'oeil_destin',        name:"L'Œil",                        icon:'👁️', r:R.LEGENDARY, desc:'Lance 2 fois et choisit le résultat pour tous les jets.' },
+    ]
+  },
+  {
+    label: 'Bonus Déplacement', color: '#77ddff', key: 'bonus_deplacement',
+    desc: 'Cartes numériques piochées lors de certains effets de mouvement.',
+    cards: [
+      { id:'mb_1',    name:'1',       icon:'①', r:R.COMMON,  desc:'Déplace de 1 case exactement.' },
+      { id:'mb_2',    name:'2',       icon:'②', r:R.COMMON,  desc:'Déplace de 2 cases exactement.' },
+      { id:'mb_3',    name:'3',       icon:'③', r:R.COMMON,  desc:'Déplace de 3 cases exactement.' },
+      { id:'mb_4',    name:'4',       icon:'④', r:R.COMMON,  desc:'Déplace de 4 cases exactement.' },
+      { id:'mb_5',    name:'5',       icon:'⑤', r:R.COMMON,  desc:'Déplace de 5 cases exactement.' },
+      { id:'mb_6',    name:'6',       icon:'⑥', r:R.COMMON,  desc:'Déplace de 6 cases exactement.' },
+      { id:'mb_p1',   name:'+1',      icon:'🔼', r:R.COMMON,  desc:'Ajoute 1 au jet de déplacement.' },
+      { id:'mb_p2',   name:'+2',      icon:'🔼', r:R.COMMON,  desc:'Ajoute 2 au jet de déplacement.' },
+      { id:'mb_p3',   name:'+3',      icon:'🔼', r:R.COMMON,  desc:'Ajoute 3 au jet de déplacement.' },
+      { id:'mb_p4',   name:'+4',      icon:'🔼', r:R.COMMON,  desc:'Ajoute 4 au jet de déplacement.' },
+      { id:'mb_p5',   name:'+5',      icon:'🔼', r:R.COMMON,  desc:'Ajoute 5 au jet de déplacement.' },
+      { id:'mb_m1',   name:'-1',      icon:'🔽', r:R.COMMON,  desc:'Retire 1 au jet de déplacement.' },
+      { id:'mb_m2',   name:'-2',      icon:'🔽', r:R.COMMON,  desc:'Retire 2 au jet de déplacement.' },
+      { id:'mb_m3',   name:'-3',      icon:'🔽', r:R.COMMON,  desc:'Retire 3 au jet de déplacement.' },
+      { id:'mb_x2',   name:'×2',      icon:'⏫', r:R.COMMON,  desc:'Multiplie le jet de déplacement par 2.' },
+      { id:'mb_x3',   name:'×3',      icon:'⏫', r:R.COMMON,  desc:'Multiplie le jet de déplacement par 3.' },
+      { id:'mb_d2',   name:'÷2',      icon:'⏬', r:R.COMMON,  desc:'Divise le jet de déplacement par 2.' },
+      { id:'mb_0',    name:'0',       icon:'⊘',  r:R.COMMON,  desc:'Déplacement annulé (0 case).' },
+      { id:'mb_inv',  name:'Inversé', icon:'🔃', r:R.COMMON,  desc:'Déplacement dans le sens opposé.' },
+      { id:'mb_min3', name:'Min 3',   icon:'🔒', r:R.COMMON,  desc:'Déplacement minimum de 3 cases.' },
+      { id:'mb_max3', name:'Max 3',   icon:'🔒', r:R.COMMON,  desc:'Déplacement maximum de 3 cases.' },
+      { id:'mb_cond_p2',name:'Cond +2',icon:'❓', r:R.COMMON,  desc:'+2 si condition remplie ce tour.' },
+      { id:'mb_skip', name:'Passe',   icon:'⏭️', r:R.COMMON,  desc:'Passe le déplacement — garde 1 action.' },
+      { id:'mb_tp',   name:'Portail', icon:'🌀', r:R.COMMON,  desc:'Teleporte à la case visitée le plus récemment.' },
+    ]
+  },
+  {
+    label: 'Monnaie', color: '#f0cc44', key: 'monnaie',
+    desc: 'Jouez depuis la main pour gagner immédiatement des pièces d\'or.',
+    cards: [
+      { id:'or_1',  name:"1 Pièce d'Or",   icon:'🪙', r:R.COMMON,   desc:'Gagnez immédiatement 1 pièce d\'or.' },
+      { id:'or_3',  name:"3 Pièces d'Or",  icon:'💰', r:R.COMMON,   desc:'Gagnez immédiatement 3 pièces d\'or.' },
+      { id:'or_6',  name:"6 Pièces d'Or",  icon:'💎', r:R.UNCOMMON, desc:'Gagnez immédiatement 6 pièces d\'or.' },
+      { id:'or_10', name:"10 Pièces d'Or", icon:'👑', r:R.RARE,     desc:'Gagnez immédiatement 10 pièces d\'or.' },
+    ]
+  },
+];
+
+function renderCard(card, catColor) {
+  const dark = darken(catColor, 50);
+  const gemColors = { common: 'rgba(220,220,220,0.5)', uncommon: '#4488ff', rare: '#a050ff', legendary: '#ffdd00' };
+  return `
+    <div class="card rarity-${card.r}"
+         style="--cat-color:${catColor};"
+         data-desc="${card.desc.replace(/"/g,'&quot;')}">
+      <div class="card-art" style="background:linear-gradient(145deg,${catColor},${dark})">
+        <span class="card-cost">${card.r === 'legendary' ? '★' : card.r === 'rare' ? '◆◆' : card.r === 'uncommon' ? '◆' : '·'}</span>
+        <span class="card-icon">${card.icon}</span>
+      </div>
+      <div class="card-body">
+        <div class="card-name">${card.name}</div>
+        <div class="card-desc">${card.desc}</div>
+      </div>
+    </div>`;
+}
+
+function renderSection(section) {
+  const cards = section.cards.map(c => renderCard(c, section.color)).join('');
+  return `
+    <div class="section">
+      <div class="section-header">
+        <div class="section-swatch" style="background:${section.color}"></div>
+        <div>
+          <div class="section-title" style="color:${section.color}">${section.label}</div>
+          <div style="font-size:10px;color:#555;margin-top:3px">${section.desc}</div>
+        </div>
+        <div class="section-count">${section.cards.length} carte${section.cards.length > 1 ? 's' : ''}</div>
+      </div>
+      <div class="card-grid">${cards}</div>
+    </div>`;
+}
+
+document.getElementById('app').innerHTML = SECTIONS.map(renderSection).join('');
+
+// ── Design system banner ─────────────────────────────────────────────────
+
+// Insert a "design system" banner at the very top
+const banner = document.createElement('div');
+banner.style.cssText = 'margin-bottom:56px;';
+banner.innerHTML = `
+  <div style="text-align:center;font-size:11px;letter-spacing:2px;color:#333;text-transform:uppercase;margin-bottom:20px">Grille de design — Comportement des cartes au survol</div>
+  <div style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-bottom:16px">
+    ${[
+      {name:'Commun',color:'#55ccff',icon:'💨',r:'common',desc:'Exemple carte commune — icône en noir sur fond coloré.'},
+      {name:'Peu commun',color:'#ff9955',icon:'🏑',r:'uncommon',desc:'Exemple carte peu commune — bordure bleue.'},
+      {name:'Rare',color:'#ff55ff',icon:'🔮',r:'rare',desc:'Exemple carte rare — bordure violette.'},
+      {name:'Légendaire',color:'#ffdd00',icon:'👑',r:'legendary',desc:'Exemple carte légendaire — lueur dorée.'},
+    ].map(c => `
+      <div class="card rarity-${c.r}" style="width:110px;height:110px;" data-desc="${c.desc}">
+        <div class="card-art" style="background:linear-gradient(145deg,${c.color},${darken(c.color,50)});flex:1">
+          <span class="card-icon" style="font-size:36px">${c.icon}</span>
+        </div>
+        <div class="card-body" style="height:38px">
+          <div class="card-name">${c.name}</div>
+        </div>
+      </div>`).join('')}
+  </div>
+  <div style="text-align:center;font-size:9px;color:#333;letter-spacing:1px">↑ Icônes en noir sur fond de couleur · Au survol : couleurs originales + description</div>
+`;
+document.getElementById('app').prepend(banner);
+</script>
+
+</body>
+</html>
