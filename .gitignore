@@ -37,3 +37,8 @@ yarn-error.log*
 *.tsbuildinfo
 
 .idea/
+card-rpg/node_modules
+card-rpg/dist
+
+# Playwright browser binaries (accidentally placed here during dev)
+\[Function: resolve\]*

@@ -1,0 +1,76 @@
+.classes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 28px;
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.class-card {
+  background: #11111c;
+  border: 1px solid #252535;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.class-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 40px rgba(240, 204, 68, 0.12);
+}
+
+.class-card .illus {
+  background: #f4efe6;
+}
+
+.class-card .illus svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.class-card .body {
+  padding: 16px 18px;
+  border-top: 2px solid #252535;
+  font-family: Georgia, serif;
+}
+
+.class-card .top {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 8px;
+}
+
+.class-card .emoji {
+  font-size: 1.5rem;
+}
+
+.class-card .name {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #f0cc44;
+}
+
+.class-card .flavor {
+  font-size: 0.78rem;
+  color: #999;
+  font-style: italic;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+.class-card .stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.class-card .stat {
+  background: #181828;
+  border: 1px solid #303050;
+  border-radius: 4px;
+  padding: 2px 9px;
+  font-size: 0.72rem;
+  color: #7799ff;
+}
