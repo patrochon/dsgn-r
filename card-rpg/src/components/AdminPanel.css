@@ -1,0 +1,588 @@
+/* ============================================================
+   ADMIN PANEL — DÉTOPIA  |  AdminPanel.css
+   ============================================================ */
+
+/* ---- OVERLAY ---- */
+.adm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: adm-fadeIn 0.2s ease;
+}
+
+@keyframes adm-fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ---- PANEL PRINCIPAL ---- */
+.adm-panel {
+  background: #111418;
+  border: 1px solid #2a2d35;
+  border-radius: 16px;
+  width: min(1100px, 96vw);
+  height: min(780px, 95vh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.9), 0 0 0 1px #ffffff0a;
+  animation: adm-slideUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes adm-slideUp {
+  from { transform: translateY(30px) scale(0.97); opacity: 0; }
+  to   { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+/* ---- HEADER ---- */
+.adm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid #2a2d35;
+  background: #0d1117;
+  flex-shrink: 0;
+}
+
+.adm-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.adm-logo {
+  font-size: 22px;
+}
+
+.adm-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin: 0;
+  letter-spacing: 0.5px;
+}
+
+.adm-close {
+  background: #1e2129;
+  border: 1px solid #3a3d45;
+  color: #aaa;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.adm-close:hover {
+  background: #c0392b;
+  border-color: #c0392b;
+  color: #fff;
+}
+
+/* ---- TABS ---- */
+.adm-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 8px 16px;
+  background: #0d1117;
+  border-bottom: 1px solid #2a2d35;
+  flex-shrink: 0;
+}
+
+.adm-tab {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #6b7280;
+  padding: 7px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+
+.adm-tab:hover {
+  background: #1e2129;
+  color: #d1d5db;
+}
+
+.adm-tab--active {
+  background: #1e2d40;
+  border-color: #2563eb44;
+  color: #60a5fa;
+}
+
+/* ---- CONTENT AREA ---- */
+.adm-content {
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ---- CREATE LAYOUT ---- */
+.adm-create-layout {
+  display: grid;
+  grid-template-columns: 150px 1fr 220px;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ---- TYPE SIDEBAR ---- */
+.adm-type-sidebar {
+  background: #0d1117;
+  border-right: 1px solid #2a2d35;
+  padding: 12px 8px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.adm-sidebar-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #4b5563;
+  font-weight: 600;
+  padding: 4px 8px 8px;
+}
+
+.adm-type-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #9ca3af;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  transition: all 0.15s;
+}
+
+.adm-type-btn:hover {
+  background: #1e2129;
+  color: #e2e8f0;
+}
+
+.adm-type-btn--active {
+  background: #1e2d40;
+  border-color: #2563eb44;
+  color: #60a5fa;
+}
+
+.adm-type-icon {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* ---- FORM AREA ---- */
+.adm-form-area {
+  padding: 16px 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.adm-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.adm-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin: 0 0 12px 0;
+}
+
+.adm-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.adm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.adm-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.adm-input {
+  background: #1a1d24;
+  border: 1px solid #2a2d35;
+  color: #e2e8f0;
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 13px;
+  transition: border-color 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.adm-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  background: #1e2d40;
+}
+
+.adm-input--num {
+  max-width: 100px;
+}
+
+.adm-input--hex {
+  max-width: 90px;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.adm-textarea {
+  background: #1a1d24;
+  border: 1px solid #2a2d35;
+  color: #e2e8f0;
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 13px;
+  resize: vertical;
+  min-height: 64px;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  transition: border-color 0.15s;
+}
+
+.adm-textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  background: #1e2d40;
+}
+
+.adm-select {
+  background: #1a1d24;
+  border: 1px solid #2a2d35;
+  color: #e2e8f0;
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 13px;
+  cursor: pointer;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.adm-select:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+/* ---- IMAGE UPLOAD ---- */
+.adm-image-upload {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.adm-image-name {
+  font-size: 11px;
+  color: #6b7280;
+  font-style: italic;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- FORM ACTIONS ---- */
+.adm-form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #2a2d35;
+}
+
+/* ---- BUTTONS ---- */
+.adm-btn {
+  background: #1e2129;
+  border: 1px solid #2a2d35;
+  color: #d1d5db;
+  padding: 7px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.adm-btn:hover {
+  background: #2a2d35;
+  color: #f9fafb;
+}
+
+.adm-btn--primary {
+  background: #1d4ed8;
+  border-color: #2563eb;
+  color: #fff;
+}
+
+.adm-btn--primary:hover {
+  background: #2563eb;
+  border-color: #3b82f6;
+}
+
+.adm-btn--lg {
+  padding: 9px 20px;
+  font-size: 13px;
+}
+
+.adm-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: #6b7280;
+}
+
+.adm-btn--ghost:hover {
+  background: #1e2129;
+  color: #d1d5db;
+}
+
+.adm-btn--edit {
+  background: #1a2e1a;
+  border-color: #2d6a2d;
+  color: #86efac;
+  font-size: 11px;
+  padding: 5px 10px;
+}
+
+.adm-btn--edit:hover {
+  background: #2d6a2d;
+}
+
+.adm-btn--danger {
+  background: #2d1a1a;
+  border-color: #7f1d1d;
+  color: #fca5a5;
+  font-size: 11px;
+  padding: 5px 10px;
+}
+
+.adm-btn--danger:hover {
+  background: #7f1d1d;
+}
+
+.adm-btn--danger-sm {
+  background: #2d1a1a;
+  border-color: #7f1d1d;
+  color: #fca5a5;
+  font-size: 11px;
+  padding: 3px 7px;
+}
+
+.adm-btn--upload {
+  background: #1a2535;
+  border-color: #2563eb44;
+  color: #60a5fa;
+}
+
+.adm-btn--upload:hover {
+  background: #1e3a5f;
+}
+
+/* ---- PREVIEW AREA ---- */
+.adm-preview-area {
+  background: #0d1117;
+  border-left: 1px solid #2a2d35;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-y: auto;
+  gap: 8px;
+}
+
+/* ---- LIST AREA ---- */
+.adm-list-area {
+  padding: 20px;
+  overflow-y: auto;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.adm-card-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: flex-start;
+  align-items: flex-start;
+}
+
+.adm-card-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.adm-card-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* ---- VISUAL EDITOR ---- */
+.adm-visual-editor {
+  padding: 20px;
+  overflow-y: auto;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.adm-visual-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.adm-visual-block {
+  background: #1a1d24;
+  border: 1px solid #2a2d35;
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.adm-subsection {
+  font-size: 12px;
+  font-weight: 700;
+  color: #9ca3af;
+  margin: 0 0 10px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #2a2d35;
+}
+
+.adm-field--color {}
+
+.adm-color-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.adm-color-picker {
+  width: 32px;
+  height: 28px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  padding: 0;
+  background: transparent;
+  flex-shrink: 0;
+}
+
+/* ---- EXPORT PANEL ---- */
+.adm-export {
+  padding: 20px;
+  overflow-y: auto;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.adm-export-summary {
+  background: #1a1d24;
+  border: 1px solid #2a2d35;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.adm-export-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid #2a2d35;
+  font-size: 13px;
+  color: #d1d5db;
+}
+
+.adm-export-row:last-child {
+  border-bottom: none;
+}
+
+.adm-badge {
+  background: #1e2d40;
+  color: #60a5fa;
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* ---- SCROLLBARS ---- */
+.adm-panel *::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.adm-panel *::-webkit-scrollbar-track {
+  background: #0d1117;
+}
+
+.adm-panel *::-webkit-scrollbar-thumb {
+  background: #2a2d35;
+  border-radius: 3px;
+}
+
+.adm-panel *::-webkit-scrollbar-thumb:hover {
+  background: #3a3d45;
+}
+
+/* ---- RESPONSIVE ---- */
+@media (max-width: 768px) {
+  .adm-create-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr auto;
+  }
+
+  .adm-type-sidebar {
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid #2a2d35;
+    padding: 8px;
+  }
+
+  .adm-preview-area {
+    border-left: none;
+    border-top: 1px solid #2a2d35;
+  }
+}
