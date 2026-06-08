@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { FULL_DECK, shuffleDeck } from '../data/cards';
+import { FULL_DECK, shuffleDeck, getCards, getCardWeights, buildWeightedDeck } from '../data/cards';
 import { MULTIPLAYER_MAPS } from '../data/multiplayerMaps';
 import { T } from '../data/map';
 import { MONSTER_PILE_1, MONSTER_PILE_2, MONSTER_PILE_3, shuffleMonsters } from '../data/monsters';
@@ -18,7 +18,7 @@ function buildPlayer(charData, index, mapData) {
   const maxHp = stats.vie;
   const finalMaxHp = (charData.spec?.passive === 'imperissable') ? maxHp * 2 : maxHp;
   const start = mapData.playerStarts[index] ?? mapData.playerStarts[0];
-  const deck = shuffleDeck([...FULL_DECK]);
+  const deck = shuffleDeck(buildWeightedDeck(getCards(), getCardWeights()));
   return {
     id: index,
     name: charData.name ?? `Joueur ${index + 1}`,
@@ -347,9 +347,9 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
   const [pendingShopOffer, setPendingShopOffer] = useState(null);
 
   const treasurePileRef = useRef({
-    1: shuffleDeck(FULL_DECK.filter(c => c.rarity === 'common')),
-    2: shuffleDeck(FULL_DECK.filter(c => c.rarity === 'uncommon')),
-    3: shuffleDeck(FULL_DECK.filter(c => c.rarity === 'rare' || c.rarity === 'legendary')),
+    1: shuffleDeck(getCards().filter(c => c.rarity === 'common')),
+    2: shuffleDeck(getCards().filter(c => c.rarity === 'uncommon')),
+    3: shuffleDeck(getCards().filter(c => c.rarity === 'rare' || c.rarity === 'legendary')),
   });
 
   const currentPlayer = players[currentIdx] ?? players[0];

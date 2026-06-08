@@ -9,9 +9,10 @@ import AllPlayersStatus from './components/AllPlayersStatus';
 import CharacterCreation from './CharacterCreation';
 import SpecEditor from './components/SpecEditor';
 import StatsReference from './components/StatsReference';
+import AdminPanel from './components/AdminPanel';
 
 // ─── Player count selection ────────────────────────────────────────────────────
-function PlayerCountSelect({ onSelect, onEditSpecs, onStats }) {
+function PlayerCountSelect({ onSelect, onEditSpecs, onStats, onAdmin }) {
   return (
     <div style={{
       minHeight: '100vh', background: '#08080f',
@@ -57,6 +58,16 @@ function PlayerCountSelect({ onSelect, onEditSpecs, onStats }) {
           onMouseOver={e => { e.currentTarget.style.color = '#ffdd00'; e.currentTarget.style.borderColor = '#3a3a5a'; }}
           onMouseOut={e => { e.currentTarget.style.color = '#555'; e.currentTarget.style.borderColor = '#2a2a3a'; }}
         >📊 Référence stats</button>
+        <button
+          onClick={onAdmin}
+          style={{
+            background: 'transparent', border: '1px solid #2a2a3a', borderRadius: 8,
+            color: '#555', padding: '8px 20px', cursor: 'pointer', fontSize: 12,
+            transition: 'all 0.15s',
+          }}
+          onMouseOver={e => { e.currentTarget.style.color = '#ff8866'; e.currentTarget.style.borderColor = '#3a3a5a'; }}
+          onMouseOut={e => { e.currentTarget.style.color = '#555'; e.currentTarget.style.borderColor = '#2a2a3a'; }}
+        >⚙ Administration</button>
       </div>
     </div>
   );
@@ -69,7 +80,10 @@ export default function App() {
   const [setupIdx, setSetupIdx] = useState(0);
   const [editingSpecs, setEditingSpecs] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
 
+  // Admin panel
+  if (showAdmin) return <AdminPanel onClose={() => setShowAdmin(false)} />;
   // Spec editor
   if (editingSpecs) return <SpecEditor onClose={() => setEditingSpecs(false)} />;
   // Stats reference
@@ -81,7 +95,7 @@ export default function App() {
   );
 
   // Step 1: choose player count
-  if (!playerCount) return <PlayerCountSelect onSelect={setPlayerCount} onEditSpecs={() => setEditingSpecs(true)} onStats={() => setShowStats(true)} />;
+  if (!playerCount) return <PlayerCountSelect onSelect={setPlayerCount} onEditSpecs={() => setEditingSpecs(true)} onStats={() => setShowStats(true)} onAdmin={() => setShowAdmin(true)} />;
 
   // Step 2: create each character
   if (setupIdx < playerCount) {

@@ -323,3 +323,28 @@ export function shuffleDeck(deck) {
 
 // Keep old export names for backwards compat
 export const DECK = FULL_DECK;
+
+export function getCards() {
+  try {
+    const s = localStorage.getItem('detopia_custom_cards');
+    if (s) return JSON.parse(s);
+  } catch {}
+  return FULL_DECK;
+}
+
+export function getCardWeights() {
+  try {
+    const s = localStorage.getItem('detopia_card_weights');
+    if (s) return JSON.parse(s);
+  } catch {}
+  return {};
+}
+
+export function buildWeightedDeck(cards, weights) {
+  const deck = [];
+  for (const card of cards) {
+    const w = Math.max(0, Math.floor(weights[card.id] ?? 1));
+    for (let i = 0; i < w; i++) deck.push({ ...card });
+  }
+  return deck;
+}
