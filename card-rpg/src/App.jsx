@@ -9,6 +9,7 @@ import AllPlayersStatus from './components/AllPlayersStatus';
 import CharacterCreation from './CharacterCreation';
 import SpecEditor from './components/SpecEditor';
 import StatsReference from './components/StatsReference';
+import AdminPanel from './components/AdminPanel';
 
 // ─── Player count selection ────────────────────────────────────────────────────
 function PlayerCountSelect({ onSelect, onEditSpecs, onStats }) {
@@ -64,6 +65,7 @@ function PlayerCountSelect({ onSelect, onEditSpecs, onStats }) {
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
+  const [showAdmin, setShowAdmin] = useState(false);
   const [playerCount, setPlayerCount] = useState(null);
   const [characters, setCharacters] = useState([]);
   const [setupIdx, setSetupIdx] = useState(0);
@@ -191,6 +193,7 @@ function Game({ characters, onRestart }) {
         <div style={{ display: 'flex', gap: 8 }}>
           <div style={{ color: '#444', fontSize: 12, alignSelf: 'center' }}>{g.mapName}</div>
           <button onClick={onRestart} style={{ ...btnStyle('#1a1a2e', '#555'), fontSize: 11, padding: '4px 10px' }}>↩ Menu</button>
+          <button onClick={() => setShowAdmin(true)} style={{ ...btnStyle('#0d1a0d', '#2d6a2d'), fontSize: 11, padding: '4px 10px', title: 'Menu Admin' }}>⚙️ Admin</button>
         </div>
       </div>
 
@@ -500,6 +503,9 @@ function Game({ characters, onRestart }) {
           <div key={i} style={{ fontSize: 11, color: i === 0 ? '#ddd' : '#444', lineHeight: 1.6 }}>{line}</div>
         ))}
       </div>
+
+      {/* ── Admin Panel ── */}
+      {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
     </div>
   );
 }
