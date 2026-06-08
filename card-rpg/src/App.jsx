@@ -101,6 +101,7 @@ export default function App() {
   if (setupIdx < playerCount) {
     return (
       <CharacterCreation
+        key={setupIdx}
         playerIndex={setupIdx}
         totalPlayers={playerCount}
         onComplete={char => {
