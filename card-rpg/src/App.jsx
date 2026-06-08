@@ -65,7 +65,6 @@ function PlayerCountSelect({ onSelect, onEditSpecs, onStats }) {
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const [showAdmin, setShowAdmin] = useState(false);
   const [playerCount, setPlayerCount] = useState(null);
   const [characters, setCharacters] = useState([]);
   const [setupIdx, setSetupIdx] = useState(0);
@@ -89,6 +88,7 @@ export default function App() {
   if (setupIdx < playerCount) {
     return (
       <CharacterCreation
+        key={setupIdx}
         playerIndex={setupIdx}
         totalPlayers={playerCount}
         onComplete={char => {
@@ -106,6 +106,7 @@ export default function App() {
 
 // ─── Game ─────────────────────────────────────────────────────────────────────
 function Game({ characters, onRestart }) {
+  const [showAdmin, setShowAdmin] = useState(false);
   const g = useGameState(characters);
   const cp = g.currentPlayer;
   const cardType = g.selectedCard?.effect?.type;
