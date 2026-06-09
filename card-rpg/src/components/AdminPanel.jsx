@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import MapBuilder from './MapBuilder';
 import './AdminPanel.css';
 
 // ============================================================
@@ -556,6 +557,7 @@ export default function AdminPanel({ onClose }) {
     { id: 'list',   label: `📦 Cartes (${cards.length})`, icon: '📦' },
     { id: 'visual', label: '🎨 Visuels', icon: '🎨' },
     { id: 'export', label: '📤 Export', icon: '📤' },
+    { id: 'map',    label: '\uD83D\uDDFA\uFE0F Carte', icon: '\uD83D\uDDFA\uFE0F' },
   ];
 
   return (
@@ -651,6 +653,11 @@ export default function AdminPanel({ onClose }) {
           {activeTab === 'export' && (
             <ExportPanel cards={cards} />
           )}
+
+            {/* ---- ONGLET MAP ---- */}
+            {activeTab === 'map' && (
+              <MapBuilder />
+            )}
         </div>
       </div>
     </div>
