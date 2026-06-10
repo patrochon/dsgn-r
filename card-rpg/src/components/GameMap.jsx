@@ -169,6 +169,23 @@ export default function GameMap({ grid, players, currentIdx, enemies, traps, che
     baseAtTile[`${p.baseX},${p.baseY}`] = { player: p, idx: i };
   });
 
+  // Fog of war: visible tiles set
+  const visibleTiles = new Set();
+  for (let y = 0; y < rows; y++)
+    for (let x = 0; x < cols; x++) {
+      const cell = grid[y][x];
+      if (cell === T.SHOP || cell === T.TELEPORT) visibleTiles.add(`${x},${y}`);
+    }
+  (players ?? []).forEach(p => {
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++)
+      visibleTiles.add(`${p.baseX + dx},${p.baseY + dy}`);
+  });
+  (players ?? []).forEach(p => {
+    if (!p.isAlive) return;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++)
+      visibleTiles.add(`${p.x + dx},${p.y + dy}`);
+  });
+
   const canClick = [
     'choosing_move', 'choosing_attack',
     'voyage_astral_select', 'voyage_astral_move',
@@ -210,11 +227,14 @@ export default function GameMap({ grid, players, currentIdx, enemies, traps, che
           const isAtk      = isHighlight && (phase === 'choosing_attack' || phase === 'bum_throw' || phase === 'fou_attack');
           const isMove     = isHighlight && !isAtk;
           const isOwnBase  = playerHere && playerHere.player.baseX === x && playerHere.player.baseY === y;
+          const isVisible  = visibleTiles.has(key) || !!playerHere || isHighlight;
 
           // Background and border
           let bg, border, extraStyle = {};
 
-          if (isWall) {
+          if (!isVisible) {
+            bg = '#07070f'; border = '#0e0e1a';
+          } else if (isWall) {
             bg = TILE_DEF[T.WALL].bg;
             border = TILE_DEF[T.WALL].border;
           } else if (isAtk) {
@@ -270,10 +290,9 @@ export default function GameMap({ grid, players, currentIdx, enemies, traps, che
                 ...extraStyle,
               }}
             >
+              {isVisible && (<>
               {/* Wall brick texture */}
               {isWall && <WallCell />}
-
-              {/* Height indicator */}
 
               {/* Highlight ring */}
               {isHighlight && !isWall && (
@@ -361,6 +380,7 @@ export default function GameMap({ grid, players, currentIdx, enemies, traps, che
                   />
                 </div>
               )}
+              </>)}
 
               {/* Player token */}
               {!isWall && playerHere && (

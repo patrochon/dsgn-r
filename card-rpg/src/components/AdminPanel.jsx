@@ -1,664 +1,695 @@
-import { useState, useRef } from 'react';
-import MapBuilder from './MapBuilder';
-import './AdminPanel.css';
+import { useState, useMemo, useCallback } from 'react';
+import { FULL_DECK, getCards, getCardWeights, RARITY_COLOR, CAT_META } from '../data/cards';
+import { T } from '../data/map';
 
-// ============================================================
-// PARAMETRES VISUELS DES CARTES - Facilement modifiables ici
-// ============================================================
-const CARD_VISUAL_DEFAULTS = {
-  // Dimensions de la carte
-  width: 180,           // largeur en pixels
-  height: 260,          // hauteur en pixels
-  borderRadius: 16,     // arrondi des coins
-  // Couleurs par type de carte
-  colors: {
-    arme:         { bg: '#1a0a0a', border: '#8B2020', header: '#5C1010', text: '#f5d0d0' },
-    armure:       { bg: '#0a1a0a', border: '#1a6b1a', header: '#0d4a0d', text: '#d0f5d0' },
-    parchemin:    { bg: '#1a1600', border: '#8B7520', header: '#5C4C10', text: '#f5ecc0' },
-    deplacement:  { bg: '#0a0a1a', border: '#203a8B', header: '#10205C', text: '#c0d5f5' },
-    monstre:      { bg: '#1a0a1a', border: '#6b1a6b', header: '#4a0d4a', text: '#f0c0f5' },
-    classe:       { bg: '#120a00', border: '#8B5010', header: '#5C3010', text: '#f5dcc0' },
-    race:         { bg: '#001a1a', border: '#107a7a', header: '#0a5050', text: '#c0f0f5' },
-  },
-  // Typographie
-  titleSize: 14,        // taille du titre en px
-  descSize: 11,         // taille de la description en px
-  statSize: 10,         // taille des stats en px
-  fontFamily: "'Segoe UI', system-ui, sans-serif",
+const KEY_CARDS   = 'detopia_custom_cards';
+const KEY_WEIGHTS = 'detopia_card_weights';
+const KEY_MAPS    = 'detopia_custom_maps';
+
+const EFFECT_TYPES = ['move','defense','attack','magic_attack','heal','buff','magic','gold','passive','legendary','move_bonus','cure'];
+const RANGES       = ['self','melee','r2','r4','r5','r6','line','aoe1','aoe2','global','wall_melee','back'];
+const RARITIES     = ['common','uncommon','rare','legendary'];
+const RARITY_FR    = { common:'Commune', uncommon:'Peu commune', rare:'Rare', legendary:'Légendaire' };
+const CAT_MAP      = Object.fromEntries(CAT_META.map(c => [c.key, c]));
+
+// ── Styles partagés ──────────────────────────────────────────────────────────
+const BASE = {
+  overlay: { position:'fixed', inset:0, background:'#06060f', zIndex:9000, display:'flex', flexDirection:'column', fontFamily:"'Segoe UI', system-ui, sans-serif", color:'#ddd', overflow:'hidden' },
+  header:  { display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 24px', borderBottom:'1px solid #1e1e2e', flexShrink:0, background:'#0a0a18' },
+  tabs:    { display:'flex', gap:8, padding:'12px 24px', borderBottom:'1px solid #1a1a2a', background:'#08080f', flexShrink:0 },
+  scroll:  { flex:1, overflowY:'auto', padding:'20px 24px' },
+  btn:     { border:'1px solid #2a2a4a', borderRadius:8, padding:'7px 18px', cursor:'pointer', fontSize:12, fontWeight:600, letterSpacing:'0.05em', transition:'all 0.15s' },
+  input:   { background:'#12121e', border:'1px solid #2a2a3a', borderRadius:6, color:'#ddd', padding:'5px 10px', fontSize:12, width:'100%' },
+  label:   { fontSize:11, color:'#666', marginBottom:3, display:'block' },
+  row:     { display:'grid', gap:10, gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))' },
 };
 
-// Types de cartes disponibles
-const CARD_TYPES = [
-  { id: 'arme',        label: 'Arme',         icon: '⚔️',  emoji: '🗡️' },
-  { id: 'armure',      label: 'Armure',       icon: '🛡️',  emoji: '🛡️' },
-  { id: 'parchemin',   label: 'Parchemin',    icon: '📜',  emoji: '📜' },
-  { id: 'deplacement', label: 'Deplacement',  icon: '🚶',  emoji: '🏃' },
-  { id: 'monstre',     label: 'Monstre',      icon: '👹',  emoji: '💀' },
-  { id: 'classe',      label: 'Classe',       icon: '⚡',  emoji: '🎖️' },
-  { id: 'race',        label: 'Race',         icon: '🧬',  emoji: '🌍' },
-];
+// ── Probability bar ──────────────────────────────────────────────────────────
+function ProbBar({ pct, color }) {
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+      <div style={{ flex:1, height:6, background:'#1a1a2a', borderRadius:3, overflow:'hidden' }}>
+        <div style={{ width:`${Math.min(pct * 5, 100)}%`, height:'100%', background: color || '#88aaff', borderRadius:3, transition:'width 0.3s' }}/>
+      </div>
+      <span style={{ fontSize:11, color:'#888', minWidth:42, textAlign:'right' }}>{pct.toFixed(2)}%</span>
+    </div>
+  );
+}
 
-// Champs par type de carte
-const CARD_FIELDS = {
-  arme: [
-    { key: 'id',     label: 'Identifiant',  type: 'text',   placeholder: 'ex: epee_feu' },
-    { key: 'name',   label: 'Nom',          type: 'text',   placeholder: 'ex: Épée de Feu' },
-    { key: 'icon',   label: 'Icône/Emoji',  type: 'text',   placeholder: '⚔️' },
-    { key: 'damage', label: 'Dégâts',       type: 'number', placeholder: '3' },
-    { key: 'range',  label: 'Portée',       type: 'select', options: ['self','melee','back','r2','r3','aoe2'] },
-    { key: 'cost',   label: 'Coût PA',      type: 'number', placeholder: '1' },
-    { key: 'effect', label: 'Type d\'effet', type: 'text', placeholder: 'attack' },
-    { key: 'desc',   label: 'Description',  type: 'textarea', placeholder: 'Description de la carte...' },
-    { key: 'image',  label: 'Image PNG',    type: 'image',  placeholder: '' },
-  ],
-  armure: [
-    { key: 'id',     label: 'Identifiant',  type: 'text',   placeholder: 'ex: bouclier_bois' },
-    { key: 'name',   label: 'Nom',          type: 'text',   placeholder: 'ex: Bouclier de Bois' },
-    { key: 'icon',   label: 'Icône/Emoji',  type: 'text',   placeholder: '🛡️' },
-    { key: 'armor',  label: 'Armure',       type: 'number', placeholder: '2' },
-    { key: 'cost',   label: 'Coût PA',      type: 'number', placeholder: '1' },
-    { key: 'effect', label: 'Type d\'effet', type: 'text', placeholder: 'block' },
-    { key: 'desc',   label: 'Description',  type: 'textarea', placeholder: 'Description de la carte...' },
-    { key: 'image',  label: 'Image PNG',    type: 'image',  placeholder: '' },
-  ],
-  parchemin: [
-    { key: 'id',      label: 'Identifiant', type: 'text',   placeholder: 'ex: soin_mineur' },
-    { key: 'name',    label: 'Nom',         type: 'text',   placeholder: 'ex: Parchemin de Soin' },
-    { key: 'icon',    label: 'Icône/Emoji', type: 'text',   placeholder: '📜' },
-    { key: 'heal',    label: 'Soin',        type: 'number', placeholder: '3' },
-    { key: 'cost',    label: 'Coût PA',     type: 'number', placeholder: '1' },
-    { key: 'effect',  label: 'Type d\'effet', type: 'text', placeholder: 'heal' },
-    { key: 'range',   label: 'Portée',      type: 'select', options: ['self','melee','r2','r3','aoe2'] },
-    { key: 'desc',    label: 'Description', type: 'textarea', placeholder: 'Description...' },
-    { key: 'image',   label: 'Image PNG',   type: 'image',  placeholder: '' },
-  ],
-  deplacement: [
-    { key: 'id',     label: 'Identifiant',  type: 'text',   placeholder: 'ex: sprint' },
-    { key: 'name',   label: 'Nom',          type: 'text',   placeholder: 'ex: Sprint' },
-    { key: 'icon',   label: 'Icône/Emoji',  type: 'text',   placeholder: '🏃' },
-    { key: 'move',   label: 'Cases',        type: 'number', placeholder: '2' },
-    { key: 'cost',   label: 'Coût PA',      type: 'number', placeholder: '1' },
-    { key: 'effect', label: 'Type d\'effet', type: 'text', placeholder: 'move' },
-    { key: 'desc',   label: 'Description',  type: 'textarea', placeholder: 'Description...' },
-    { key: 'image',  label: 'Image PNG',    type: 'image',  placeholder: '' },
-  ],
-  monstre: [
-    { key: 'id',     label: 'Identifiant',  type: 'text',   placeholder: 'ex: gobelin' },
-    { key: 'name',   label: 'Nom',          type: 'text',   placeholder: 'ex: Gobelin' },
-    { key: 'icon',   label: 'Icône/Emoji',  type: 'text',   placeholder: '👹' },
-    { key: 'hp',     label: 'PV max',       type: 'number', placeholder: '5' },
-    { key: 'atk',    label: 'Attaque',      type: 'number', placeholder: '2' },
-    { key: 'def',    label: 'Défense',      type: 'number', placeholder: '1' },
-    { key: 'move',   label: 'Mouvement',    type: 'number', placeholder: '2' },
-    { key: 'xp',     label: 'XP donné',     type: 'number', placeholder: '3' },
-    { key: 'desc',   label: 'Description',  type: 'textarea', placeholder: 'Description...' },
-    { key: 'image',  label: 'Image PNG',    type: 'image',  placeholder: '' },
-  ],
-  classe: [
-    { key: 'id',      label: 'Identifiant', type: 'text',   placeholder: 'ex: guerrier' },
-    { key: 'name',    label: 'Nom',         type: 'text',   placeholder: 'ex: Guerrier' },
-    { key: 'icon',    label: 'Icône/Emoji', type: 'text',   placeholder: '⚔️' },
-    { key: 'flavor',  label: 'Description', type: 'textarea', placeholder: 'Texte saveur...' },
-    { key: 'force',   label: 'Bonus Force', type: 'number', placeholder: '0' },
-    { key: 'magie',   label: 'Bonus Magie', type: 'number', placeholder: '0' },
-    { key: 'vie',     label: 'Bonus Vie',   type: 'number', placeholder: '0' },
-    { key: 'deplacement', label: 'Bonus Déplacement', type: 'number', placeholder: '0' },
-    { key: 'passive', label: 'Passif',      type: 'text',   placeholder: 'nom_du_passif' },
-    { key: 'startCards', label: 'Cartes départ', type: 'text', placeholder: 'id1,id2,id3' },
-    { key: 'image',   label: 'Image PNG',   type: 'image',  placeholder: '' },
-  ],
-  race: [
-    { key: 'id',      label: 'Identifiant', type: 'text',   placeholder: 'ex: elfe' },
-    { key: 'name',    label: 'Nom',         type: 'text',   placeholder: 'ex: Elfe' },
-    { key: 'icon',    label: 'Icône/Emoji', type: 'text',   placeholder: '🧝' },
-    { key: 'flavor',  label: 'Description', type: 'textarea', placeholder: 'Texte saveur...' },
-    { key: 'force',   label: 'Bonus Force', type: 'number', placeholder: '0' },
-    { key: 'magie',   label: 'Bonus Magie', type: 'number', placeholder: '0' },
-    { key: 'vie',     label: 'Bonus Vie',   type: 'number', placeholder: '0' },
-    { key: 'deplacement', label: 'Bonus Déplacement', type: 'number', placeholder: '0' },
-    { key: 'destin',  label: 'Bonus Destin', type: 'number', placeholder: '0' },
-    { key: 'armor',   label: 'Bonus Armure', type: 'number', placeholder: '0' },
-    { key: 'passive', label: 'Passif',      type: 'text',   placeholder: 'nom_du_passif' },
-    { key: 'image',   label: 'Image PNG',   type: 'image',  placeholder: '' },
-  ],
-};
-
-// ============================================================
-// APERCU DE CARTE
-// ============================================================
-function CardPreview({ cardType, formData, visuals }) {
-  const v = visuals;
-  const col = v.colors[cardType] || v.colors.arme;
-  const type = CARD_TYPES.find(t => t.id === cardType);
+// ── Card row in editor ───────────────────────────────────────────────────────
+function CardRow({ card, isExpanded, onToggle, onChange }) {
+  const rc = RARITY_COLOR[card.rarity] ?? '#888';
+  const handleField = (path, val) => {
+    const updated = JSON.parse(JSON.stringify(card));
+    const parts = path.split('.');
+    let obj = updated;
+    for (let i = 0; i < parts.length - 1; i++) obj = obj[parts[i]];
+    obj[parts[parts.length - 1]] = val;
+    onChange(card.id, updated);
+  };
 
   return (
-    <div style={{
-      width: v.width,
-      height: v.height,
-      borderRadius: v.borderRadius,
-      background: col.bg,
-      border: `2px solid ${col.border}`,
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden',
-      fontFamily: v.fontFamily,
-      boxShadow: `0 0 18px ${col.border}66, inset 0 0 30px #00000066`,
-      flexShrink: 0,
-    }}>
-      {/* En-tête */}
-      <div style={{
-        background: col.header,
-        padding: '6px 8px',
-        borderBottom: `1px solid ${col.border}`,
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-      }}>
-        <span style={{ fontSize: v.titleSize - 2, color: col.border, fontWeight: 700 }}>
-          {type?.icon} {type?.label?.toUpperCase()}
-        </span>
-        <span style={{ fontSize: 11, color: col.text, opacity: 0.7 }}>
-          {formData.cost ? `${formData.cost} PA` : ''}
-        </span>
+    <div style={{ borderBottom:'1px solid #14141f', overflow:'hidden' }}>
+      <div
+        onClick={onToggle}
+        style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', cursor:'pointer', userSelect:'none',
+          background: isExpanded ? '#101020' : 'transparent',
+          transition:'background 0.15s' }}
+        onMouseOver={e => { if (!isExpanded) e.currentTarget.style.background = '#0e0e1c'; }}
+        onMouseOut={e => { if (!isExpanded) e.currentTarget.style.background = 'transparent'; }}
+      >
+        <span style={{ fontSize:18, minWidth:26 }}>{card.icon}</span>
+        <span style={{ fontSize:13, fontWeight:600, flex:1 }}>{card.name}</span>
+        <span style={{ fontSize:10, border:`1px solid ${rc}`, color:rc, borderRadius:4, padding:'1px 7px', marginRight:4 }}>{RARITY_FR[card.rarity]}</span>
+        <span style={{ fontSize:10, color:'#555', background:'#1a1a2a', borderRadius:4, padding:'1px 7px' }}>{card.catLabel}</span>
+        <span style={{ fontSize:14, color:'#444', marginLeft:4 }}>{isExpanded ? '▲' : '▼'}</span>
       </div>
 
-      {/* Image */}
-      <div style={{
-        height: 90,
-        background: formData.imageSrc ? `url(${formData.imageSrc}) center/cover no-repeat` : `${col.header}88`,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: 36,
-        borderBottom: `1px solid ${col.border}44`,
-      }}>
-        {!formData.imageSrc && (formData.icon || type?.emoji || '?')}
-      </div>
+      {isExpanded && (
+        <div style={{ padding:'14px 16px 20px', background:'#0d0d1c', borderTop:'1px solid #1a1a2a' }}>
+          <div style={{ ...BASE.row, marginBottom:12 }}>
+            <div>
+              <label style={BASE.label}>Icône</label>
+              <input style={{ ...BASE.input, width:60, textAlign:'center', fontSize:18 }}
+                value={card.icon} onChange={e => handleField('icon', e.target.value)} />
+            </div>
+            <div>
+              <label style={BASE.label}>Nom</label>
+              <input style={BASE.input} value={card.name} onChange={e => handleField('name', e.target.value)} />
+            </div>
+            <div>
+              <label style={BASE.label}>Rareté</label>
+              <select style={{ ...BASE.input, cursor:'pointer' }} value={card.rarity} onChange={e => handleField('rarity', e.target.value)}>
+                {RARITIES.map(r => <option key={r} value={r}>{RARITY_FR[r]}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={BASE.label}>Catégorie</label>
+              <select style={{ ...BASE.input, cursor:'pointer' }} value={card.category}
+                onChange={e => {
+                  const meta = CAT_MAP[e.target.value];
+                  if (!meta) return;
+                  const updated = { ...JSON.parse(JSON.stringify(card)), category: meta.key, catColor: meta.color, catLabel: meta.label };
+                  onChange(card.id, updated);
+                }}>
+                {CAT_META.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+              </select>
+            </div>
+          </div>
 
-      {/* Titre */}
-      <div style={{
-        padding: '5px 8px 3px',
-        fontSize: v.titleSize,
-        fontWeight: 700,
-        color: col.text,
-        textAlign: 'center',
-        textShadow: `0 0 8px ${col.border}`,
-      }}>
-        {formData.name || 'Nom de la carte'}
-      </div>
+          <div style={{ marginBottom:12 }}>
+            <label style={BASE.label}>Description</label>
+            <textarea style={{ ...BASE.input, resize:'vertical', minHeight:52, lineHeight:1.5 }}
+              value={card.desc} onChange={e => handleField('desc', e.target.value)} />
+          </div>
 
-      {/* Stats */}
-      <div style={{
-        padding: '2px 8px',
-        display: 'flex',
-        gap: 6,
-        justifyContent: 'center',
-        flexWrap: 'wrap',
-      }}>
-        {formData.damage && <span style={{ fontSize: v.statSize, color: '#ff8888', background: '#ff000022', borderRadius: 4, padding: '1px 5px' }}>⚔️ {formData.damage}</span>}
-        {formData.armor && <span style={{ fontSize: v.statSize, color: '#88ff88', background: '#00ff0022', borderRadius: 4, padding: '1px 5px' }}>🛡 {formData.armor}</span>}
-        {formData.heal && <span style={{ fontSize: v.statSize, color: '#88ffaa', background: '#00ff5522', borderRadius: 4, padding: '1px 5px' }}>💚 {formData.heal}</span>}
-        {formData.move && <span style={{ fontSize: v.statSize, color: '#88aaff', background: '#0055ff22', borderRadius: 4, padding: '1px 5px' }}>🏃 {formData.move}</span>}
-        {formData.hp && <span style={{ fontSize: v.statSize, color: '#ff88aa', background: '#ff005522', borderRadius: 4, padding: '1px 5px' }}>❤️ {formData.hp}</span>}
-        {formData.atk && <span style={{ fontSize: v.statSize, color: '#ffaa44', background: '#ff660022', borderRadius: 4, padding: '1px 5px' }}>⚡ {formData.atk}</span>}
-        {formData.range && <span style={{ fontSize: v.statSize, color: '#aaaaff', background: '#0000ff22', borderRadius: 4, padding: '1px 5px' }}>📏 {formData.range}</span>}
-      </div>
-
-      {/* Description */}
-      <div style={{
-        padding: '4px 8px',
-        fontSize: v.descSize,
-        color: col.text,
-        opacity: 0.85,
-        textAlign: 'center',
-        flexGrow: 1,
-        overflow: 'hidden',
-        lineHeight: 1.4,
-      }}>
-        {formData.desc || formData.flavor || 'Description de la carte...'}
-      </div>
-
-      {/* Passif badge */}
-      {(formData.passive || formData.bonus) && (
-        <div style={{
-          padding: '3px 8px',
-          background: `${col.border}33`,
-          borderTop: `1px solid ${col.border}44`,
-          fontSize: 9,
-          color: col.border,
-          textAlign: 'center',
-        }}>
-          PASSIF: {formData.passive}
+          <div style={{ fontSize:11, color:'#555', marginBottom:8, textTransform:'uppercase', letterSpacing:'0.1em' }}>Effet</div>
+          <div style={{ ...BASE.row, marginBottom:10 }}>
+            <div>
+              <label style={BASE.label}>Type</label>
+              <select style={{ ...BASE.input, cursor:'pointer' }} value={card.effect.type} onChange={e => handleField('effect.type', e.target.value)}>
+                {EFFECT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={BASE.label}>Bonus</label>
+              <input type="number" style={BASE.input} value={card.effect.bonus}
+                onChange={e => handleField('effect.bonus', Number(e.target.value))} />
+            </div>
+            <div>
+              <label style={BASE.label}>Portée</label>
+              <select style={{ ...BASE.input, cursor:'pointer' }} value={card.effect.range ?? 'self'} onChange={e => handleField('effect.range', e.target.value)}>
+                {RANGES.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={BASE.label}>Coût Magie</label>
+              <input type="number" style={BASE.input} min={0} value={card.effect.magieCost ?? 0}
+                onChange={e => handleField('effect.magieCost', Number(e.target.value))} />
+            </div>
+          </div>
+          <div>
+            <label style={BASE.label}>Effet spécial (code)</label>
+            <input style={BASE.input} value={card.effect.special ?? ''} placeholder="ex: stat:armor+1 ou burn"
+              onChange={e => handleField('effect.special', e.target.value || null)} />
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-// ============================================================
-// FORMULAIRE D'UNE CARTE
-// ============================================================
-function CardForm({ cardType, formData, onChange }) {
-  const fields = CARD_FIELDS[cardType] || [];
-  const imageRef = useRef(null);
+// ── Tab: Cartes ──────────────────────────────────────────────────────────────
+function CardsTab({ cards, setCards }) {
+  const [catFilter, setCatFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [expandedId, setExpandedId] = useState(null);
+  const [flash, setFlash] = useState('');
 
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => onChange({ ...formData, imageSrc: ev.target.result, imageFile: file.name });
-    reader.readAsDataURL(file);
-  };
-
-  return (
-    <div className="adm-form">
-      {fields.map(field => (
-        <div key={field.key} className="adm-field">
-          <label className="adm-label">{field.label}</label>
-
-          {field.type === 'text' && (
-            <input
-              className="adm-input"
-              type="text"
-              placeholder={field.placeholder}
-              value={formData[field.key] || ''}
-              onChange={e => onChange({ ...formData, [field.key]: e.target.value })}
-            />
-          )}
-
-          {field.type === 'number' && (
-            <input
-              className="adm-input adm-input--num"
-              type="number"
-              placeholder={field.placeholder}
-              value={formData[field.key] || ''}
-              onChange={e => onChange({ ...formData, [field.key]: e.target.value })}
-            />
-          )}
-
-          {field.type === 'textarea' && (
-            <textarea
-              className="adm-textarea"
-              placeholder={field.placeholder}
-              value={formData[field.key] || ''}
-              onChange={e => onChange({ ...formData, [field.key]: e.target.value })}
-              rows={3}
-            />
-          )}
-
-          {field.type === 'select' && (
-            <select
-              className="adm-select"
-              value={formData[field.key] || ''}
-              onChange={e => onChange({ ...formData, [field.key]: e.target.value })}
-            >
-              <option value="">-- choisir --</option>
-              {field.options.map(o => <option key={o} value={o}>{o}</option>)}
-            </select>
-          )}
-
-          {field.type === 'image' && (
-            <div className="adm-image-upload">
-              <button
-                className="adm-btn adm-btn--upload"
-                onClick={() => imageRef.current?.click()}
-                type="button"
-              >
-                {formData.imageSrc ? '✅ Image chargée' : '📁 Choisir PNG'}
-              </button>
-              {formData.imageFile && (
-                <span className="adm-image-name">{formData.imageFile}</span>
-              )}
-              <input
-                ref={imageRef}
-                type="file"
-                accept="image/png,image/jpeg,image/gif,image/webp"
-                style={{ display: 'none' }}
-                onChange={handleImageUpload}
-              />
-              {formData.imageSrc && (
-                <button
-                  className="adm-btn adm-btn--danger-sm"
-                  onClick={() => onChange({ ...formData, imageSrc: null, imageFile: null })}
-                  type="button"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ============================================================
-// EDITEUR VISUEL
-// ============================================================
-function VisualEditor({ visuals, onChange }) {
-  const handleColorChange = (type, key, val) => {
-    onChange({
-      ...visuals,
-      colors: {
-        ...visuals.colors,
-        [type]: { ...visuals.colors[type], [key]: val },
-      },
-    });
-  };
-
-  return (
-    <div className="adm-visual-editor">
-      <h3 className="adm-section-title">🎨 Paramètres Visuels</h3>
-
-      <div className="adm-visual-grid">
-        <div className="adm-visual-block">
-          <h4 className="adm-subsection">Dimensions</h4>
-          <div className="adm-field">
-            <label className="adm-label">Largeur (px)</label>
-            <input type="number" className="adm-input adm-input--num" value={visuals.width}
-              onChange={e => onChange({ ...visuals, width: Number(e.target.value) })} />
-          </div>
-          <div className="adm-field">
-            <label className="adm-label">Hauteur (px)</label>
-            <input type="number" className="adm-input adm-input--num" value={visuals.height}
-              onChange={e => onChange({ ...visuals, height: Number(e.target.value) })} />
-          </div>
-          <div className="adm-field">
-            <label className="adm-label">Arrondi coins (px)</label>
-            <input type="number" className="adm-input adm-input--num" value={visuals.borderRadius}
-              onChange={e => onChange({ ...visuals, borderRadius: Number(e.target.value) })} />
-          </div>
-          <div className="adm-field">
-            <label className="adm-label">Taille titre (px)</label>
-            <input type="number" className="adm-input adm-input--num" value={visuals.titleSize}
-              onChange={e => onChange({ ...visuals, titleSize: Number(e.target.value) })} />
-          </div>
-          <div className="adm-field">
-            <label className="adm-label">Taille desc (px)</label>
-            <input type="number" className="adm-input adm-input--num" value={visuals.descSize}
-              onChange={e => onChange({ ...visuals, descSize: Number(e.target.value) })} />
-          </div>
-        </div>
-
-        {CARD_TYPES.map(ct => (
-          <div key={ct.id} className="adm-visual-block">
-            <h4 className="adm-subsection">{ct.icon} {ct.label}</h4>
-            {['bg', 'border', 'header', 'text'].map(key => (
-              <div key={key} className="adm-field adm-field--color">
-                <label className="adm-label">{key.charAt(0).toUpperCase() + key.slice(1)}</label>
-                <div className="adm-color-row">
-                  <input
-                    type="color"
-                    className="adm-color-picker"
-                    value={visuals.colors[ct.id]?.[key] || '#000000'}
-                    onChange={e => handleColorChange(ct.id, key, e.target.value)}
-                  />
-                  <input
-                    type="text"
-                    className="adm-input adm-input--hex"
-                    value={visuals.colors[ct.id]?.[key] || '#000000'}
-                    onChange={e => handleColorChange(ct.id, key, e.target.value)}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// LISTE DES CARTES CREEES
-// ============================================================
-function CardList({ cards, onEdit, onDelete, visuals }) {
-  if (!cards.length) return (
-    <p style={{ color: '#555', textAlign: 'center', padding: 32 }}>
-      Aucune carte créée. Utilisez le formulaire à gauche.
-    </p>
-  );
-
-  return (
-    <div className="adm-card-list">
-      {cards.map((card, idx) => (
-        <div key={idx} className="adm-card-item">
-          <CardPreview cardType={card._type} formData={card} visuals={visuals} />
-          <div className="adm-card-actions">
-            <button className="adm-btn adm-btn--edit" onClick={() => onEdit(idx)}>✏️ Éditer</button>
-            <button className="adm-btn adm-btn--danger" onClick={() => onDelete(idx)}>🗑️ Suppr.</button>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ============================================================
-// EXPORTEUR JSON/JS
-// ============================================================
-function ExportPanel({ cards }) {
-  const grouped = {};
-  CARD_TYPES.forEach(t => { grouped[t.id] = []; });
-  cards.forEach(card => {
-    const type = card._type;
-    if (grouped[type]) grouped[type].push(card);
-  });
-
-  const generateJS = () => {
-    let output = '// === Données exportées depuis le menu Admin Détopia ===\n\n';
-    CARD_TYPES.forEach(t => {
-      const items = grouped[t.id];
-      if (!items.length) return;
-      const varName = t.id.toUpperCase() + 'S';
-      output += `export const ${varName} = [\n`;
-      items.forEach(card => {
-        const clean = { ...card };
-        delete clean._type;
-        delete clean.imageSrc;
-        output += '  ' + JSON.stringify(clean, null, 2).replace(/\n/g, '\n  ') + ',\n';
-      });
-      output += `];\n\n`;
-    });
-    return output;
-  };
-
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(generateJS());
-    alert('Code JS copié dans le presse-papiers !');
-  };
-
-  const downloadJSON = () => {
-    const data = {};
-    CARD_TYPES.forEach(t => { data[t.id] = grouped[t.id]; });
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'detopia-cards.json';
-    a.click();
-  };
-
-  const totalCards = cards.length;
-
-  return (
-    <div className="adm-export">
-      <h3 className="adm-section-title">📤 Export</h3>
-      <p style={{ color: '#888', fontSize: 12, marginBottom: 12 }}>
-        {totalCards} carte(s) créée(s)
-      </p>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        <button className="adm-btn adm-btn--primary" onClick={copyToClipboard}>📋 Copier JS</button>
-        <button className="adm-btn adm-btn--primary" onClick={downloadJSON}>⬇️ JSON</button>
-      </div>
-      <div className="adm-export-summary">
-        {CARD_TYPES.map(t => (
-          grouped[t.id].length > 0 && (
-            <div key={t.id} className="adm-export-row">
-              <span>{t.icon} {t.label}</span>
-              <span className="adm-badge">{grouped[t.id].length}</span>
-            </div>
-          )
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// COMPOSANT PRINCIPAL ADMINPANEL
-// ============================================================
-export default function AdminPanel({ onClose }) {
-  const [activeTab, setActiveTab] = useState('create'); // 'create' | 'list' | 'visual' | 'export'
-  const [activeType, setActiveType] = useState('arme');
-  const [formData, setFormData] = useState({});
-  const [cards, setCards] = useState([]);
-  const [editIndex, setEditIndex] = useState(null);
-  const [visuals, setVisuals] = useState({ ...CARD_VISUAL_DEFAULTS });
-
-  const handleSaveCard = () => {
-    if (!formData.name) {
-      alert('Le nom de la carte est obligatoire !');
-      return;
+  const categories = useMemo(() => {
+    const seen = new Set();
+    const cats = [];
+    for (const c of cards) {
+      if (!seen.has(c.category)) { seen.add(c.category); cats.push({ key: c.category, label: c.catLabel }); }
     }
-    const card = { ...formData, _type: activeType };
-    if (editIndex !== null) {
-      const updated = [...cards];
-      updated[editIndex] = card;
-      setCards(updated);
-      setEditIndex(null);
+    return cats;
+  }, [cards]);
+
+  const visible = useMemo(() => {
+    return cards.filter(c => {
+      if (catFilter !== 'all' && c.category !== catFilter) return false;
+      if (search && !c.name.toLowerCase().includes(search.toLowerCase()) && !c.id.includes(search.toLowerCase())) return false;
+      return true;
+    });
+  }, [cards, catFilter, search]);
+
+  const handleChange = useCallback((id, updated) => {
+    setCards(prev => prev.map(c => c.id === id ? updated : c));
+  }, [setCards]);
+
+  const save = () => {
+    localStorage.setItem(KEY_CARDS, JSON.stringify(cards));
+    setFlash('saved');
+    setTimeout(() => setFlash(''), 1800);
+  };
+  const reset = () => {
+    localStorage.removeItem(KEY_CARDS);
+    setCards(FULL_DECK.map(c => JSON.parse(JSON.stringify(c))));
+    setFlash('reset');
+    setTimeout(() => setFlash(''), 1800);
+  };
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', height:'100%' }}>
+      <div style={{ display:'flex', gap:10, alignItems:'center', padding:'12px 0', flexWrap:'wrap', flexShrink:0 }}>
+        <input placeholder="Rechercher..." style={{ ...BASE.input, width:180 }}
+          value={search} onChange={e => setSearch(e.target.value)} />
+        <span style={{ color:'#444', fontSize:12 }}>{visible.length} carte{visible.length !== 1 ? 's' : ''}</span>
+        <div style={{ flex:1 }}/>
+        <button style={{ ...BASE.btn, background: flash==='saved' ? '#1a3a1a' : '#0e0e1a', color: flash==='saved' ? '#55cc88' : '#88aaff', borderColor: flash==='saved' ? '#336633' : '#2a2a4a' }} onClick={save}>
+          {flash==='saved' ? 'OK Sauvegardé' : 'Sauvegarder'}
+        </button>
+        <button style={{ ...BASE.btn, background:'#0e0e1a', color:'#ff8866', borderColor:'#3a1a1a' }} onClick={reset}>
+          Réinitialiser
+        </button>
+      </div>
+
+      <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:14, flexShrink:0 }}>
+        <button onClick={() => setCatFilter('all')}
+          style={{ ...BASE.btn, fontSize:11, padding:'4px 12px', background: catFilter==='all' ? '#1a2a3a' : 'transparent', color: catFilter==='all' ? '#88ccff' : '#555', borderColor: catFilter==='all' ? '#3a5a7a' : '#1e1e2e' }}>
+          Toutes ({cards.length})
+        </button>
+        {categories.map(c => (
+          <button key={c.key} onClick={() => setCatFilter(c.key)}
+            style={{ ...BASE.btn, fontSize:11, padding:'4px 12px', background: catFilter===c.key ? '#1a2a3a' : 'transparent', color: catFilter===c.key ? '#88ccff' : '#555', borderColor: catFilter===c.key ? '#3a5a7a' : '#1e1e2e' }}>
+            {c.label} ({cards.filter(x => x.category === c.key).length})
+          </button>
+        ))}
+      </div>
+
+      <div style={{ fontSize:11, color:'#444', marginBottom:14, fontStyle:'italic', flexShrink:0 }}>
+        Les modifications s'appliquent à la prochaine partie démarrée.
+      </div>
+
+      <div style={{ flex:1, overflowY:'auto', border:'1px solid #1a1a2a', borderRadius:8 }}>
+        {visible.map(card => (
+          <CardRow key={card.id} card={card}
+            isExpanded={expandedId === card.id}
+            onToggle={() => setExpandedId(prev => prev === card.id ? null : card.id)}
+            onChange={handleChange}
+          />
+        ))}
+        {visible.length === 0 && (
+          <div style={{ textAlign:'center', color:'#444', padding:40 }}>Aucune carte ne correspond.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Tab: Rareté / Probabilité ────────────────────────────────────────────────
+function RarityTab({ cards, weights, setWeights }) {
+  const [filter, setFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('rarity');
+  const [flash, setFlash] = useState('');
+
+  const totalWeight = useMemo(() => cards.reduce((s, c) => s + Math.max(0, weights[c.id] ?? 1), 0), [cards, weights]);
+
+  const sorted = useMemo(() => {
+    let list = filter === 'all' ? [...cards] : cards.filter(c => c.rarity === filter);
+    list = list.map(c => ({ ...c, w: Math.max(0, weights[c.id] ?? 1), prob: totalWeight > 0 ? (Math.max(0, weights[c.id] ?? 1) / totalWeight * 100) : 0 }));
+    if (sortBy === 'rarity') {
+      const order = { legendary:0, rare:1, uncommon:2, common:3 };
+      list.sort((a,b) => order[a.rarity] - order[b.rarity] || a.name.localeCompare(b.name));
+    } else if (sortBy === 'weight') {
+      list.sort((a,b) => b.w - a.w || a.name.localeCompare(b.name));
+    } else if (sortBy === 'prob') {
+      list.sort((a,b) => b.prob - a.prob);
     } else {
-      setCards([...cards, card]);
+      list.sort((a,b) => a.name.localeCompare(b.name));
     }
-    setFormData({});
+    return list;
+  }, [cards, weights, filter, sortBy, totalWeight]);
+
+  const setWeight = (id, val) => {
+    const v = Math.max(0, Math.min(10, Math.floor(Number(val))));
+    setWeights(prev => ({ ...prev, [id]: v }));
   };
 
-  const handleEdit = (idx) => {
-    const card = cards[idx];
-    setActiveType(card._type);
-    setFormData(card);
-    setEditIndex(idx);
-    setActiveTab('create');
+  const save = () => {
+    localStorage.setItem(KEY_WEIGHTS, JSON.stringify(weights));
+    setFlash('saved');
+    setTimeout(() => setFlash(''), 1800);
+  };
+  const reset = () => {
+    localStorage.removeItem(KEY_WEIGHTS);
+    setWeights({});
+    setFlash('reset');
+    setTimeout(() => setFlash(''), 1800);
   };
 
-  const handleDelete = (idx) => {
-    if (!confirm('Supprimer cette carte ?')) return;
-    setCards(cards.filter((_, i) => i !== idx));
-    if (editIndex === idx) { setEditIndex(null); setFormData({}); }
-  };
+  const raritySummary = useMemo(() => {
+    const map = {};
+    for (const c of cards) {
+      const w = Math.max(0, weights[c.id] ?? 1);
+      if (!map[c.rarity]) map[c.rarity] = { count:0, weight:0 };
+      map[c.rarity].count++;
+      map[c.rarity].weight += w;
+    }
+    return map;
+  }, [cards, weights]);
 
-  const handleCancel = () => {
-    setFormData({});
-    setEditIndex(null);
-  };
-
-  const tabs = [
-    { id: 'create', label: '✨ Créer', icon: '➕' },
-    { id: 'list',   label: `📦 Cartes (${cards.length})`, icon: '📦' },
-    { id: 'visual', label: '🎨 Visuels', icon: '🎨' },
-    { id: 'export', label: '📤 Export', icon: '📤' },
-    { id: 'map',    label: '\uD83D\uDDFA\uFE0F Carte', icon: '\uD83D\uDDFA\uFE0F' },
-  ];
+  const excl = cards.filter(c => (weights[c.id] ?? 1) === 0).length;
 
   return (
-    <div className="adm-overlay">
-      <div className="adm-panel">
-        {/* HEADER */}
-        <div className="adm-header">
-          <div className="adm-header-left">
-            <span className="adm-logo">⚙️</span>
-            <h2 className="adm-title">Menu Admin — Détopia</h2>
-          </div>
-          <button className="adm-close" onClick={onClose} title="Fermer">✕</button>
+    <div style={{ display:'flex', flexDirection:'column', height:'100%' }}>
+      <div style={{ display:'flex', gap:10, alignItems:'center', padding:'12px 0', flexWrap:'wrap', flexShrink:0 }}>
+        <span style={{ fontSize:12, color:'#888' }}>Taille du deck : <strong style={{ color:'#88ccff' }}>{totalWeight}</strong> cartes</span>
+        {excl > 0 && <span style={{ fontSize:11, color:'#ff6644', background:'#1a0a0a', border:'1px solid #3a1a1a', borderRadius:4, padding:'2px 8px' }}>{excl} carte{excl>1?'s':''} exclue{excl>1?'s':''}</span>}
+        <div style={{ flex:1 }}/>
+        <button style={{ ...BASE.btn, background: flash==='saved' ? '#1a3a1a' : '#0e0e1a', color: flash==='saved' ? '#55cc88' : '#88aaff', borderColor: flash==='saved' ? '#336633' : '#2a2a4a' }} onClick={save}>
+          {flash==='saved' ? 'OK Sauvegardé' : 'Sauvegarder'}
+        </button>
+        <button style={{ ...BASE.btn, background:'#0e0e1a', color:'#ff8866', borderColor:'#3a1a1a' }} onClick={reset}>
+          Réinitialiser
+        </button>
+      </div>
+
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:10, marginBottom:14, flexShrink:0 }}>
+        {RARITIES.map(r => {
+          const info = raritySummary[r] ?? { count:0, weight:0 };
+          const rc = RARITY_COLOR[r];
+          const pct = totalWeight > 0 ? info.weight / totalWeight * 100 : 0;
+          return (
+            <div key={r} style={{ background:'#0d0d1c', border:`1px solid ${rc}22`, borderRadius:8, padding:'10px 14px' }}>
+              <div style={{ fontSize:11, color:rc, fontWeight:700, marginBottom:4 }}>{RARITY_FR[r].toUpperCase()}</div>
+              <div style={{ fontSize:18, color:'#ddd', fontWeight:700 }}>{info.count}</div>
+              <div style={{ fontSize:11, color:'#555', marginBottom:6 }}>cartes · {info.weight} dans deck</div>
+              <ProbBar pct={pct} color={rc} />
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ display:'flex', gap:8, alignItems:'center', marginBottom:10, flexShrink:0, flexWrap:'wrap' }}>
+        <span style={{ fontSize:11, color:'#555' }}>Filtrer :</span>
+        {['all', ...RARITIES].map(r => (
+          <button key={r} onClick={() => setFilter(r)}
+            style={{ ...BASE.btn, fontSize:11, padding:'3px 10px',
+              background: filter===r ? '#1a2a3a' : 'transparent',
+              color: filter===r ? (r==='all' ? '#88ccff' : (RARITY_COLOR[r]||'#88ccff')) : '#444',
+              borderColor: filter===r ? '#3a5a7a' : '#1e1e2e' }}>
+            {r === 'all' ? 'Toutes' : RARITY_FR[r]}
+          </button>
+        ))}
+        <span style={{ fontSize:11, color:'#555', marginLeft:8 }}>Trier :</span>
+        {[['rarity','Rareté'],['name','Nom'],['weight','Poids'],['prob','Prob.']].map(([k,l]) => (
+          <button key={k} onClick={() => setSortBy(k)}
+            style={{ ...BASE.btn, fontSize:11, padding:'3px 10px',
+              background: sortBy===k ? '#1a2a3a' : 'transparent',
+              color: sortBy===k ? '#88ccff' : '#444',
+              borderColor: sortBy===k ? '#3a5a7a' : '#1e1e2e' }}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ fontSize:11, color:'#444', marginBottom:10, fontStyle:'italic', flexShrink:0 }}>
+        Poids 1 = probabilité normale · Poids 0 = carte exclue du deck · Max 10
+      </div>
+
+      <div style={{ flex:1, overflowY:'auto', border:'1px solid #1a1a2a', borderRadius:8 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'32px 1fr 100px 100px 1fr', gap:12, padding:'8px 14px', background:'#0a0a18', borderBottom:'1px solid #1a1a2a', fontSize:10, color:'#555', textTransform:'uppercase', letterSpacing:'0.08em', position:'sticky', top:0 }}>
+          <div></div>
+          <div>Carte</div>
+          <div>Rareté</div>
+          <div style={{ textAlign:'center' }}>Poids</div>
+          <div>Probabilité</div>
         </div>
 
-        {/* TABS */}
-        <div className="adm-tabs">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              className={`adm-tab ${activeTab === tab.id ? 'adm-tab--active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
+        {sorted.map(card => {
+          const rc = RARITY_COLOR[card.rarity] ?? '#888';
+          const isExcl = card.w === 0;
+          return (
+            <div key={card.id} style={{ display:'grid', gridTemplateColumns:'32px 1fr 100px 100px 1fr', gap:12, padding:'8px 14px', borderBottom:'1px solid #0f0f1a', alignItems:'center', opacity: isExcl ? 0.4 : 1, transition:'opacity 0.2s' }}
+              onMouseOver={e => e.currentTarget.style.background = '#0e0e1c'}
+              onMouseOut={e => e.currentTarget.style.background = 'transparent'}
             >
-              {tab.label}
-            </button>
-          ))}
+              <span style={{ fontSize:18, textAlign:'center' }}>{card.icon}</span>
+              <span style={{ fontSize:13 }}>{card.name}</span>
+              <span style={{ fontSize:10, color:rc, border:`1px solid ${rc}44`, borderRadius:4, padding:'1px 6px', display:'inline-block', textAlign:'center' }}>{RARITY_FR[card.rarity]}</span>
+              <div style={{ display:'flex', alignItems:'center', gap:6, justifyContent:'center' }}>
+                <button onClick={() => setWeight(card.id, card.w - 1)} style={{ background:'#1a1a2a', border:'1px solid #2a2a3a', color:'#aaa', borderRadius:4, width:22, height:22, cursor:'pointer', fontSize:14, lineHeight:1, display:'flex', alignItems:'center', justifyContent:'center' }}>-</button>
+                <span style={{ minWidth:18, textAlign:'center', fontSize:13, fontWeight:700, color: card.w === 0 ? '#ff4444' : card.w > 1 ? '#55cc88' : '#ddd' }}>{card.w}</span>
+                <button onClick={() => setWeight(card.id, card.w + 1)} style={{ background:'#1a1a2a', border:'1px solid #2a2a3a', color:'#aaa', borderRadius:4, width:22, height:22, cursor:'pointer', fontSize:14, lineHeight:1, display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
+              </div>
+              <ProbBar pct={card.prob} color={rc} />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Map Tab ──────────────────────────────────────────────────────────────────
+const TILE_PALETTE = [
+  { code: T.FLOOR,    icon: '·',  label: 'Sol',      bg: '#111120', border: '#1c1c30', color: '#444' },
+  { code: T.WALL,     icon: '█',  label: 'Mur',      bg: '#06060e', border: '#333',    color: '#aaa' },
+  { code: T.SHOP,     icon: '🏪', label: 'Magasin',  bg: '#1c1400', border: '#cc9900', color: '#cc9900' },
+  { code: T.TELEPORT, icon: '🌀', label: 'Portail',  bg: '#0d0019', border: '#8833ee', color: '#8833ee' },
+  { code: T.EXIT,     icon: '⭐', label: 'Objectif', bg: '#001810', border: '#00bb66', color: '#00bb66' },
+  { code: T.ITEM,     icon: '✦',  label: 'Item',     bg: '#0d130d', border: '#2a4a2a', color: '#3a6a3a' },
+  { code: T.PRISON,   icon: '⛓',  label: 'Prison',   bg: '#1a0a0a', border: '#994422', color: '#994422' },
+  { code: -1,         icon: '⚑',  label: 'Base',     bg: '#0a1020', border: '#5ab4ff', color: '#5ab4ff' },
+];
+
+function makeGrid(rows, cols) {
+  return Array.from({ length: rows }, (_, y) =>
+    Array.from({ length: cols }, (_, x) =>
+      x === 0 || x === cols - 1 || y === 0 || y === rows - 1 ? T.WALL : T.FLOOR
+    )
+  );
+}
+
+function getCustomMaps() {
+  try { return JSON.parse(localStorage.getItem(KEY_MAPS) ?? '[]'); } catch { return []; }
+}
+
+function MapTab() {
+  const [maps, setMaps] = useState(() => getCustomMaps());
+  const [editingIdx, setEditingIdx] = useState(null);
+  const [draft, setDraft] = useState(null);
+  const [activeTile, setActiveTile] = useState(T.WALL);
+  const [painting, setPainting] = useState(false);
+  const [flash, setFlash] = useState('');
+
+  const CELL = 22;
+
+  const newMap = () => {
+    const rows = 15, cols = 15;
+    setDraft({
+      id: `custom_${Date.now()}`,
+      name: 'Nouvelle carte',
+      desc: '',
+      playerCount: [2, 3, 4],
+      grid: makeGrid(rows, cols),
+      playerStarts: [{ x: 1, y: 1, label: 'P1' }, { x: cols - 2, y: rows - 2, label: 'P2' }],
+    });
+    setEditingIdx(null);
+  };
+
+  const editMap = (idx) => {
+    setDraft(JSON.parse(JSON.stringify(maps[idx])));
+    setEditingIdx(idx);
+  };
+
+  const deleteMap = (idx) => {
+    const next = maps.filter((_, i) => i !== idx);
+    localStorage.setItem(KEY_MAPS, JSON.stringify(next));
+    setMaps(next);
+  };
+
+  const saveDraft = () => {
+    const next = editingIdx !== null
+      ? maps.map((m, i) => i === editingIdx ? draft : m)
+      : [...maps, draft];
+    localStorage.setItem(KEY_MAPS, JSON.stringify(next));
+    setMaps(next);
+    setDraft(null);
+    setEditingIdx(null);
+    setFlash('saved');
+    setTimeout(() => setFlash(''), 1800);
+  };
+
+  const paintTile = (y, x) => {
+    if (!draft) return;
+    if (y === 0 || x === 0 || y === draft.grid.length - 1 || x === draft.grid[0].length - 1) return;
+    if (activeTile === -1) {
+      const alreadyBase = draft.playerStarts.some(p => p.x === x && p.y === y);
+      if (alreadyBase) {
+        setDraft(d => ({ ...d, playerStarts: d.playerStarts.filter(p => !(p.x === x && p.y === y)) }));
+      } else {
+        const label = `P${draft.playerStarts.length + 1}`;
+        setDraft(d => ({ ...d, playerStarts: [...d.playerStarts, { x, y, label }] }));
+      }
+    } else {
+      setDraft(d => {
+        const grid = d.grid.map(r => [...r]);
+        grid[y][x] = activeTile;
+        return { ...d, grid };
+      });
+    }
+  };
+
+  const resize = (rows, cols) => {
+    if (!draft) return;
+    const oldGrid = draft.grid;
+    const newGrid = Array.from({ length: rows }, (_, y) =>
+      Array.from({ length: cols }, (_, x) => {
+        if (y === 0 || x === 0 || y === rows - 1 || x === cols - 1) return T.WALL;
+        return (oldGrid[y]?.[x]) ?? T.FLOOR;
+      })
+    );
+    setDraft(d => ({ ...d, grid: newGrid, playerStarts: d.playerStarts.filter(p => p.x < cols - 1 && p.y < rows - 1) }));
+  };
+
+  const togglePlayerCount = (n) => {
+    setDraft(d => ({
+      ...d,
+      playerCount: d.playerCount.includes(n)
+        ? d.playerCount.filter(x => x !== n)
+        : [...d.playerCount, n].sort((a, b) => a - b),
+    }));
+  };
+
+  if (draft) {
+    const rows = draft.grid.length;
+    const cols = draft.grid[0].length;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 0', flexShrink: 0, flexWrap: 'wrap' }}>
+          <button onClick={() => setDraft(null)} style={{ ...BASE.btn, background: 'transparent', color: '#888', borderColor: '#2a2a3a' }}>← Retour</button>
+          <input
+            style={{ ...BASE.input, width: 220, fontSize: 14, fontWeight: 700 }}
+            value={draft.name}
+            onChange={e => setDraft(d => ({ ...d, name: e.target.value }))}
+            placeholder="Nom de la carte"
+          />
+          <input
+            style={{ ...BASE.input, flex: 1, minWidth: 140 }}
+            value={draft.desc}
+            onChange={e => setDraft(d => ({ ...d, desc: e.target.value }))}
+            placeholder="Description"
+          />
+          <button onClick={saveDraft} style={{ ...BASE.btn, background: '#1a3a1a', color: '#55cc88', borderColor: '#336633' }}>💾 Sauvegarder</button>
         </div>
 
-        {/* CONTENT */}
-        <div className="adm-content">
-
-          {/* ---- ONGLET CRÉER ---- */}
-          {activeTab === 'create' && (
-            <div className="adm-create-layout">
-              {/* Sidebar: type selector */}
-              <div className="adm-type-sidebar">
-                <div className="adm-sidebar-title">Type de carte</div>
-                {CARD_TYPES.map(t => (
-                  <button
-                    key={t.id}
-                    className={`adm-type-btn ${activeType === t.id ? 'adm-type-btn--active' : ''}`}
-                    onClick={() => { setActiveType(t.id); setFormData({}); setEditIndex(null); }}
+        <div style={{ display: 'flex', gap: 16, flex: 1, overflow: 'hidden', minHeight: 0 }}>
+          {/* Left: grid */}
+          <div style={{ overflowAuto: 'auto', flex: '0 0 auto', overflow: 'auto' }}>
+            <div
+              onMouseLeave={() => setPainting(false)}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(${cols}, ${CELL}px)`,
+                gridTemplateRows: `repeat(${rows}, ${CELL}px)`,
+                gap: 1,
+                border: '2px solid #2a2a4a',
+                borderRadius: 6,
+                overflow: 'hidden',
+                userSelect: 'none',
+                cursor: 'crosshair',
+              }}
+            >
+              {draft.grid.map((row, y) => row.map((cell, x) => {
+                const pal = TILE_PALETTE.find(p => p.code === cell) ?? TILE_PALETTE[0];
+                const base = draft.playerStarts.find(p => p.x === x && p.y === y);
+                return (
+                  <div
+                    key={`${x},${y}`}
+                    onMouseDown={() => { setPainting(true); paintTile(y, x); }}
+                    onMouseEnter={() => painting && paintTile(y, x)}
+                    onMouseUp={() => setPainting(false)}
+                    style={{
+                      width: CELL, height: CELL,
+                      background: pal.bg,
+                      border: `1px solid ${pal.border}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: base ? 8 : cell === T.FLOOR || cell === T.WALL ? 10 : 12,
+                      color: base ? '#5ab4ff' : pal.color,
+                      boxSizing: 'border-box',
+                      fontWeight: base ? 900 : 400,
+                    }}
                   >
-                    <span className="adm-type-icon">{t.icon}</span>
-                    <span>{t.label}</span>
+                    {base ? base.label : (cell !== T.FLOOR && cell !== T.WALL ? pal.icon : (cell === T.WALL ? '' : ''))}
+                  </div>
+                );
+              }))}
+            </div>
+          </div>
+
+          {/* Right: controls */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto', minWidth: 180 }}>
+            <div>
+              <div style={{ fontSize: 11, color: '#555', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Tuile active</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {TILE_PALETTE.map(p => (
+                  <button
+                    key={p.code}
+                    onClick={() => setActiveTile(p.code)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      background: activeTile === p.code ? '#1a2a4a' : 'transparent',
+                      border: `1px solid ${activeTile === p.code ? '#3a5a8a' : '#1e1e2e'}`,
+                      borderRadius: 6, padding: '5px 10px', cursor: 'pointer', color: p.color,
+                      fontSize: 12, textAlign: 'left',
+                    }}
+                  >
+                    <span style={{ fontSize: 14, minWidth: 18 }}>{p.icon}</span>
+                    {p.label}
                   </button>
                 ))}
               </div>
+            </div>
 
-              {/* Form */}
-              <div className="adm-form-area">
-                <div className="adm-form-header">
-                  <h3 className="adm-section-title">
-                    {editIndex !== null ? '✏️ Modifier la carte' : '➕ Nouvelle carte — '}{CARD_TYPES.find(t => t.id === activeType)?.label}
-                  </h3>
-                  {editIndex !== null && (
-                    <button className="adm-btn adm-btn--ghost" onClick={handleCancel}>Annuler l'édition</button>
-                  )}
-                </div>
-                <CardForm cardType={activeType} formData={formData} onChange={setFormData} />
-                <div className="adm-form-actions">
-                  <button className="adm-btn adm-btn--primary adm-btn--lg" onClick={handleSaveCard}>
-                    {editIndex !== null ? '💾 Sauvegarder' : '✅ Ajouter la carte'}
+            <div>
+              <div style={{ fontSize: 11, color: '#555', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Taille de la carte</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {[[10,10],[12,12],[15,15],[19,19],[15,19]].map(([r, c]) => (
+                  <button key={`${r}x${c}`} onClick={() => resize(r, c)}
+                    style={{ ...BASE.btn, fontSize: 11, padding: '3px 8px', background: rows === r && cols === c ? '#1a2a3a' : 'transparent', color: rows === r && cols === c ? '#88ccff' : '#555', borderColor: rows === r && cols === c ? '#3a5a7a' : '#1e1e2e' }}>
+                    {r}×{c}
                   </button>
-                  <button className="adm-btn adm-btn--ghost" onClick={handleCancel}>Réinitialiser</button>
-                </div>
-              </div>
-
-              {/* Preview */}
-              <div className="adm-preview-area">
-                <div className="adm-sidebar-title">Aperçu</div>
-                <CardPreview cardType={activeType} formData={formData} visuals={visuals} />
-                <div style={{ marginTop: 12, fontSize: 11, color: '#555', textAlign: 'center' }}>
-                  {visuals.width} × {visuals.height} px
-                </div>
+                ))}
               </div>
             </div>
-          )}
 
-          {/* ---- ONGLET LISTE ---- */}
-          {activeTab === 'list' && (
-            <div className="adm-list-area">
-              <h3 className="adm-section-title">📦 Cartes créées ({cards.length})</h3>
-              <CardList cards={cards} onEdit={handleEdit} onDelete={handleDelete} visuals={visuals} />
+            <div>
+              <div style={{ fontSize: 11, color: '#555', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Joueurs compatibles</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {[2, 3, 4, 5, 6].map(n => (
+                  <button key={n} onClick={() => togglePlayerCount(n)}
+                    style={{ ...BASE.btn, fontSize: 12, padding: '4px 10px', width: 36,
+                      background: draft.playerCount.includes(n) ? '#1a3a1a' : 'transparent',
+                      color: draft.playerCount.includes(n) ? '#55cc88' : '#555',
+                      borderColor: draft.playerCount.includes(n) ? '#336633' : '#1e1e2e' }}>
+                    {n}
+                  </button>
+                ))}
+              </div>
             </div>
-          )}
 
-          {/* ---- ONGLET VISUELS ---- */}
-          {activeTab === 'visual' && (
-            <VisualEditor visuals={visuals} onChange={setVisuals} />
-          )}
-
-          {/* ---- ONGLET EXPORT ---- */}
-          {activeTab === 'export' && (
-            <ExportPanel cards={cards} />
-          )}
-
-            {/* ---- ONGLET MAP ---- */}
-            {activeTab === 'map' && (
-              <MapBuilder />
-            )}
+            <div>
+              <div style={{ fontSize: 11, color: '#555', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Bases joueurs ({draft.playerStarts.length})</div>
+              {draft.playerStarts.map((p, i) => (
+                <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
+                  <span style={{ fontSize: 11, color: '#5ab4ff', minWidth: 20 }}>{p.label}</span>
+                  <span style={{ fontSize: 10, color: '#444' }}>{p.x},{p.y}</span>
+                  <button onClick={() => setDraft(d => ({ ...d, playerStarts: d.playerStarts.filter((_, j) => j !== i) }))}
+                    style={{ background: 'transparent', border: '1px solid #3a1a1a', color: '#ff6644', borderRadius: 4, padding: '1px 6px', cursor: 'pointer', fontSize: 11 }}>×</button>
+                </div>
+              ))}
+              <div style={{ fontSize: 10, color: '#444', fontStyle: 'italic', marginTop: 4 }}>Cliquez sur la grille avec ⚑ pour placer une base</div>
+            </div>
+          </div>
         </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '12px 0', flexShrink: 0 }}>
+        <span style={{ fontSize: 12, color: '#888' }}>{maps.length} carte{maps.length !== 1 ? 's' : ''} personnalisée{maps.length !== 1 ? 's' : ''}</span>
+        <div style={{ flex: 1 }} />
+        {flash === 'saved' && <span style={{ fontSize: 11, color: '#55cc88' }}>✓ Sauvegardée</span>}
+        <button onClick={newMap} style={{ ...BASE.btn, background: '#1a2a3a', color: '#88ccff', borderColor: '#3a5a8a' }}>+ Nouvelle carte</button>
+      </div>
+
+      {maps.length === 0 && (
+        <div style={{ textAlign: 'center', color: '#444', padding: 60, fontStyle: 'italic' }}>
+          Aucune carte personnalisée. Créez-en une avec le bouton ci-dessus.
+        </div>
+      )}
+
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+        {maps.map((m, i) => (
+          <div key={m.id} style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '12px 14px', borderBottom: '1px solid #14141f' }}
+            onMouseOver={e => e.currentTarget.style.background = '#0e0e1c'}
+            onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 2 }}>{m.name}</div>
+              <div style={{ fontSize: 11, color: '#555' }}>{m.desc || 'Aucune description'}</div>
+              <div style={{ fontSize: 10, color: '#444', marginTop: 3 }}>
+                {m.grid.length}×{m.grid[0].length} · Joueurs : {m.playerCount.join(', ')} · {m.playerStarts.length} bases
+              </div>
+            </div>
+            <button onClick={() => editMap(i)} style={{ ...BASE.btn, background: 'transparent', color: '#88aaff', borderColor: '#2a2a4a' }}>Modifier</button>
+            <button onClick={() => deleteMap(i)} style={{ ...BASE.btn, background: 'transparent', color: '#ff6644', borderColor: '#3a1a1a' }}>Supprimer</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Main AdminPanel ──────────────────────────────────────────────────────────
+export default function AdminPanel({ onClose }) {
+  const [tab, setTab] = useState('cards');
+  const [cards, setCards] = useState(() => getCards().map(c => JSON.parse(JSON.stringify(c))));
+  const [weights, setWeights] = useState(() => getCardWeights());
+
+  const tabBtn = (id, label, active) => (
+    <button onClick={() => setTab(id)} style={{
+      ...BASE.btn,
+      background: active ? '#1a2a4a' : 'transparent',
+      color: active ? '#88ccff' : '#555',
+      borderColor: active ? '#3a5a8a' : '#1e1e2e',
+      fontSize: 13,
+    }}>{label}</button>
+  );
+
+  return (
+    <div style={BASE.overlay}>
+      <div style={BASE.header}>
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          <span style={{ fontSize:18, color:'#88aaff', fontWeight:700, letterSpacing:2 }}>ADMINISTRATION</span>
+          <span style={{ fontSize:11, color:'#333', background:'#0a0a18', border:'1px solid #1e1e2e', borderRadius:4, padding:'2px 8px' }}>Détopia</span>
+        </div>
+        <button onClick={onClose} style={{ ...BASE.btn, background:'transparent', color:'#666', borderColor:'#1e1e2e', fontSize:14 }}>Fermer</button>
+      </div>
+
+      <div style={BASE.tabs}>
+        {tabBtn('cards', '🃏 Cartes', tab === 'cards')}
+        {tabBtn('rarity', '📊 Rareté / Probabilité', tab === 'rarity')}
+        {tabBtn('maps', '🗺️ Cartes de jeu', tab === 'maps')}
+      </div>
+
+      <div style={BASE.scroll}>
+        {tab === 'cards'  && <CardsTab  cards={cards}   setCards={setCards}     />}
+        {tab === 'rarity' && <RarityTab cards={cards}   weights={weights} setWeights={setWeights} />}
+        {tab === 'maps'   && <MapTab />}
       </div>
     </div>
   );

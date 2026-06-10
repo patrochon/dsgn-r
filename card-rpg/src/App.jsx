@@ -12,7 +12,7 @@ import StatsReference from './components/StatsReference';
 import AdminPanel from './components/AdminPanel';
 
 // ─── Player count selection ────────────────────────────────────────────────────
-function PlayerCountSelect({ onSelect, onEditSpecs, onStats }) {
+function PlayerCountSelect({ onSelect, onEditSpecs, onStats, onAdmin }) {
   return (
     <div style={{
       minHeight: '100vh', background: '#08080f',
@@ -58,6 +58,16 @@ function PlayerCountSelect({ onSelect, onEditSpecs, onStats }) {
           onMouseOver={e => { e.currentTarget.style.color = '#ffdd00'; e.currentTarget.style.borderColor = '#3a3a5a'; }}
           onMouseOut={e => { e.currentTarget.style.color = '#555'; e.currentTarget.style.borderColor = '#2a2a3a'; }}
         >📊 Référence stats</button>
+        <button
+          onClick={onAdmin}
+          style={{
+            background: 'transparent', border: '1px solid #2a2a3a', borderRadius: 8,
+            color: '#555', padding: '8px 20px', cursor: 'pointer', fontSize: 12,
+            transition: 'all 0.15s',
+          }}
+          onMouseOver={e => { e.currentTarget.style.color = '#ff8866'; e.currentTarget.style.borderColor = '#3a3a5a'; }}
+          onMouseOut={e => { e.currentTarget.style.color = '#555'; e.currentTarget.style.borderColor = '#2a2a3a'; }}
+        >⚙ Administration</button>
       </div>
     </div>
   );
@@ -70,7 +80,10 @@ export default function App() {
   const [setupIdx, setSetupIdx] = useState(0);
   const [editingSpecs, setEditingSpecs] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
 
+  // Admin panel
+  if (showAdmin) return <AdminPanel onClose={() => setShowAdmin(false)} />;
   // Spec editor
   if (editingSpecs) return <SpecEditor onClose={() => setEditingSpecs(false)} />;
   // Stats reference
@@ -82,7 +95,7 @@ export default function App() {
   );
 
   // Step 1: choose player count
-  if (!playerCount) return <PlayerCountSelect onSelect={setPlayerCount} onEditSpecs={() => setEditingSpecs(true)} onStats={() => setShowStats(true)} />;
+  if (!playerCount) return <PlayerCountSelect onSelect={setPlayerCount} onEditSpecs={() => setEditingSpecs(true)} onStats={() => setShowStats(true)} onAdmin={() => setShowAdmin(true)} />;
 
   // Step 2: create each character
   if (setupIdx < playerCount) {
@@ -106,7 +119,6 @@ export default function App() {
 
 // ─── Game ─────────────────────────────────────────────────────────────────────
 function Game({ characters, onRestart }) {
-  const [showAdmin, setShowAdmin] = useState(false);
   const g = useGameState(characters);
   const cp = g.currentPlayer;
   const cardType = g.selectedCard?.effect?.type;
@@ -194,7 +206,6 @@ function Game({ characters, onRestart }) {
         <div style={{ display: 'flex', gap: 8 }}>
           <div style={{ color: '#444', fontSize: 12, alignSelf: 'center' }}>{g.mapName}</div>
           <button onClick={onRestart} style={{ ...btnStyle('#1a1a2e', '#555'), fontSize: 11, padding: '4px 10px' }}>↩ Menu</button>
-          <button onClick={() => setShowAdmin(true)} style={{ ...btnStyle('#0d1a0d', '#2d6a2d'), fontSize: 11, padding: '4px 10px', title: 'Menu Admin' }}>⚙️ Admin</button>
         </div>
       </div>
 
@@ -504,9 +515,6 @@ function Game({ characters, onRestart }) {
           <div key={i} style={{ fontSize: 11, color: i === 0 ? '#ddd' : '#444', lineHeight: 1.6 }}>{line}</div>
         ))}
       </div>
-
-      {/* ── Admin Panel ── */}
-      {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
     </div>
   );
 }
