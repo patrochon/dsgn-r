@@ -1,8 +1,10 @@
 import { useState, useMemo, useCallback } from 'react';
 import { FULL_DECK, getCards, getCardWeights, RARITY_COLOR, CAT_META } from '../data/cards';
+import { T } from '../data/map';
 
 const KEY_CARDS   = 'detopia_custom_cards';
 const KEY_WEIGHTS = 'detopia_card_weights';
+const KEY_MAPS    = 'detopia_custom_maps';
 
 const EFFECT_TYPES = ['move','defense','attack','magic_attack','heal','buff','magic','gold','passive','legendary','move_bonus','cure'];
 const RANGES       = ['self','melee','r2','r4','r5','r6','line','aoe1','aoe2','global','wall_melee','back'];
@@ -370,6 +372,288 @@ function RarityTab({ cards, weights, setWeights }) {
   );
 }
 
+// ── Map Tab ──────────────────────────────────────────────────────────────────
+const TILE_PALETTE = [
+  { code: T.FLOOR,    icon: '·',  label: 'Sol',      bg: '#111120', border: '#1c1c30', color: '#444' },
+  { code: T.WALL,     icon: '█',  label: 'Mur',      bg: '#06060e', border: '#333',    color: '#aaa' },
+  { code: T.SHOP,     icon: '🏪', label: 'Magasin',  bg: '#1c1400', border: '#cc9900', color: '#cc9900' },
+  { code: T.TELEPORT, icon: '🌀', label: 'Portail',  bg: '#0d0019', border: '#8833ee', color: '#8833ee' },
+  { code: T.EXIT,     icon: '⭐', label: 'Objectif', bg: '#001810', border: '#00bb66', color: '#00bb66' },
+  { code: T.ITEM,     icon: '✦',  label: 'Item',     bg: '#0d130d', border: '#2a4a2a', color: '#3a6a3a' },
+  { code: T.PRISON,   icon: '⛓',  label: 'Prison',   bg: '#1a0a0a', border: '#994422', color: '#994422' },
+  { code: -1,         icon: '⚑',  label: 'Base',     bg: '#0a1020', border: '#5ab4ff', color: '#5ab4ff' },
+];
+
+function makeGrid(rows, cols) {
+  return Array.from({ length: rows }, (_, y) =>
+    Array.from({ length: cols }, (_, x) =>
+      x === 0 || x === cols - 1 || y === 0 || y === rows - 1 ? T.WALL : T.FLOOR
+    )
+  );
+}
+
+function getCustomMaps() {
+  try { return JSON.parse(localStorage.getItem(KEY_MAPS) ?? '[]'); } catch { return []; }
+}
+
+function MapTab() {
+  const [maps, setMaps] = useState(() => getCustomMaps());
+  const [editingIdx, setEditingIdx] = useState(null);
+  const [draft, setDraft] = useState(null);
+  const [activeTile, setActiveTile] = useState(T.WALL);
+  const [painting, setPainting] = useState(false);
+  const [flash, setFlash] = useState('');
+
+  const CELL = 22;
+
+  const newMap = () => {
+    const rows = 15, cols = 15;
+    setDraft({
+      id: `custom_${Date.now()}`,
+      name: 'Nouvelle carte',
+      desc: '',
+      playerCount: [2, 3, 4],
+      grid: makeGrid(rows, cols),
+      playerStarts: [{ x: 1, y: 1, label: 'P1' }, { x: cols - 2, y: rows - 2, label: 'P2' }],
+    });
+    setEditingIdx(null);
+  };
+
+  const editMap = (idx) => {
+    setDraft(JSON.parse(JSON.stringify(maps[idx])));
+    setEditingIdx(idx);
+  };
+
+  const deleteMap = (idx) => {
+    const next = maps.filter((_, i) => i !== idx);
+    localStorage.setItem(KEY_MAPS, JSON.stringify(next));
+    setMaps(next);
+  };
+
+  const saveDraft = () => {
+    const next = editingIdx !== null
+      ? maps.map((m, i) => i === editingIdx ? draft : m)
+      : [...maps, draft];
+    localStorage.setItem(KEY_MAPS, JSON.stringify(next));
+    setMaps(next);
+    setDraft(null);
+    setEditingIdx(null);
+    setFlash('saved');
+    setTimeout(() => setFlash(''), 1800);
+  };
+
+  const paintTile = (y, x) => {
+    if (!draft) return;
+    if (y === 0 || x === 0 || y === draft.grid.length - 1 || x === draft.grid[0].length - 1) return;
+    if (activeTile === -1) {
+      const alreadyBase = draft.playerStarts.some(p => p.x === x && p.y === y);
+      if (alreadyBase) {
+        setDraft(d => ({ ...d, playerStarts: d.playerStarts.filter(p => !(p.x === x && p.y === y)) }));
+      } else {
+        const label = `P${draft.playerStarts.length + 1}`;
+        setDraft(d => ({ ...d, playerStarts: [...d.playerStarts, { x, y, label }] }));
+      }
+    } else {
+      setDraft(d => {
+        const grid = d.grid.map(r => [...r]);
+        grid[y][x] = activeTile;
+        return { ...d, grid };
+      });
+    }
+  };
+
+  const resize = (rows, cols) => {
+    if (!draft) return;
+    const oldGrid = draft.grid;
+    const newGrid = Array.from({ length: rows }, (_, y) =>
+      Array.from({ length: cols }, (_, x) => {
+        if (y === 0 || x === 0 || y === rows - 1 || x === cols - 1) return T.WALL;
+        return (oldGrid[y]?.[x]) ?? T.FLOOR;
+      })
+    );
+    setDraft(d => ({ ...d, grid: newGrid, playerStarts: d.playerStarts.filter(p => p.x < cols - 1 && p.y < rows - 1) }));
+  };
+
+  const togglePlayerCount = (n) => {
+    setDraft(d => ({
+      ...d,
+      playerCount: d.playerCount.includes(n)
+        ? d.playerCount.filter(x => x !== n)
+        : [...d.playerCount, n].sort((a, b) => a - b),
+    }));
+  };
+
+  if (draft) {
+    const rows = draft.grid.length;
+    const cols = draft.grid[0].length;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 0', flexShrink: 0, flexWrap: 'wrap' }}>
+          <button onClick={() => setDraft(null)} style={{ ...BASE.btn, background: 'transparent', color: '#888', borderColor: '#2a2a3a' }}>← Retour</button>
+          <input
+            style={{ ...BASE.input, width: 220, fontSize: 14, fontWeight: 700 }}
+            value={draft.name}
+            onChange={e => setDraft(d => ({ ...d, name: e.target.value }))}
+            placeholder="Nom de la carte"
+          />
+          <input
+            style={{ ...BASE.input, flex: 1, minWidth: 140 }}
+            value={draft.desc}
+            onChange={e => setDraft(d => ({ ...d, desc: e.target.value }))}
+            placeholder="Description"
+          />
+          <button onClick={saveDraft} style={{ ...BASE.btn, background: '#1a3a1a', color: '#55cc88', borderColor: '#336633' }}>💾 Sauvegarder</button>
+        </div>
+
+        <div style={{ display: 'flex', gap: 16, flex: 1, overflow: 'hidden', minHeight: 0 }}>
+          {/* Left: grid */}
+          <div style={{ overflowAuto: 'auto', flex: '0 0 auto', overflow: 'auto' }}>
+            <div
+              onMouseLeave={() => setPainting(false)}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(${cols}, ${CELL}px)`,
+                gridTemplateRows: `repeat(${rows}, ${CELL}px)`,
+                gap: 1,
+                border: '2px solid #2a2a4a',
+                borderRadius: 6,
+                overflow: 'hidden',
+                userSelect: 'none',
+                cursor: 'crosshair',
+              }}
+            >
+              {draft.grid.map((row, y) => row.map((cell, x) => {
+                const pal = TILE_PALETTE.find(p => p.code === cell) ?? TILE_PALETTE[0];
+                const base = draft.playerStarts.find(p => p.x === x && p.y === y);
+                return (
+                  <div
+                    key={`${x},${y}`}
+                    onMouseDown={() => { setPainting(true); paintTile(y, x); }}
+                    onMouseEnter={() => painting && paintTile(y, x)}
+                    onMouseUp={() => setPainting(false)}
+                    style={{
+                      width: CELL, height: CELL,
+                      background: pal.bg,
+                      border: `1px solid ${pal.border}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: base ? 8 : cell === T.FLOOR || cell === T.WALL ? 10 : 12,
+                      color: base ? '#5ab4ff' : pal.color,
+                      boxSizing: 'border-box',
+                      fontWeight: base ? 900 : 400,
+                    }}
+                  >
+                    {base ? base.label : (cell !== T.FLOOR && cell !== T.WALL ? pal.icon : (cell === T.WALL ? '' : ''))}
+                  </div>
+                );
+              }))}
+            </div>
+          </div>
+
+          {/* Right: controls */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto', minWidth: 180 }}>
+            <div>
+              <div style={{ fontSize: 11, color: '#555', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Tuile active</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {TILE_PALETTE.map(p => (
+                  <button
+                    key={p.code}
+                    onClick={() => setActiveTile(p.code)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      background: activeTile === p.code ? '#1a2a4a' : 'transparent',
+                      border: `1px solid ${activeTile === p.code ? '#3a5a8a' : '#1e1e2e'}`,
+                      borderRadius: 6, padding: '5px 10px', cursor: 'pointer', color: p.color,
+                      fontSize: 12, textAlign: 'left',
+                    }}
+                  >
+                    <span style={{ fontSize: 14, minWidth: 18 }}>{p.icon}</span>
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: 11, color: '#555', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Taille de la carte</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {[[10,10],[12,12],[15,15],[19,19],[15,19]].map(([r, c]) => (
+                  <button key={`${r}x${c}`} onClick={() => resize(r, c)}
+                    style={{ ...BASE.btn, fontSize: 11, padding: '3px 8px', background: rows === r && cols === c ? '#1a2a3a' : 'transparent', color: rows === r && cols === c ? '#88ccff' : '#555', borderColor: rows === r && cols === c ? '#3a5a7a' : '#1e1e2e' }}>
+                    {r}×{c}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: 11, color: '#555', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Joueurs compatibles</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {[2, 3, 4, 5, 6].map(n => (
+                  <button key={n} onClick={() => togglePlayerCount(n)}
+                    style={{ ...BASE.btn, fontSize: 12, padding: '4px 10px', width: 36,
+                      background: draft.playerCount.includes(n) ? '#1a3a1a' : 'transparent',
+                      color: draft.playerCount.includes(n) ? '#55cc88' : '#555',
+                      borderColor: draft.playerCount.includes(n) ? '#336633' : '#1e1e2e' }}>
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: 11, color: '#555', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Bases joueurs ({draft.playerStarts.length})</div>
+              {draft.playerStarts.map((p, i) => (
+                <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
+                  <span style={{ fontSize: 11, color: '#5ab4ff', minWidth: 20 }}>{p.label}</span>
+                  <span style={{ fontSize: 10, color: '#444' }}>{p.x},{p.y}</span>
+                  <button onClick={() => setDraft(d => ({ ...d, playerStarts: d.playerStarts.filter((_, j) => j !== i) }))}
+                    style={{ background: 'transparent', border: '1px solid #3a1a1a', color: '#ff6644', borderRadius: 4, padding: '1px 6px', cursor: 'pointer', fontSize: 11 }}>×</button>
+                </div>
+              ))}
+              <div style={{ fontSize: 10, color: '#444', fontStyle: 'italic', marginTop: 4 }}>Cliquez sur la grille avec ⚑ pour placer une base</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '12px 0', flexShrink: 0 }}>
+        <span style={{ fontSize: 12, color: '#888' }}>{maps.length} carte{maps.length !== 1 ? 's' : ''} personnalisée{maps.length !== 1 ? 's' : ''}</span>
+        <div style={{ flex: 1 }} />
+        {flash === 'saved' && <span style={{ fontSize: 11, color: '#55cc88' }}>✓ Sauvegardée</span>}
+        <button onClick={newMap} style={{ ...BASE.btn, background: '#1a2a3a', color: '#88ccff', borderColor: '#3a5a8a' }}>+ Nouvelle carte</button>
+      </div>
+
+      {maps.length === 0 && (
+        <div style={{ textAlign: 'center', color: '#444', padding: 60, fontStyle: 'italic' }}>
+          Aucune carte personnalisée. Créez-en une avec le bouton ci-dessus.
+        </div>
+      )}
+
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+        {maps.map((m, i) => (
+          <div key={m.id} style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '12px 14px', borderBottom: '1px solid #14141f' }}
+            onMouseOver={e => e.currentTarget.style.background = '#0e0e1c'}
+            onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 2 }}>{m.name}</div>
+              <div style={{ fontSize: 11, color: '#555' }}>{m.desc || 'Aucune description'}</div>
+              <div style={{ fontSize: 10, color: '#444', marginTop: 3 }}>
+                {m.grid.length}×{m.grid[0].length} · Joueurs : {m.playerCount.join(', ')} · {m.playerStarts.length} bases
+              </div>
+            </div>
+            <button onClick={() => editMap(i)} style={{ ...BASE.btn, background: 'transparent', color: '#88aaff', borderColor: '#2a2a4a' }}>Modifier</button>
+            <button onClick={() => deleteMap(i)} style={{ ...BASE.btn, background: 'transparent', color: '#ff6644', borderColor: '#3a1a1a' }}>Supprimer</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Main AdminPanel ──────────────────────────────────────────────────────────
 export default function AdminPanel({ onClose }) {
   const [tab, setTab] = useState('cards');
@@ -397,13 +681,15 @@ export default function AdminPanel({ onClose }) {
       </div>
 
       <div style={BASE.tabs}>
-        {tabBtn('cards', 'Cartes', tab === 'cards')}
-        {tabBtn('rarity', 'Rareté / Probabilité', tab === 'rarity')}
+        {tabBtn('cards', '🃏 Cartes', tab === 'cards')}
+        {tabBtn('rarity', '📊 Rareté / Probabilité', tab === 'rarity')}
+        {tabBtn('maps', '🗺️ Cartes de jeu', tab === 'maps')}
       </div>
 
       <div style={BASE.scroll}>
         {tab === 'cards'  && <CardsTab  cards={cards}   setCards={setCards}     />}
         {tab === 'rarity' && <RarityTab cards={cards}   weights={weights} setWeights={setWeights} />}
+        {tab === 'maps'   && <MapTab />}
       </div>
     </div>
   );

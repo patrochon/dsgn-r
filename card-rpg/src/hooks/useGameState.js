@@ -300,7 +300,10 @@ function getCrossedPlayers(startX, startY, endX, endY, allPlayers, currentIdx) {
 export function useGameState(characters) {
   const [mapData] = useState(() => {
     const count = characters?.length ?? 2;
-    const pool = MULTIPLAYER_MAPS.filter(m => !m.playerCount || m.playerCount.includes(count));
+    let custom = [];
+    try { custom = JSON.parse(localStorage.getItem('detopia_custom_maps') ?? '[]'); } catch {}
+    const allMaps = [...MULTIPLAYER_MAPS, ...custom];
+    const pool = allMaps.filter(m => !m.playerCount || m.playerCount.includes(count));
     const src = pool.length > 0 ? pool : MULTIPLAYER_MAPS;
     return src[Math.floor(Math.random() * src.length)];
   });
