@@ -272,7 +272,7 @@ export default function StatsReference() {
           ['deplacement', BASE_STATS.deplacement,  'Cases supplémentaires ajoutées au jet de dé de mouvement.'],
           ['richesse',    BASE_STATS.richesse,     'Or gagné par tour = richesse×3. Aussi utilisé pour certains parchemins.'],
           ['destin',      BASE_STATS.destin,       'Nombre de résurrections disponibles. Chaque mort consomme 1 Destin.'],
-          ['portee',      BASE_STATS.portee,       'Portée de base des attaques physiques (cases adjacentes = 1).'],
+          ['portee',      BASE_STATS.portee,       'Allonge les attaques : portée finale = portée de l\'arme + (Portée − 1). Les murs bloquent la ligne de vue.'],
           ['armor',       BASE_STATS.armor,        'Points d\'Armure. Réduit les dégâts physiques reçus de cette valeur.'],
         ]}
       />
