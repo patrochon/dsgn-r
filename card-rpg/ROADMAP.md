@@ -41,10 +41,9 @@
 
 ### Tâches
 
-- [ ] **1.1 — Sauvegarde de partie automatique**
-  ⏱️ 90 min · 🛠️ Claude Code · 🔋🔋🔋
-  Demander : « Sauvegarde l'état de la partie dans localStorage à chaque fin de tour, avec un bouton Reprendre la partie au menu. »
-  ✅ Fini quand : tu rafraîchis la page en pleine partie et tu peux continuer où tu étais.
+- [x] **1.1 — Sauvegarde de partie automatique** → ❌ **DÉCISION : pas de sauvegarde** *(2026-06-10)*
+  Choix de design assumé : quitter ou rafraîchir la page réinitialise la partie en cours.
+  ✅ Tâche fermée — rien à faire.
 
 - [ ] **1.2 — Validation des maps custom**
   ⏱️ 45 min · 🛠️ Claude Code · 🔋🔋
