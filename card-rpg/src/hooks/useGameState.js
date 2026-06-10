@@ -401,11 +401,13 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       p.forcedImmobileNextTurn = false;
       // Gold income: 3 gold per richesse point each turn
       const income = (p.stats?.richesse ?? 1) * 3;
+      // Champagne : goldDoubleRemaining = nombre de TOURS où tous les gains d'or sont doublés.
+      // Décrémenté ici une seule fois par tour ; les autres gains du tour doublent sans consommer.
       const doubleIncome = (p.goldDoubleRemaining ?? 0) > 0;
       const actualIncome = doubleIncome ? income * 2 : income;
       if (doubleIncome) { p.goldDoubleRemaining--; }
       p.gold = (p.gold ?? 0) + actualIncome;
-      addLog(`💰 ${p.name} reçoit ${actualIncome} pièce(s) d'or${doubleIncome ? ' (×2 🥂)' : ''}. Total: ${p.gold}`);
+      addLog(`💰 ${p.name} reçoit ${actualIncome} pièce(s) d'or${doubleIncome ? ` (×2 🥂, ${p.goldDoubleRemaining} tour(s) restant(s))` : ''}. Total: ${p.gold}`);
       // Toujours tirer exactement 1 carte par tour (peut passer à 7 en main)
       {
         let deck = [...p.deck];
@@ -425,6 +427,12 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       p.weaponJustSwapped = false;
       p.armorJustSwapped = false;
       p.trinketSwappedThisTurn = false;
+      // Filet de sécurité L'Ancien : si le tour s'est terminé sans passer par endTurn
+      // (mort, téléportation forcée…), le swap Force↔Magie est encore actif — on le défait ici.
+      if (p.wikiSwapped) {
+        const f = p.stats.force;
+        p.stats = { ...p.stats, force: p.stats.magie, magie: f };
+      }
       p.wikiSwapped = false;
       p.slowMalus = 0;
       p.tempDepBonus = 0;
@@ -754,7 +762,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       return next;
     });
     const cp2 = players[currentIdx];
-    addLog(`📚 ${cp2.name} (Wiki) interéchange Force (${cp2.stats.force}) ↔ Magie (${cp2.stats.magie}).`);
+    addLog(`📚 ${cp2.name} (L'Ancien) interéchange Force (${cp2.stats.force}) ↔ Magie (${cp2.stats.magie}) jusqu'à la fin du tour.`);
   }, [currentIdx, players]);
 
   // Skip Cravaté prison swap (optional)
@@ -856,7 +864,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       const hasImmuneForce = players[currentIdx]?.equippedArmor?.effect?.special?.includes('immune_forced_move');
       if (grid[ty][tx] === T.TELEPORT && teleportTiles.length > 1 && !hasImmuneForce) {
         const others = teleportTiles.filter(t => !(t.x === tx && t.y === ty));
-        if (hasChapeaux && others.length > 1) {
+        if (hasChapeaux && others.length > 0) {
           // Discard move card before suspending for portal choice
           if (selectedCard?.effect?.type === 'move') {
             setPlayers(prev => {
@@ -1005,7 +1013,6 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
           }
           const doubleG = (np.goldDoubleRemaining ?? 0) > 0;
           const actualGold = doubleG ? goldGain * 2 : goldGain;
-          if (doubleG) np.goldDoubleRemaining--;
           np.gold = (np.gold ?? 0) + actualGold;
           np.kills = kills;
           if (forceGain > 0) {
@@ -1940,7 +1947,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
             else { kills.pile3++; goldGain = 6; forceGain = 1; }
             const doubleGold = (np.goldDoubleRemaining ?? 0) > 0;
             const actualGold = doubleGold ? goldGain * 2 : goldGain;
-            if (doubleGold) { np.goldDoubleRemaining--; addLog(`🥂 Champagne ! Or doublé (${np.goldDoubleRemaining} restant(s))`); }
+            if (doubleGold) addLog(`🥂 Champagne ! Or doublé`);
             np.gold = (np.gold ?? 0) + actualGold;
             np.kills = kills;
             if (forceGain > 0) { np.stats.force = (np.stats.force ?? 0) + forceGain; addLog(`💪 ${np.name} gagne +${forceGain} Force !`); }
@@ -2248,7 +2255,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
           let np = { ...next[currentIdx] };
           const doubleGFou = (np.goldDoubleRemaining ?? 0) > 0;
           np.gold = (np.gold ?? 0) + (doubleGFou ? goldRewardFou * 2 : goldRewardFou);
-          if (doubleGFou) { np.goldDoubleRemaining--; addLog(`🥂 Champagne ! Or doublé (${np.goldDoubleRemaining} restant(s))`); }
+          if (doubleGFou) addLog(`🥂 Champagne ! Or doublé`);
           if (treasureCardFou) np.hand = [...np.hand, treasureCardFou];
           next[currentIdx] = np;
           return next;
@@ -2391,7 +2398,6 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       else { kills.pile3++; goldGain = 6; forceGain = 1; }
       const doubleG = (np.goldDoubleRemaining ?? 0) > 0;
       const actualGold = doubleG ? goldGain * 2 : goldGain;
-      if (doubleG) np.goldDoubleRemaining--;
       np.gold = (np.gold ?? 0) + actualGold;
       np.kills = kills;
       if (forceGain > 0) {
@@ -2666,6 +2672,25 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
   const endTurn = useCallback(() => {
     // Compute all end-of-turn player updates in one pass
     let updPlayers = [...players];
+
+    // Passif L'Ancien : le swap Force↔Magie prend fin avec le tour
+    if (updPlayers[currentIdx]?.wikiSwapped) {
+      let p = { ...updPlayers[currentIdx], stats: { ...updPlayers[currentIdx].stats } };
+      const oldForce = p.stats.force;
+      p.stats.force = p.stats.magie;
+      p.stats.magie = oldForce;
+      p.wikiSwapped = false;
+      if (p.equippedWeapon) {
+        const req = p.equippedWeapon.effect.bonus ?? 0;
+        if (p.stats.force < req) {
+          addLog(`🔴 ${p.name} ne peut plus porter ${p.equippedWeapon.icon} ${p.equippedWeapon.name} (Force ${p.stats.force} < requis ${req}) — défaussé.`);
+          p = unequipCard(p, p.equippedWeapon);
+          p.equippedWeapon = null;
+        }
+      }
+      updPlayers[currentIdx] = p;
+      addLog(`📚 ${p.name} (L'Ancien) — Force (${p.stats.force}) et Magie (${p.stats.magie}) reviennent à la normale.`);
+    }
 
     // Passif Cailloux : immobile ce tour → immunité physique jusqu'au prochain tour
     if (!hasMoved && updPlayers[currentIdx]?.race?.passive === 'cailloux') {

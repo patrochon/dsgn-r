@@ -351,7 +351,7 @@ function Game({ characters, onRestart }) {
             )}
             {cp?.cls?.passive === 'wiki' && !cp?.wikiSwapped && (
               <Btn
-                label={`📚 Wiki — interchanger Force↔Magie (gratuit, 1×/tour)`}
+                label={`📚 L'Ancien — interchanger Force↔Magie (gratuit, jusqu'à la fin du tour)`}
                 onClick={g.wikiSwapStats}
                 primary
                 hint={`Force: ${cp.stats.force} → ${cp.stats.magie} | Magie: ${cp.stats.magie} → ${cp.stats.force}`}

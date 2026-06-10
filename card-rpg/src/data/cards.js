@@ -137,7 +137,7 @@ const POTION_CARDS = [
   card('shake_prot',     "Shake de prot'",             '🥛', C.POTION, R.COMMON,   'buff',  0, '+3 dégâts sur la prochaine attaque. (✨1)',                                                'next_atk_bonus_3',  1, 'self'),
   card('double_allonge', 'Double allongé noir',        '☕', C.POTION, R.COMMON,   'buff',  0, '+3 Déplacement sur le prochain mouvement. (✨1)',                                          'next_move_bonus_3', 1, 'self'),
   card('antibiotique',   "Cuillère d'antibiotique",    '🧴', C.POTION, R.UNCOMMON, 'buff',  0, '+12 PV temporaires. Immunise contre les malédictions jusqu\'au prochain tour. (✨2)',      'temphp_curse_shield', 2, 'self'),
-  card('champagne',      'Coupe de champagne',         '🥂', C.POTION, R.UNCOMMON, 'buff',  0, 'Double les 3 prochains gains d\'or. (✨2)',                                                'gold_double_3',     2, 'self'),
+  card('champagne',      'Coupe de champagne',         '🥂', C.POTION, R.UNCOMMON, 'buff',  0, 'Double tous les gains d\'or pendant 3 tours. (✨2)',                                       'gold_double_3',     2, 'self'),
   card('jus_etoile',     "Verre de jus d'étoile",      '⭐', C.POTION, R.UNCOMMON, 'buff',  0, '+6 dégâts sur la prochaine attaque. (✨2)',                                                'next_atk_bonus_6',  2, 'self'),
   card('lait_licorne',   'Verre de lait de licorne',   '🦄', C.POTION, R.RARE,     'buff',  0, '+18 Vie permanent (augmente le HP max). (✨4)',                                            'perm:vie+18',       4, 'self'),
   card('sang_dragon',    'Verre de sang de dragon',    '🐉', C.POTION, R.RARE,     'buff',  0, '+1 Destin permanent. (✨2)',                                                               'perm:destin+1',     2, 'self'),
