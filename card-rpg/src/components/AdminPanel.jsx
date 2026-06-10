@@ -430,6 +430,16 @@ function MapTab() {
     setMaps(next);
   };
 
+  // Export vers le dossier Map Beta (src/data/mapsBeta/)
+  const exportMap = (m) => {
+    const blob = new Blob([JSON.stringify(m, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${(m.name || 'map').toLowerCase().replace(/[^a-z0-9àâçéèêëîïôûùüÿœ]+/gi, '-').replace(/^-+|-+$/g, '')}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
   const saveDraft = () => {
     const next = editingIdx !== null
       ? maps.map((m, i) => i === editingIdx ? draft : m)
@@ -627,6 +637,11 @@ function MapTab() {
         <button onClick={newMap} style={{ ...BASE.btn, background: '#1a2a3a', color: '#88ccff', borderColor: '#3a5a8a' }}>+ Nouvelle carte</button>
       </div>
 
+      <div style={{ fontSize: 11, color: '#666', background: '#0d0d1c', border: '1px solid #1a1a2a', borderRadius: 6, padding: '8px 12px', marginBottom: 12, flexShrink: 0 }}>
+        🛠️ Outil de développement — les maps créées ici ne sont pas chargées dans les parties.
+        Utilise <strong style={{ color: '#55cc88' }}>⬇ Exporter</strong> pour obtenir le fichier JSON à classer dans le dossier <code style={{ color: '#88ccff' }}>Map Beta</code> du projet.
+      </div>
+
       {maps.length === 0 && (
         <div style={{ textAlign: 'center', color: '#444', padding: 60, fontStyle: 'italic' }}>
           Aucune carte personnalisée. Créez-en une avec le bouton ci-dessus.
@@ -646,6 +661,7 @@ function MapTab() {
               </div>
             </div>
             <button onClick={() => editMap(i)} style={{ ...BASE.btn, background: 'transparent', color: '#88aaff', borderColor: '#2a2a4a' }}>Modifier</button>
+            <button onClick={() => exportMap(m)} style={{ ...BASE.btn, background: 'transparent', color: '#55cc88', borderColor: '#1a3a1a' }}>⬇ Exporter</button>
             <button onClick={() => deleteMap(i)} style={{ ...BASE.btn, background: 'transparent', color: '#ff6644', borderColor: '#3a1a1a' }}>Supprimer</button>
           </div>
         ))}

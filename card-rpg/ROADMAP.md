@@ -45,10 +45,11 @@
   Choix de design assumé : quitter ou rafraîchir la page réinitialise la partie en cours.
   ✅ Tâche fermée — rien à faire.
 
-- [ ] **1.2 — Validation des maps custom**
-  ⏱️ 45 min · 🛠️ Claude Code · 🔋🔋
-  Demander : « Valide les maps custom au chargement (grille rectangulaire, murs au pourtour, assez de bases). Map invalide = ignorée avec un message, pas de crash. »
-  ✅ Fini quand : tu crées une map volontairement cassée dans l'admin et le jeu démarre quand même.
+- [x] **1.2 — Validation des maps custom**
+  → ✅ **DÉCISION + FAIT** *(2026-06-10)* : l'outil de création de maps est réservé au développement.
+  Les maps créées ne sont plus chargées dans les parties. Un bouton **⬇ Exporter** télécharge la map en JSON,
+  à classer dans le dossier `src/data/mapsBeta/` (« Map Beta ») du projet. Elles seront intégrées au pool le moment venu.
+  📌 Reporté à l'intégration : valider chaque map Beta (grille, murs, bases) AVANT de l'ajouter au pool de jeu.
 
 - [ ] **1.3 — Corriger le bug Wiki (swap permanent)**
   ⏱️ 30 min · 🛠️ Claude Code · 🔋
