@@ -28,4 +28,4 @@ Dossier de classement des maps créées avec l'outil de développement (Admin �
 }
 ```
 
-Codes de tuiles : `0`=sol, `1`=mur, `3`=item, `4`=objectif, `7`=portail, `8`=magasin, `9`=prison.
+Codes de tuiles : `0`=sol, `1`=mur, `3`=item, `7`=portail, `8`=magasin, `9`=prison.

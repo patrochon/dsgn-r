@@ -62,14 +62,13 @@
   Nouvelle mécanique : TOUS les gains d'or sont doublés pendant 3 tours complets
   (le compteur descend une fois par tour, au revenu). Description de la carte mise à jour.
 
-- [ ] **1.6 — Décision design : la case Objectif ⭐**
-  ⏱️ 30 min · 🛠️ Papier + crayon (PAS d'ordi) · 🔋🔋
-  La case existe sur les maps mais ne fait rien. Décide : victoire alternative ? Trésor majeur ? Événement ? La supprimer ?
-  ✅ Fini quand : tu as écrit ta décision en 2 phrases. (L'implémentation = tâche 1.7.)
+- [x] **1.6 — Décision design : la case Objectif ⭐** → ✅ **DÉCIDÉ** *(2026-06-10)*
+  Les cases Objectif sont retirées du jeu. L'objectif unique : le dernier joueur en vie remporte la partie.
+  Si les derniers joueurs meurent en même temps, c'est une partie nulle.
 
-- [ ] **1.7 — Implémenter la décision de 1.6**
-  ⏱️ 60 min · 🛠️ Claude Code · 🔋🔋
-  ✅ Fini quand : la case Objectif fait ce que tu as décidé, testé en partie.
+- [x] **1.7 — Implémenter la décision de 1.6** → ✅ **FAIT** *(2026-06-10)*
+  Cases ⭐ retirées des 14 maps (remplacées par du sol), de la légende, du rendu et de l'éditeur de maps.
+  Partie nulle implémentée : si tous les joueurs restants meurent simultanément, écran « Partie nulle ⚖️ ».
 
 - [ ] **1.8 — Vérification de la portée des armes**
   ⏱️ 60 min · 🛠️ Claude Code · 🔋🔋

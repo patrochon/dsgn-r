@@ -960,7 +960,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       // Helper: handle player death after damage
       const handleDeath = (updPlayers) => {
         const alive = updPlayers.filter(p => p.isAlive);
-        if (alive.length === 1) { setWinner(alive[0]); setPhase('win'); }
+        if (alive.length <= 1) { setWinner(alive[0] ?? null); setPhase('win'); }
         else {
           let ni = (currentIdx + 1) % updPlayers.length;
           while (!updPlayers[ni]?.isAlive) ni = (ni + 1) % updPlayers.length;
@@ -1687,7 +1687,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
         thrower.hand = thrower.hand.filter(c => c !== card);
         next[currentIdx] = thrower;
         const alive = next.filter(p => p.isAlive);
-        if (alive.length === 1) { setWinner(alive[0]); setPhase('win'); }
+        if (alive.length <= 1) { setWinner(alive[0] ?? null); setPhase('win'); }
         else setPhase('player_turn');
         return next;
       });
@@ -1894,8 +1894,8 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
           next[targetPlayerIdx] = t;
           // Check win
           const alive = next.filter(p => p.isAlive);
-          if (alive.length === 1) {
-            setWinner(alive[0]);
+          if (alive.length <= 1) {
+            setWinner(alive[0] ?? null);
             setPhase('win');
           } else {
             setPhase('player_turn');
@@ -2239,7 +2239,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
         }
         next[targetPlayerIdx] = t;
         const alive = next.filter(p => p.isAlive);
-        if (alive.length === 1) { setWinner(alive[0]); setPhase('win'); }
+        if (alive.length <= 1) { setWinner(alive[0] ?? null); setPhase('win'); }
         else setPhase('player_turn');
         return next;
       });
@@ -2467,7 +2467,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       } else {
         addLog(`💀 ${cp.name} est définitivement éliminé !`);
         const alive = nextPlayers.filter(p => p.isAlive);
-        if (alive.length === 1) { setWinner(alive[0]); setPhase('win'); }
+        if (alive.length <= 1) { setWinner(alive[0] ?? null); setPhase('win'); }
         else {
           let ni = (currentIdx + 1) % nextPlayers.length;
           while (!nextPlayers[ni]?.isAlive) ni = (ni + 1) % nextPlayers.length;
@@ -2615,7 +2615,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       next[attackerIdx] = attacker;
       next[defenderIdx] = defender;
       const alive = next.filter(p => p.isAlive);
-      if (alive.length === 1) { setWinner(alive[0]); setPhase('win'); }
+      if (alive.length <= 1) { setWinner(alive[0] ?? null); setPhase('win'); }
       else setPhase('player_turn');
       return next;
     });
@@ -2650,7 +2650,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       }
       next[defenderIdx] = defender;
       const alive = next.filter(p => p.isAlive);
-      if (alive.length === 1) { setWinner(alive[0]); setPhase('win'); }
+      if (alive.length <= 1) { setWinner(alive[0] ?? null); setPhase('win'); }
       else setPhase('player_turn');
       return next;
     });
@@ -2742,9 +2742,9 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
           updPlayers = updPlayers.map((p, i) => i === victimIdx ? newVictim : p);
           // Win check after push
           const alive = updPlayers.filter(p => p.isAlive);
-          if (alive.length === 1) {
+          if (alive.length <= 1) {
             setPlayers(updPlayers);
-            setWinner(alive[0]); setPhase('win');
+            setWinner(alive[0] ?? null); setPhase('win');
             setActionsLeft(0); setHasMoved(false); setSelectedCard(null); setHighlightTiles([]);
             return;
           }
@@ -2815,9 +2815,9 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
           }
           updPlayers = updPlayers.map((p, i) => i === victimIdx ? newVictim : p);
           const alive = updPlayers.filter(p => p.isAlive);
-          if (alive.length === 1) {
+          if (alive.length <= 1) {
             setPlayers(updPlayers);
-            setWinner(alive[0]); setPhase('win');
+            setWinner(alive[0] ?? null); setPhase('win');
             setActionsLeft(0); setHasMoved(false); setSelectedCard(null); setHighlightTiles([]);
             return;
           }

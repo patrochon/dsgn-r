@@ -378,7 +378,6 @@ const TILE_PALETTE = [
   { code: T.WALL,     icon: '█',  label: 'Mur',      bg: '#06060e', border: '#333',    color: '#aaa' },
   { code: T.SHOP,     icon: '🏪', label: 'Magasin',  bg: '#1c1400', border: '#cc9900', color: '#cc9900' },
   { code: T.TELEPORT, icon: '🌀', label: 'Portail',  bg: '#0d0019', border: '#8833ee', color: '#8833ee' },
-  { code: T.EXIT,     icon: '⭐', label: 'Objectif', bg: '#001810', border: '#00bb66', color: '#00bb66' },
   { code: T.ITEM,     icon: '✦',  label: 'Item',     bg: '#0d130d', border: '#2a4a2a', color: '#3a6a3a' },
   { code: T.PRISON,   icon: '⛓',  label: 'Prison',   bg: '#1a0a0a', border: '#994422', color: '#994422' },
   { code: -1,         icon: '⚑',  label: 'Base',     bg: '#0a1020', border: '#5ab4ff', color: '#5ab4ff' },
