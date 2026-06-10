@@ -19,10 +19,6 @@ const TILE_DEF = {
     bg: '#0d0019', border: '#8833ee', glow: '#8833ee44',
     icon: '🌀',
   },
-  [T.EXIT]: {
-    bg: '#001810', border: '#00bb66', glow: '#00bb6633',
-    icon: '⭐', label: 'OBJ', labelColor: '#00bb66',
-  },
   [T.ITEM]: {
     bg: '#0d130d', border: '#2a4a2a',
     icon: '✦', iconColor: '#3a6a3a',
@@ -107,7 +103,6 @@ const LEGEND_ITEMS = [
   { label: 'Mur',      bg: '#06060e', border: '#03030a', icon: null, pattern: true },
   { label: 'Magasin',  bg: '#1c1400', border: '#cc9900', icon: '🏪' },
   { label: 'Téléport', bg: '#0d0019', border: '#8833ee', icon: '🌀' },
-  { label: 'Objectif', bg: '#001810', border: '#00bb66', icon: '⭐' },
   { label: 'Item',     bg: '#0d130d', border: '#2a4a2a', icon: '✦', iconColor: '#3a6a3a' },
   { label: 'Monstre①', bg: '#1a2a1a', border: '#44cc44', icon: '👾', pileDot: '#44cc44' },
   { label: 'Monstre②', bg: '#2a2a14', border: '#ccaa00', icon: '👹', pileDot: '#ccaa00' },
@@ -213,7 +208,6 @@ export default function GameMap({ grid, players, currentIdx, enemies, traps, che
           const isWall     = cell === T.WALL;
           const isTeleport = cell === T.TELEPORT;
           const isShop     = cell === T.SHOP;
-          const isExit     = cell === T.EXIT;
           const isItem     = cell === T.ITEM;
           const isHighlight = highlightTiles.includes(key);
           const playerHere = playerAtTile[key];
@@ -251,10 +245,6 @@ export default function GameMap({ grid, players, currentIdx, enemies, traps, che
             const d = TILE_DEF[T.SHOP];
             bg = d.bg; border = d.border;
             extraStyle.boxShadow = `inset 0 0 10px ${d.glow}`;
-          } else if (isExit) {
-            const d = TILE_DEF[T.EXIT];
-            bg = d.bg; border = d.border;
-            extraStyle.boxShadow = `inset 0 0 12px ${d.glow}`;
           } else if (isItem) {
             const d = TILE_DEF[T.ITEM];
             bg = d.bg; border = d.border;
@@ -306,9 +296,6 @@ export default function GameMap({ grid, players, currentIdx, enemies, traps, che
               {!isWall && !playerHere && isShop && (
                 <SpecialTileContent def={TILE_DEF[T.SHOP]} />
               )}
-              {!isWall && !playerHere && isExit && (
-                <SpecialTileContent def={TILE_DEF[T.EXIT]} />
-              )}
               {!isWall && !playerHere && isItem && !enemy && !trap && (
                 <span style={{ fontSize: 10, color: '#2a4a2a', opacity: 0.7 }}>✦</span>
               )}
@@ -338,7 +325,7 @@ export default function GameMap({ grid, players, currentIdx, enemies, traps, che
               )}
 
               {/* Base marker (when player not standing on it) */}
-              {!isWall && baseHere && !playerHere && !enemy && !isTeleport && !isShop && !isExit && (
+              {!isWall && baseHere && !playerHere && !enemy && !isTeleport && !isShop && (
                 <div style={{
                   width: 22, height: 22, borderRadius: 3,
                   border: `2px solid ${baseHere.player.color}88`,

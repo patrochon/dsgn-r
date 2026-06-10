@@ -51,29 +51,24 @@
   à classer dans le dossier `src/data/mapsBeta/` (« Map Beta ») du projet. Elles seront intégrées au pool le moment venu.
   📌 Reporté à l'intégration : valider chaque map Beta (grille, murs, bases) AVANT de l'ajouter au pool de jeu.
 
-- [ ] **1.3 — Corriger le bug Wiki (swap permanent)**
-  ⏱️ 30 min · 🛠️ Claude Code · 🔋
-  Le swap Force↔Magie de la classe Wiki ne se remet jamais à la normale.
-  ✅ Fini quand : après le tour du Wiki, ses stats sont revenues à la normale.
+- [x] **1.3 — Corriger le bug Wiki (swap permanent)** → ✅ **FAIT** *(2026-06-10)*
+  Le swap Force↔Magie se défait maintenant à la fin du tour (avec filet de sécurité si le tour
+  se termine autrement). La classe a été renommée **« L'Ancien »** partout (jeu, références, illustrations).
 
-- [ ] **1.4 — Corriger le bug Chapeaux (portail)**
-  ⏱️ 30 min · 🛠️ Claude Code · 🔋
-  Avec un seul autre portail disponible, le Chapeaux subit une sortie aléatoire au lieu de choisir.
-  ✅ Fini quand : un Chapeaux choisit toujours sa sortie, peu importe le nombre de portails.
+- [x] **1.4 — Corriger le bug Chapeaux (portail)** → ✅ **FAIT** *(2026-06-10)*
+  Un Chapeaux choisit toujours sa sortie de portail, même s'il n'y a qu'une seule autre sortie.
 
-- [ ] **1.5 — Corriger le bug Champagne (or doublé)**
-  ⏱️ 30 min · 🛠️ Claude Code · 🔋
-  La carte dit « 3 tours » mais ne s'applique qu'une fois.
-  ✅ Fini quand : l'or est doublé 3 tours de suite.
+- [x] **1.5 — Corriger le bug Champagne (or doublé)** → ✅ **FAIT** *(2026-06-10)*
+  Nouvelle mécanique : TOUS les gains d'or sont doublés pendant 3 tours complets
+  (le compteur descend une fois par tour, au revenu). Description de la carte mise à jour.
 
-- [ ] **1.6 — Décision design : la case Objectif ⭐**
-  ⏱️ 30 min · 🛠️ Papier + crayon (PAS d'ordi) · 🔋🔋
-  La case existe sur les maps mais ne fait rien. Décide : victoire alternative ? Trésor majeur ? Événement ? La supprimer ?
-  ✅ Fini quand : tu as écrit ta décision en 2 phrases. (L'implémentation = tâche 1.7.)
+- [x] **1.6 — Décision design : la case Objectif ⭐** → ✅ **DÉCIDÉ** *(2026-06-10)*
+  Les cases Objectif sont retirées du jeu. L'objectif unique : le dernier joueur en vie remporte la partie.
+  Si les derniers joueurs meurent en même temps, c'est une partie nulle.
 
-- [ ] **1.7 — Implémenter la décision de 1.6**
-  ⏱️ 60 min · 🛠️ Claude Code · 🔋🔋
-  ✅ Fini quand : la case Objectif fait ce que tu as décidé, testé en partie.
+- [x] **1.7 — Implémenter la décision de 1.6** → ✅ **FAIT** *(2026-06-10)*
+  Cases ⭐ retirées des 14 maps (remplacées par du sol), de la légende, du rendu et de l'éditeur de maps.
+  Partie nulle implémentée : si tous les joueurs restants meurent simultanément, écran « Partie nulle ⚖️ ».
 
 - [ ] **1.8 — Vérification de la portée des armes**
   ⏱️ 60 min · 🛠️ Claude Code · 🔋🔋

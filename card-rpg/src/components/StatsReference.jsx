@@ -107,7 +107,7 @@ const PASSIFS = [
   { id: 'alchimiste',   src: '⚗️ Classe', label: 'Alchimiste',     desc: 'Bonus passifs de +3 Vie et +1 Richesse. Ses potions ont des effets amplifiés.' },
   { id: 'messager',     src: '📨 Classe', label: 'Messager',        desc: 'Peut choisir de passer à travers un monstre sans combattre. Échange une carte avec un joueur croisé en ligne droite.' },
   { id: 'cravate',      src: '👔 Classe', label: 'Cravaté',         desc: 'En atterrissant sur une Case Prison, peut interchanger sa position avec un adversaire à 6 cases.' },
-  { id: 'wiki',         src: '📚 Classe', label: 'Wiki',            desc: 'Une fois par tour, peut interchanger ses stats Force ↔ Magie. Les armes avec Force requise sont défaussées si la condition n\'est plus remplie.' },
+  { id: 'wiki',         src: '📚 Classe', label: 'L\'Ancien',       desc: 'Une fois par tour, peut interchanger ses stats Force ↔ Magie jusqu\'à la fin du tour. Les armes avec Force requise sont défaussées si la condition n\'est plus remplie.' },
   // Spécialisations
   { id: 'autodefense',  src: '🥊 Spec',  label: 'Autodéfense',    desc: 'Contre-attaque automatique lors de certaines attaques reçues. +1 Force passif.' },
   { id: 'coeur_noir',   src: '🖤 Spec',  label: 'Cœur Noir',      desc: 'Réduit la Magie de tout attaquant adjacent à 1 lors d\'une attaque magique.' },
@@ -187,7 +187,7 @@ const SPECIALS = [
   // Potions
   { key: 'next_atk_bonus_3',      label: 'next_atk_bonus_3',     desc: '+3 dégâts sur la prochaine attaque uniquement.' },
   { key: 'next_atk_bonus_6',      label: 'next_atk_bonus_6',     desc: '+6 dégâts sur la prochaine attaque uniquement.' },
-  { key: 'gold_double_3',         label: 'gold_double_3',         desc: 'Double les 3 prochains gains d\'or.' },
+  { key: 'gold_double_3',         label: 'gold_double_3',         desc: 'Double tous les gains d\'or pendant 3 tours.' },
   { key: 'frenzied_3',            label: 'frenzied_3',            desc: '×2 dégâts sur les 3 prochaines attaques physiques.' },
   { key: 'curse_shield',          label: 'curse_shield',          desc: 'Immunise contre les malédictions jusqu\'au prochain tour.' },
   { key: 'temphp_curse_shield',   label: 'temphp_curse_shield',   desc: '+12 PV temporaires + immunité malédictions jusqu\'au prochain tour.' },

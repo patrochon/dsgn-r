@@ -94,7 +94,7 @@ export const CLASSES = [
   },
   {
     id: 'wiki',
-    name: 'Le Wiki',
+    name: "L'Ancien",
     icon: '📚',
     flavor: 'Il sait tout sur tout. La connaissance est son arme la plus tranchante.',
     bonuses: { destin: 1 },

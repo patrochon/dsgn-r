@@ -566,7 +566,7 @@ export default function ClassesGrid() {
         </svg>
       </div>
       <div className="body">
-        <div className="top"><span className="emoji">📚</span><span className="name">Le Wiki</span></div>
+        <div className="top"><span className="emoji">📚</span><span className="name">L'Ancien</span></div>
         <p className="flavor">Il sait tout sur tout. La connaissance est son arme la plus tranchante.</p>
         <div className="stats"><span className="stat">+1 Destin</span></div>
       </div>

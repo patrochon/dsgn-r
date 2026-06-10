@@ -138,6 +138,22 @@ function Game({ characters, onRestart }) {
 
   const clickable = g.phase === 'choosing_move' || g.phase === 'choosing_attack';
 
+  // Draw screen (all remaining players died simultaneously)
+  if (g.phase === 'win' && !g.winner) {
+    return (
+      <Screen>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 72 }}>⚖️</div>
+          <h2 style={{ color: '#aaa', fontSize: 28 }}>Partie nulle !</h2>
+          <p style={{ color: '#888', marginBottom: 24 }}>
+            Les derniers joueurs sont morts en même temps. Personne ne remporte la partie.
+          </p>
+          <button onClick={onRestart} style={btnStyle('#1a4a1a', '#88ff88')}>🔄 Nouvelle partie</button>
+        </div>
+      </Screen>
+    );
+  }
+
   // Win screen
   if (g.phase === 'win' && g.winner) {
     return (
@@ -351,7 +367,7 @@ function Game({ characters, onRestart }) {
             )}
             {cp?.cls?.passive === 'wiki' && !cp?.wikiSwapped && (
               <Btn
-                label={`📚 Wiki — interchanger Force↔Magie (gratuit, 1×/tour)`}
+                label={`📚 L'Ancien — interchanger Force↔Magie (gratuit, jusqu'à la fin du tour)`}
                 onClick={g.wikiSwapStats}
                 primary
                 hint={`Force: ${cp.stats.force} → ${cp.stats.magie} | Magie: ${cp.stats.magie} → ${cp.stats.force}`}
