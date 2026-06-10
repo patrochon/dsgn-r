@@ -12,6 +12,23 @@ function rollDie() {
   return Math.floor(Math.random() * 6) + 1;
 }
 
+// Ligne de vue (Bresenham) : les murs entre l'attaquant et la cible bloquent le tir.
+function hasLineOfSight(grid, x0, y0, x1, y1) {
+  let dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+  const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+  let err = dx - dy, cx = x0, cy = y0;
+  while (true) {
+    if (!(cx === x0 && cy === y0) && !(cx === x1 && cy === y1)) {
+      if (grid[cy]?.[cx] === T.WALL) return false;
+    }
+    if (cx === x1 && cy === y1) break;
+    const e2 = 2 * err;
+    if (e2 > -dy) { err -= dy; cx += sx; }
+    if (e2 < dx) { err += dx; cy += sy; }
+  }
+  return true;
+}
+
 function buildPlayer(charData, index, mapData) {
   const stats = charData.stats ?? { force: 1, magie: 1, vie: 6, deplacement: 0, richesse: 1, destin: 1, portee: 1, armor: 0 };
   if (stats.armor === undefined) stats.armor = 0;
@@ -1564,14 +1581,14 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     }
     const cardRange = weapon?.effect?.range ?? null;
 
-    // Base range: stat portee, then legacy special override, then card range property
-    let range = cp.stats.portee ?? 1;
+    // Option A : portée finale = portée de l'arme + (stat Portée − 1).
+    // Une arme sans portée définie est considérée de mêlée (1).
+    let weaponRange = RANGE_NUMS[cardRange] ?? 1;
     if (weapon?.effect?.special) {
-      const sp = weapon.effect.special;
-      const m = sp.match(/range(\d+)/);
-      if (m) range = Math.max(range, parseInt(m[1]));
+      const m = weapon.effect.special.match(/range(\d+)/);
+      if (m) weaponRange = Math.max(weaponRange, parseInt(m[1]));
     }
-    if (cardRange && RANGE_NUMS[cardRange]) range = Math.max(range, RANGE_NUMS[cardRange]);
+    let range = weaponRange + Math.max(0, (cp.stats.portee ?? 1) - 1);
 
     const tiles = [];
     const isTarget = (nx, ny) =>
@@ -1618,6 +1635,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
           const nx = cp.x + dx, ny = cp.y + dy;
           if (nx < 0 || ny < 0 || ny >= grid.length || nx >= grid[0].length) continue;
           if (grid[ny][nx] === T.WALL) continue;
+          if (!hasLineOfSight(grid, cp.x, cp.y, nx, ny)) continue;
           if (isTarget(nx, ny)) tiles.push(`${nx},${ny}`);
         }
       }
@@ -1639,6 +1657,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
         const nx = cp.x + dx, ny = cp.y + dy;
         if (nx < 0 || ny < 0 || ny >= grid.length || nx >= grid[0].length) continue;
         if (grid[ny][nx] === T.WALL) continue;
+        if (!hasLineOfSight(grid, cp.x, cp.y, nx, ny)) continue;
         if (players.some((p, i) => i !== currentIdx && p.isAlive && p.x === nx && p.y === ny))
           tiles.push(`${nx},${ny}`);
       }
@@ -2197,6 +2216,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
         const nx = cp.x + dx, ny = cp.y + dy;
         if (nx < 0 || ny < 0 || ny >= grid.length || nx >= grid[0].length) continue;
         if (grid[ny][nx] === T.WALL) continue;
+        if (!hasLineOfSight(grid, cp.x, cp.y, nx, ny)) continue;
         const hasTarget = players.some((p, i) => i !== currentIdx && p.isAlive && p.x === nx && p.y === ny)
           || enemies[`${nx},${ny}`];
         if (hasTarget) tiles.push(`${nx},${ny}`);

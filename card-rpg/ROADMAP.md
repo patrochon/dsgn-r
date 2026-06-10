@@ -70,10 +70,10 @@
   Cases ⭐ retirées des 14 maps (remplacées par du sol), de la légende, du rendu et de l'éditeur de maps.
   Partie nulle implémentée : si tous les joueurs restants meurent simultanément, écran « Partie nulle ⚖️ ».
 
-- [ ] **1.8 — Vérification de la portée des armes**
-  ⏱️ 60 min · 🛠️ Claude Code · 🔋🔋
-  Les portées (r2, r4, r6…) sont sur les cartes mais ignorées au combat.
-  ✅ Fini quand : un arc r4 ne peut pas attaquer à 6 cases.
+- [x] **1.8 — Vérification de la portée des armes** → ✅ **FAIT** *(2026-06-10)*
+  Décision (Option A) : portée finale = portée de l'arme + (stat Portée − 1). L'arme définit la base,
+  la stat l'allonge. Les murs bloquent désormais la ligne de vue (attaque, lancer du Bum, sort du Fou).
+  Exceptions voulues : Lame spectrale traverse les murs, attaques `line` s'arrêtent au premier mur.
 
 - [ ] **1.9 — Effets d'armes manquants (lot 1 : armes de mêlée)**
   ⏱️ 60 min · 🛠️ Claude Code · 🔋🔋
