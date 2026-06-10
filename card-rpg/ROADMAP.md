@@ -75,10 +75,12 @@
   la stat l'allonge. Les murs bloquent désormais la ligne de vue (attaque, lancer du Bum, sort du Fou).
   Exceptions voulues : Lame spectrale traverse les murs, attaques `line` s'arrêtent au premier mur.
 
-- [ ] **1.9 — Effets d'armes manquants (lot 1 : armes de mêlée)**
-  ⏱️ 60 min · 🛠️ Claude Code · 🔋🔋
-  Hache de main (détruite après lancer), Lance (repousse), Épée longue (pas de déplacement après), Hache de guerre (perce 2 armure).
-  ✅ Fini quand : les 4 effets fonctionnent en partie test.
+- [x] **1.9 — Effets d'armes manquants (lot 1 : armes de mêlée)** → ✅ **FAIT** *(2026-06-10)*
+  🪓 Hache de main : lançable à 2 cases, détruite dès le lancer (au corps-à-corps elle survit).
+  🏹 Lance : repoussait déjà les joueurs — repousse maintenant aussi les monstres survivants.
+  🔱 Épée longue : attaquer bloque tout déplacement pour le reste du tour (bouton grisé + message).
+  ⚒️ Hache de guerre : ignore 2 points d'armure des joueurs ET 2 points de défense des monstres.
+  📌 À toi de valider en partie test (équipe chaque arme et vérifie le journal de bord).
 
 - [ ] **1.10 — Effets d'armes manquants (lot 2 : distance et magie)**
   ⏱️ 60 min · 🛠️ Claude Code · 🔋🔋

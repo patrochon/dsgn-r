@@ -69,6 +69,7 @@ function buildPlayer(charData, index, mapData) {
     trinketSwappedThisTurn: false,
     prisonEffect: null,
     wikiSwapped: false,
+    noMoveThisTurn: false,
     slowMalus: 0,
     tempDepBonus: 0,
     frenzied: false,
@@ -451,6 +452,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
         p.stats = { ...p.stats, force: p.stats.magie, magie: f };
       }
       p.wikiSwapped = false;
+      p.noMoveThisTurn = false;
       p.slowMalus = 0;
       p.tempDepBonus = 0;
       p.frenzied = false;
@@ -571,6 +573,12 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
   const startMove = useCallback(() => {
     if (actionsLeft < 1 || hasMoved) return;
     const cpCheck = players[currentIdx];
+
+    // Épée longue : déplacement interdit après avoir attaqué ce tour
+    if (cpCheck?.noMoveThisTurn) {
+      addLog(`🔱 ${cpCheck.name} a attaqué avec l'Épée longue — aucun déplacement possible ce tour.`);
+      return;
+    }
 
     // Prison roll: restricted movement check
     if (cpCheck?.prisonEffect) {
@@ -1587,6 +1595,8 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     if (weapon?.effect?.special) {
       const m = weapon.effect.special.match(/range(\d+)/);
       if (m) weaponRange = Math.max(weaponRange, parseInt(m[1]));
+      // Hache de main : lançable à 2 cases
+      if (weapon.effect.special === 'throw_destroy') weaponRange = Math.max(weaponRange, 2);
     }
     let range = weaponRange + Math.max(0, (cp.stats.portee ?? 1) - 1);
 
@@ -1729,6 +1739,26 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     const targetEnemy = enemies[key];
 
     animateRoll((roll) => {
+      // Hache de main : lancée à distance (> 1 case) = détruite dès le lancer
+      const isThrow = card?.effect?.special === 'throw_destroy'
+        && (Math.abs(tx - cp.x) + Math.abs(ty - cp.y)) > 1;
+      if (isThrow) {
+        setPlayers(prev => {
+          const next = [...prev];
+          next[currentIdx] = { ...next[currentIdx], equippedWeapon: null };
+          return next;
+        });
+        addLog(`🪓 ${cp.name} lance ${card.icon} ${card.name} — l'arme est détruite !`);
+      }
+      // Épée longue : attaquer interdit tout déplacement ce tour
+      if (card?.effect?.special === 'no_move_after') {
+        setPlayers(prev => {
+          const next = [...prev];
+          next[currentIdx] = { ...next[currentIdx], noMoveThisTurn: true };
+          return next;
+        });
+        addLog(`🔱 ${cp.name} (Épée longue) — aucun déplacement possible ce tour.`);
+      }
       const chanceBonus = Math.floor(cp.stats.richesse / 2);
       const effectiveRoll = Math.min(6, roll + chanceBonus);
       const isMagic = card?.effect?.type === 'magic_attack';
@@ -1791,7 +1821,14 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
         if (piercedArmor) addLog(`🔰 Armure percée — défense de ${target.name} annulée !`);
         const isMagicAtk = card?.effect?.type === 'magic_attack';
         const rawActualDmg = Math.max(1, dmg - defense);
-        const actualDmg = isMagicAtk ? rawActualDmg : physDmg(rawActualDmg, target);
+        // Hache de guerre : ignore 2 points d'armure de la cible
+        const pierce2 = card?.effect?.special === 'armor_pierce2';
+        const targetForDmg = pierce2
+          ? { ...target, stats: { ...target.stats, armor: Math.max(0, (target.stats.armor ?? 0) - 2) } }
+          : target;
+        if (pierce2 && !isMagicAtk && (target.stats.armor ?? 0) > 0)
+          addLog(`⚒️ Hache de guerre — perce 2 points d'armure de ${target.name} !`);
+        const actualDmg = isMagicAtk ? rawActualDmg : physDmg(rawActualDmg, targetForDmg);
         if (!isMagicAtk && target.physicalImmune) {
           addLog(`🪨 ${target.name} est immunisé aux dégâts physiques — attaque annulée !`);
         }
@@ -1922,7 +1959,11 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
           return next;
         });
       } else if (targetEnemy) {
-        const defense = targetEnemy.defense ?? 0;
+        // Hache de guerre : ignore 2 points de défense du monstre
+        const pierce2vsMonster = card?.effect?.special === 'armor_pierce2';
+        const defense = Math.max(0, (targetEnemy.defense ?? 0) - (pierce2vsMonster ? 2 : 0));
+        if (pierce2vsMonster && (targetEnemy.defense ?? 0) > 0)
+          addLog(`⚒️ Hache de guerre — perce 2 points de défense de ${targetEnemy.name} !`);
         const actualDmg = Math.max(1, dmg - defense);
         const playerMaxStatAtk = Math.max(cp.stats.force ?? 0, cp.stats.magie ?? 0);
         const mFirstAtk = targetEnemy.attack > playerMaxStatAtk;
@@ -1986,7 +2027,24 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
             next[currentIdx] = np;
             return next;
           });
-          setEnemies(prev => ({ ...prev, [key]: { ...targetEnemy, hp: newHp } }));
+          // Lance : repousse le monstre survivant d'une case
+          let pushedKey = null;
+          if (card?.effect?.special === 'push_enemy') {
+            const pnx = tx + Math.sign(tx - cp.x), pny = ty + Math.sign(ty - cp.y);
+            const destKey = `${pnx},${pny}`;
+            const occupied = players.some(p => p.isAlive && p.x === pnx && p.y === pny) || !!enemies[destKey];
+            if (pnx >= 0 && pny >= 0 && pny < grid.length && pnx < grid[0].length
+                && grid[pny][pnx] !== T.WALL && !occupied) {
+              pushedKey = destKey;
+              addLog(`🏹 ${targetEnemy.name} est repoussé d'une case !`);
+            }
+          }
+          setEnemies(prev => {
+            const n = { ...prev };
+            delete n[key];
+            n[pushedKey ?? key] = { ...targetEnemy, hp: newHp };
+            return n;
+          });
         }
         setPhase('player_turn');
       } else {
