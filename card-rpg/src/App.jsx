@@ -129,7 +129,7 @@ function Game({ characters, onRestart }) {
   const isScroll = cardType === 'magic';
   const canAttack = g.actionsLeft >= 1 && g.phase === 'player_turn'
     && !!cp?.equippedWeapon && !cp?.weaponJustSwapped;
-  const canMove = g.actionsLeft >= 1 && !g.hasMoved && g.phase === 'player_turn';
+  const canMove = g.actionsLeft >= 1 && !g.hasMoved && g.phase === 'player_turn' && !cp?.noMoveThisTurn;
   const magieCost = g.selectedCard?.effect?.magieCost ?? 0;
   const hasMagie = magieCost === 0 || (cp?.stats?.magie ?? 0) >= magieCost;
   const canUse = g.phase === 'player_turn' && isUsable && hasMagie; // card use is free
@@ -284,7 +284,7 @@ function Game({ characters, onRestart }) {
               onClick={g.startMove}
               disabled={!canMove}
               primary={canMove}
-              hint={g.hasMoved ? 'Déjà déplacé ce tour' : cp?.prisonEffect ? `Prison niv.${cp.prisonEffect.level} — jet de dé requis` : !g.selectedCard || cardType !== 'move' ? 'Facultatif : sélectionnez une carte ♦ pour bonus' : `Carte ${g.selectedCard.name} active`}
+              hint={g.hasMoved ? 'Déjà déplacé ce tour' : cp?.noMoveThisTurn ? 'Épée longue — déplacement interdit ce tour' : cp?.prisonEffect ? `Prison niv.${cp.prisonEffect.level} — jet de dé requis` : !g.selectedCard || cardType !== 'move' ? 'Facultatif : sélectionnez une carte ♦ pour bonus' : `Carte ${g.selectedCard.name} active`}
             />
             <Btn
               label="⚔️ Attaquer (1 action)"
