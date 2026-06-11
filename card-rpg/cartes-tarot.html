@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Détopia — Design de cartes style Tarot de Marseille</title>
+<style>
+  :root {
+    --noir:  #1f1b16;
+    --rouge: #d8352a;
+    --jaune: #f0b41e;
+    --bleu:  #2f6cb3;
+    --vert:  #3d8f44;
+    --chair: #f2c79b;
+    --creme: #fbf6ea;
+    --acier: #a8bfd0;
+    --bois:  #c98a3b;
+  }
+  body {
+    background: #efe7d8;
+    font-family: Georgia, 'Times New Roman', serif;
+    color: var(--noir);
+    margin: 0; padding: 32px 24px 64px;
+  }
+  h1 { text-align: center; letter-spacing: 2px; font-size: 26px; margin: 0 0 4px; }
+  .sub { text-align: center; font-style: italic; color: #6b5d46; margin: 0 0 28px; }
+  .cards { display: flex; flex-wrap: wrap; gap: 28px; justify-content: center; }
+  .card {
+    width: 300px;
+    filter: drop-shadow(2px 4px 6px rgba(40,30,10,0.35));
+    border-radius: 12px;
+  }
+  .system {
+    max-width: 760px; margin: 40px auto 0; background: var(--creme);
+    border: 2px solid var(--noir); border-radius: 8px; padding: 18px 26px;
+  }
+  .system h2 { font-size: 17px; letter-spacing: 1px; margin: 0 0 10px; }
+  .system li { margin: 5px 0; font-size: 14px; line-height: 1.5; }
+  .swatches { display: flex; gap: 8px; margin-top: 14px; }
+  .sw { width: 34px; height: 34px; border: 2px solid var(--noir); border-radius: 4px; }
+  @media print { body { background: #fff; } .system { page-break-before: always; } }
+</style>
+</head>
+<body>
+
+<h1>⚔️ DÉTOPIA</h1>
+<p class="sub">Proposition de design — inspiration Tarot de Marseille (bois gravé, aplats primaires)</p>
+
+<div class="cards">
+
+<!-- ════════════ CARTE 1 : L'ANCIEN (personnage / atout) ════════════ -->
+<svg class="card" viewBox="0 0 300 540" xmlns="http://www.w3.org/2000/svg">
+  <!-- fond + cadres -->
+  <rect x="2" y="2" width="296" height="536" rx="14" fill="#fdfaf0" stroke="#1f1b16" stroke-width="4"/>
+  <rect x="16" y="16" width="268" height="508" fill="none" stroke="#1f1b16" stroke-width="2.5"/>
+  <!-- cartouche du numéral -->
+  <line x1="16" y1="58" x2="284" y2="58" stroke="#1f1b16" stroke-width="2.5"/>
+  <text x="150" y="47" font-size="28" text-anchor="middle" font-family="Georgia, serif" fill="#1f1b16">VIIII</text>
+  <!-- bandeau du nom -->
+  <line x1="16" y1="478" x2="284" y2="478" stroke="#1f1b16" stroke-width="2.5"/>
+  <text x="150" y="510" font-size="25" text-anchor="middle" font-family="Georgia, serif" fill="#1f1b16">L'Ancien</text>
+
+  <!-- sol -->
+  <path d="M16,452 Q70,432 150,444 Q230,456 284,438 L284,478 L16,478 Z"
+        fill="#f0b41e" stroke="#1f1b16" stroke-width="3.5"/>
+  <g stroke="#3d8f44" stroke-width="3" stroke-linecap="round">
+    <path d="M55,446 l-4,-12 M55,446 l2,-13 M55,446 l8,-10"/>
+    <path d="M235,448 l-5,-11 M235,448 l1,-13 M235,448 l7,-9"/>
+  </g>
+
+  <!-- bâton -->
+  <rect x="218" y="170" width="12" height="282" rx="5" fill="#c98a3b" stroke="#1f1b16" stroke-width="3.5"/>
+
+  <!-- robe -->
+  <path d="M150,196 C112,214 98,310 92,448 L212,448 C206,310 188,214 150,196 Z"
+        fill="#d8352a" stroke="#1f1b16" stroke-width="4"/>
+  <!-- plis de robe -->
+  <path d="M128,260 C124,320 120,390 118,442 M174,260 C178,320 182,390 184,442"
+        fill="none" stroke="#1f1b16" stroke-width="2.5"/>
+  <!-- manteau bleu -->
+  <path d="M150,196 C188,210 204,280 209,380 C193,362 176,352 166,344 C168,288 158,226 150,196 Z"
+        fill="#2f6cb3" stroke="#1f1b16" stroke-width="4"/>
+
+  <!-- bras + grand livre tenu devant -->
+  <path d="M120,238 C100,252 96,278 104,300 L138,316 L146,288 C132,276 126,254 132,240 Z"
+        fill="#d8352a" stroke="#1f1b16" stroke-width="3.5"/>
+  <g transform="rotate(-8 145 312)">
+    <rect x="104" y="290" width="82" height="48" rx="3" fill="#2f6cb3" stroke="#1f1b16" stroke-width="3.5"/>
+    <rect x="110" y="296" width="70" height="36" fill="#fdfaf0" stroke="#1f1b16" stroke-width="2"/>
+    <line x1="145" y1="296" x2="145" y2="332" stroke="#1f1b16" stroke-width="2"/>
+    <g stroke="#1f1b16" stroke-width="1.5">
+      <line x1="116" y1="305" x2="139" y2="305"/><line x1="116" y1="313" x2="139" y2="313"/>
+      <line x1="116" y1="321" x2="139" y2="321"/>
+      <line x1="151" y1="305" x2="174" y2="305"/><line x1="151" y1="313" x2="174" y2="313"/>
+      <line x1="151" y1="321" x2="174" y2="321"/>
+    </g>
+  </g>
+  <!-- main sur le livre -->
+  <ellipse cx="142" cy="292" rx="11" ry="8" fill="#f2c79b" stroke="#1f1b16" stroke-width="3"/>
+
+  <!-- bras droit vers le bâton -->
+  <path d="M178,232 C198,244 210,262 218,282 L206,296 C194,274 182,258 170,250 Z"
+        fill="#2f6cb3" stroke="#1f1b16" stroke-width="3.5"/>
+  <ellipse cx="219" cy="290" rx="11" ry="9" fill="#f2c79b" stroke="#1f1b16" stroke-width="3"/>
+
+  <!-- tête (profil, barbe, capuche) -->
+  <circle cx="150" cy="158" r="30" fill="#f2c79b" stroke="#1f1b16" stroke-width="3.5"/>
+  <path d="M124,164 C124,202 176,202 176,164 C168,184 132,184 124,164 Z"
+        fill="#efe9dc" stroke="#1f1b16" stroke-width="3"/>
+  <circle cx="141" cy="152" r="2.8" fill="#1f1b16"/>
+  <circle cx="161" cy="152" r="2.8" fill="#1f1b16"/>
+  <path d="M148,156 C146,162 148,166 152,166" fill="none" stroke="#1f1b16" stroke-width="2.2"/>
+  <!-- capuchon -->
+  <path d="M118,156 C112,112 188,112 182,156 C172,132 128,132 118,156 Z"
+        fill="#2f6cb3" stroke="#1f1b16" stroke-width="3.5"/>
+  <circle cx="150" cy="118" r="6" fill="#f0b41e" stroke="#1f1b16" stroke-width="2.5"/>
+
+  <!-- lueur de savoir : petits soleils -->
+  <g fill="#f0b41e" stroke="#1f1b16" stroke-width="1.8">
+    <path d="M70,120 l4,9 9,2 -7,7 2,9 -8,-5 -8,5 2,-9 -7,-7 9,-2 Z"/>
+    <path d="M236,108 l4,9 9,2 -7,7 2,9 -8,-5 -8,5 2,-9 -7,-7 9,-2 Z"/>
+  </g>
+</svg>
+
+<!-- ════════════ CARTE 2 : LA HACHE DE GUERRE (arme / as) ════════════ -->
+<svg class="card" viewBox="0 0 300 540" xmlns="http://www.w3.org/2000/svg">
+  <rect x="2" y="2" width="296" height="536" rx="14" fill="#fdfaf0" stroke="#1f1b16" stroke-width="4"/>
+  <rect x="16" y="16" width="268" height="508" fill="none" stroke="#1f1b16" stroke-width="2.5"/>
+  <line x1="16" y1="58" x2="284" y2="58" stroke="#1f1b16" stroke-width="2.5"/>
+  <text x="150" y="47" font-size="28" text-anchor="middle" font-family="Georgia, serif" fill="#1f1b16">⚒ III</text>
+  <line x1="16" y1="478" x2="284" y2="478" stroke="#1f1b16" stroke-width="2.5"/>
+  <text x="150" y="510" font-size="23" text-anchor="middle" font-family="Georgia, serif" fill="#1f1b16">La Hache de Guerre</text>
+
+  <!-- manche -->
+  <rect x="142" y="118" width="16" height="300" rx="6" fill="#c98a3b" stroke="#1f1b16" stroke-width="3.5"/>
+  <g fill="#d8352a" stroke="#1f1b16" stroke-width="2.5">
+    <rect x="138" y="226" width="24" height="14" rx="4"/>
+    <rect x="138" y="382" width="24" height="14" rx="4"/>
+  </g>
+
+  <!-- double lame -->
+  <path d="M142,160 C96,128 70,168 84,202 C96,228 124,224 142,206 Z"
+        fill="#a8bfd0" stroke="#1f1b16" stroke-width="4"/>
+  <path d="M158,160 C204,128 230,168 216,202 C204,228 176,224 158,206 Z"
+        fill="#a8bfd0" stroke="#1f1b16" stroke-width="4"/>
+  <path d="M100,196 C112,210 128,210 140,200 M200,196 C188,210 172,210 160,200"
+        fill="none" stroke="#1f1b16" stroke-width="2.2"/>
+  <rect x="134" y="146" width="32" height="68" rx="8" fill="#f0b41e" stroke="#1f1b16" stroke-width="3.5"/>
+  <circle cx="150" cy="166" r="5" fill="#d8352a" stroke="#1f1b16" stroke-width="2"/>
+  <circle cx="150" cy="194" r="5" fill="#d8352a" stroke="#1f1b16" stroke-width="2"/>
+
+  <!-- nuage + main (comme les as du tarot) -->
+  <path d="M16,300 C46,290 58,302 56,318 C76,312 92,326 84,344 C100,344 108,360 98,372
+           C82,386 52,384 36,376 C24,372 16,366 16,360 Z"
+        fill="#cfe0ef" stroke="#1f1b16" stroke-width="3.5"/>
+  <path d="M16,310 C36,304 44,312 44,320 M22,352 C38,358 56,358 68,350"
+        fill="none" stroke="#1f1b16" stroke-width="2.2"/>
+  <!-- bras/main qui saisit le manche -->
+  <path d="M84,330 C108,322 126,322 140,330 L140,356 C124,364 106,364 88,358 Z"
+        fill="#f2c79b" stroke="#1f1b16" stroke-width="3.5"/>
+  <path d="M140,326 C156,322 164,330 162,340 C164,348 158,358 146,358 L140,356 Z"
+        fill="#f2c79b" stroke="#1f1b16" stroke-width="3.5"/>
+  <path d="M144,332 l14,0 M144,340 l16,0 M144,348 l14,0" stroke="#1f1b16" stroke-width="2"/>
+
+  <!-- flammèches colorées -->
+  <g stroke="#1f1b16" stroke-width="2.2">
+    <path d="M70,96  c10,-2 14,8 6,14 c-10,4 -14,-8 -6,-14 Z" fill="#d8352a"/>
+    <path d="M226,92 c10,-2 14,8 6,14 c-10,4 -14,-8 -6,-14 Z" fill="#2f6cb3"/>
+    <path d="M52,250 c10,-2 14,8 6,14 c-10,4 -14,-8 -6,-14 Z" fill="#f0b41e"/>
+    <path d="M242,246 c10,-2 14,8 6,14 c-10,4 -14,-8 -6,-14 Z" fill="#3d8f44"/>
+    <path d="M96,84  c10,-2 14,8 6,14 c-10,4 -14,-8 -6,-14 Z" fill="#f0b41e"/>
+    <path d="M200,80 c10,-2 14,8 6,14 c-10,4 -14,-8 -6,-14 Z" fill="#d8352a"/>
+    <path d="M232,318 c10,-2 14,8 6,14 c-10,4 -14,-8 -6,-14 Z" fill="#f0b41e"/>
+    <path d="M226,402 c10,-2 14,8 6,14 c-10,4 -14,-8 -6,-14 Z" fill="#d8352a"/>
+    <path d="M62,408  c10,-2 14,8 6,14 c-10,4 -14,-8 -6,-14 Z" fill="#2f6cb3"/>
+  </g>
+
+  <!-- sol -->
+  <path d="M16,448 Q80,432 150,442 Q220,452 284,436 L284,478 L16,478 Z"
+        fill="#f0b41e" stroke="#1f1b16" stroke-width="3.5"/>
+  <g stroke="#3d8f44" stroke-width="3" stroke-linecap="round">
+    <path d="M75,444 l-4,-11 M75,444 l2,-12 M75,444 l7,-9"/>
+    <path d="M225,444 l-4,-11 M225,444 l2,-12 M225,444 l7,-9"/>
+  </g>
+</svg>
+
+<!-- ════════════ CARTE 3 : LA COUPE DE CHAMPAGNE (potion / coupe) ════════════ -->
+<svg class="card" viewBox="0 0 300 540" xmlns="http://www.w3.org/2000/svg">
+  <rect x="2" y="2" width="296" height="536" rx="14" fill="#fdfaf0" stroke="#1f1b16" stroke-width="4"/>
+  <rect x="16" y="16" width="268" height="508" fill="none" stroke="#1f1b16" stroke-width="2.5"/>
+  <line x1="16" y1="58" x2="284" y2="58" stroke="#1f1b16" stroke-width="2.5"/>
+  <text x="150" y="47" font-size="28" text-anchor="middle" font-family="Georgia, serif" fill="#1f1b16">✨ II</text>
+  <line x1="16" y1="478" x2="284" y2="478" stroke="#1f1b16" stroke-width="2.5"/>
+  <text x="150" y="510" font-size="22" text-anchor="middle" font-family="Georgia, serif" fill="#1f1b16">La Coupe de Champagne</text>
+
+  <!-- bulles montantes -->
+  <g stroke="#1f1b16" stroke-width="2.2">
+    <circle cx="150" cy="96"  r="7"  fill="#d8352a"/>
+    <circle cx="118" cy="124" r="5.5" fill="#2f6cb3"/>
+    <circle cx="184" cy="118" r="6"  fill="#f0b41e"/>
+    <circle cx="98"  cy="166" r="5"  fill="#f0b41e"/>
+    <circle cx="206" cy="160" r="5.5" fill="#3d8f44"/>
+    <circle cx="132" cy="152" r="4.5" fill="#3d8f44"/>
+    <circle cx="170" cy="148" r="4.5" fill="#d8352a"/>
+    <circle cx="150" cy="178" r="5.5" fill="#2f6cb3"/>
+  </g>
+
+  <!-- coupe -->
+  <!-- rim -->
+  <path d="M84,212 C106,200 194,200 216,212 C216,222 194,230 150,230 C106,230 84,222 84,212 Z"
+        fill="#f0b41e" stroke="#1f1b16" stroke-width="3.5"/>
+  <!-- vasque -->
+  <path d="M88,222 C88,290 116,330 150,330 C184,330 212,290 212,222 C196,234 104,234 88,222 Z"
+        fill="#f0b41e" stroke="#1f1b16" stroke-width="4"/>
+  <!-- bande décor rouge à pois -->
+  <path d="M94,258 C118,272 182,272 206,258 L204,278 C180,290 120,290 96,278 Z"
+        fill="#d8352a" stroke="#1f1b16" stroke-width="2.8"/>
+  <g fill="#fdfaf0">
+    <circle cx="116" cy="271" r="3.4"/><circle cx="138" cy="276" r="3.4"/>
+    <circle cx="162" cy="276" r="3.4"/><circle cx="184" cy="271" r="3.4"/>
+  </g>
+  <!-- vague bleue -->
+  <path d="M112,306 C126,298 138,310 150,304 C162,298 174,310 188,302"
+        fill="none" stroke="#2f6cb3" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- noeud du pied -->
+  <path d="M134,330 L166,330 L172,346 L160,358 L140,358 L128,346 Z"
+        fill="#d8352a" stroke="#1f1b16" stroke-width="3.5"/>
+  <circle cx="150" cy="344" r="6" fill="#f0b41e" stroke="#1f1b16" stroke-width="2.2"/>
+  <!-- fût -->
+  <path d="M141,358 L159,358 L163,400 L137,400 Z" fill="#f0b41e" stroke="#1f1b16" stroke-width="3.5"/>
+  <!-- pied -->
+  <path d="M104,430 C104,410 128,400 150,400 C172,400 196,410 196,430 C196,438 104,438 104,430 Z"
+        fill="#f0b41e" stroke="#1f1b16" stroke-width="3.5"/>
+  <path d="M116,416 C136,408 164,408 184,416" fill="none" stroke="#1f1b16" stroke-width="2.2"/>
+
+  <!-- éclats étoilés -->
+  <g fill="#f0b41e" stroke="#1f1b16" stroke-width="1.8">
+    <path d="M62,210 l4,9 9,2 -7,7 2,9 -8,-5 -8,5 2,-9 -7,-7 9,-2 Z"/>
+    <path d="M232,206 l4,9 9,2 -7,7 2,9 -8,-5 -8,5 2,-9 -7,-7 9,-2 Z"/>
+  </g>
+
+  <!-- sol -->
+  <path d="M16,450 Q80,434 150,444 Q220,454 284,438 L284,478 L16,478 Z"
+        fill="#f0b41e" stroke="#1f1b16" stroke-width="3.5"/>
+  <g stroke="#3d8f44" stroke-width="3" stroke-linecap="round">
+    <path d="M68,446 l-4,-11 M68,446 l2,-12 M68,446 l7,-9"/>
+    <path d="M232,446 l-4,-11 M232,446 l2,-12 M232,446 l7,-9"/>
+  </g>
+</svg>
+
+</div>
+
+<div class="system">
+  <h2>📜 LE SYSTÈME PROPOSÉ — « Tarot de Détopia »</h2>
+  <ul>
+    <li><strong>Personnages (races, classes, spécialisations) → les Atouts.</strong> Figure en pied sur un monticule, chiffre romain en haut, nom en bandeau. Ex. : <em>L'Ancien (VIIII)</em> — clin d'œil à l'Hermite du tarot.</li>
+    <li><strong>Armes → la main sortant du nuage</strong> (comme les As d'Épée et de Bâton). Le chiffre du cartouche = la Force requise. Les flammèches colorées signalent la rareté (nombre/couleur).</li>
+    <li><strong>Potions → les Coupes.</strong> Calice ornementé, bulles colorées montantes. Le chiffre = coût en ✨ Magie.</li>
+    <li><strong>Or et trésors → les Deniers</strong> (rosaces/pièces), <strong>parchemins → les Bâtons fleuris</strong>.</li>
+    <li><strong>Règles du style</strong> : contour noir 3–4 pt partout · aplats sans dégradés · 6 couleurs max · fond crème · sol jaune avec touffes d'herbe · visages naïfs de trois quarts.</li>
+  </ul>
+  <div class="swatches">
+    <div class="sw" style="background:#d8352a"></div>
+    <div class="sw" style="background:#f0b41e"></div>
+    <div class="sw" style="background:#2f6cb3"></div>
+    <div class="sw" style="background:#3d8f44"></div>
+    <div class="sw" style="background:#f2c79b"></div>
+    <div class="sw" style="background:#fbf6ea"></div>
+    <div class="sw" style="background:#1f1b16"></div>
+  </div>
+</div>
+
+</body>
+</html>
