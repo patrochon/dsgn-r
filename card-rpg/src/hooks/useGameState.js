@@ -70,6 +70,7 @@ function buildPlayer(charData, index, mapData) {
     prisonEffect: null,
     wikiSwapped: false,
     noMoveThisTurn: false,
+    magieDebuff: false,
     slowMalus: 0,
     tempDepBonus: 0,
     frenzied: false,
@@ -359,6 +360,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
   const [pendingNextIdx, setPendingNextIdx] = useState(null);
   const [pendingAutodefense, setPendingAutodefense] = useState(null);
   const [pendingVoodoo, setPendingVoodoo] = useState(null);
+  const [pendingSteal, setPendingSteal] = useState(null);
   const [pendingNde, setPendingNde] = useState(null);
   const [pendingVoyageAstral, setPendingVoyageAstral] = useState(null);
   const [pendingMoveRoll, setPendingMoveRoll] = useState(null);
@@ -1599,6 +1601,8 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       if (weapon.effect.special === 'throw_destroy') weaponRange = Math.max(weaponRange, 2);
     }
     let range = weaponRange + Math.max(0, (cp.stats.portee ?? 1) - 1);
+    // Arc court : portée minimum 3, aucun effet sur une cible adjacente/proche
+    const minRange = weapon?.effect?.special === 'range_min3' ? 3 : 0;
 
     const tiles = [];
     const isTarget = (nx, ny) =>
@@ -1641,7 +1645,8 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       if (cardRange === 'global') range = Math.max(grid.length, (grid[0]?.length ?? 0));
       for (let dy = -range; dy <= range; dy++) {
         for (let dx = -range; dx <= range; dx++) {
-          if (Math.abs(dx) + Math.abs(dy) > range || (dx === 0 && dy === 0)) continue;
+          const dist = Math.abs(dx) + Math.abs(dy);
+          if (dist > range || dist === 0 || dist < minRange) continue;
           const nx = cp.x + dx, ny = cp.y + dy;
           if (nx < 0 || ny < 0 || ny >= grid.length || nx >= grid[0].length) continue;
           if (grid[ny][nx] === T.WALL) continue;
@@ -1759,6 +1764,17 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
         });
         addLog(`🔱 ${cp.name} (Épée longue) — aucun déplacement possible ce tour.`);
       }
+      // Épée de sang : chaque 6 obtenu explose (relance et s'additionne en dégâts bonus)
+      let bonusReroll = 0;
+      if (card?.effect?.special === 'reroll_6' && roll === 6) {
+        let extra = rollDie();
+        bonusReroll += extra;
+        while (extra === 6) {
+          extra = rollDie();
+          bonusReroll += extra;
+        }
+        addLog(`🩸 Épée de sang explose (6) — +${bonusReroll} dégâts bonus !`);
+      }
       const chanceBonus = Math.floor(cp.stats.richesse / 2);
       const effectiveRoll = Math.min(6, roll + chanceBonus);
       const isMagic = card?.effect?.type === 'magic_attack';
@@ -1769,6 +1785,11 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
         if (nearCoeurNoir) {
           effectiveMagie = Math.min(effectiveMagie, 1);
           addLog(`🖤 Cœur Noir réduit la Magie de ${cp.name} à 1 !`);
+        }
+        // Arc des Nécromanciens : la cible précédente est tombée à 1 Magie pour ce tour
+        if (cp.magieDebuff) {
+          effectiveMagie = Math.min(effectiveMagie, 1);
+          addLog(`💀 ${cp.name} reste à 1 Magie ce tour (Arc des Nécromanciens) !`);
         }
       }
       const frenziedBonus = (!isMagic && cp.frenzied) ? 6 : 0;
@@ -1782,7 +1803,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
         }
       }
       const atkBonus = cp.nextAttackBonus ?? 0;
-      let dmg = effectiveRoll + baseStat + Math.floor(cp.stats.destin / 3) + hunterBonus + atkBonus;
+      let dmg = effectiveRoll + baseStat + Math.floor(cp.stats.destin / 3) + hunterBonus + atkBonus + bonusReroll;
       if (atkBonus > 0) addLog(`🥛 ${cp.name} bonus prochaine attaque : +${atkBonus} dégâts !`);
       if (card) {
         if (card.effect.special === 'crit_5_6' && effectiveRoll >= 5) dmg = Math.floor(dmg * 1.5);
@@ -1891,7 +1912,19 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
             next[currentIdx] = attacker;
           }
           // Weapon special effects (only if target survived)
+          let triggerSteal = false;
           if (t.isAlive) {
+            if (card?.effect?.special === 'target_mag1') {
+              t = { ...t, magieDebuff: true };
+              addLog(`💀 ${t.name} tombe à 1 Magie pour son prochain tour !`);
+            }
+            if (card?.effect?.special === 'steal_card') {
+              if (t.hand.length > 0) {
+                triggerSteal = true;
+              } else {
+                addLog(`🔮 ${t.name} n'a aucune carte en main à céder.`);
+              }
+            }
             if (card?.effect?.special === 'curse') {
               if (t.curseImmune) {
                 addLog(`🥦 ${t.name} est immunisé contre la malédiction !`);
@@ -1953,6 +1986,10 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
           if (alive.length <= 1) {
             setWinner(alive[0] ?? null);
             setPhase('win');
+          } else if (triggerSteal) {
+            setPendingSteal({ targetIdx: targetPlayerIdx, attackerIdx: currentIdx });
+            setPhase('steal_card_choice');
+            addLog(`🔮 ${t.name} doit choisir une carte de sa main à céder à ${cp.name}.`);
           } else {
             setPhase('player_turn');
           }
@@ -2734,6 +2771,26 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     });
   }, [phase, pendingVoodoo, players]);
 
+  // Sceptre d'enchantement : la cible choisit une carte de sa main à céder à l'attaquant
+  const stealCardChoose = useCallback((card) => {
+    if (phase !== 'steal_card_choice' || !pendingSteal) return;
+    const { targetIdx, attackerIdx } = pendingSteal;
+    if (!players[targetIdx]?.hand.includes(card)) return;
+    setPendingSteal(null);
+    addLog(`🔮 ${players[targetIdx].name} remet ${card.icon} ${card.name} à ${players[attackerIdx].name}.`);
+    setPlayers(prev => {
+      const next = [...prev];
+      let target = { ...next[targetIdx] };
+      let attacker = { ...next[attackerIdx] };
+      target.hand = target.hand.filter(c => c !== card);
+      attacker.hand = [...attacker.hand, card];
+      next[targetIdx] = target;
+      next[attackerIdx] = attacker;
+      return next;
+    });
+    setPhase('player_turn');
+  }, [phase, pendingSteal, players]);
+
   // Voyage Astral: use move action to select and teleport a monster
   const startVoyageAstral = useCallback(() => {
     if (actionsLeft < 1 || hasMoved) return;
@@ -2768,6 +2825,11 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
       }
       updPlayers[currentIdx] = p;
       addLog(`📚 ${p.name} (L'Ancien) — Force (${p.stats.force}) et Magie (${p.stats.magie}) reviennent à la normale.`);
+    }
+
+    // Arc des Nécromanciens : la Magie à 1 ne s'applique que pour ce tour-ci
+    if (updPlayers[currentIdx]?.magieDebuff) {
+      updPlayers[currentIdx] = { ...updPlayers[currentIdx], magieDebuff: false };
     }
 
     // Passif Cailloux : immobile ce tour → immunité physique jusqu'au prochain tour
@@ -3170,6 +3232,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     pendingMessager,
     pendingAutodefense,
     pendingVoodoo,
+    pendingSteal,
     pendingVoyageAstral,
     pendingMoveRoll,
     pendingGolem,
@@ -3191,6 +3254,7 @@ const [{ enemies: initEnemies, traps: initTraps, chests: initChests }] = useStat
     isUsable,
     voodooReflect,
     voodooSkip,
+    stealCardChoose,
     startVoyageAstral,
   };
 }

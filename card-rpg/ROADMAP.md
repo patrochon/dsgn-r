@@ -82,10 +82,12 @@
   ⚒️ Hache de guerre : ignore 2 points d'armure des joueurs ET 2 points de défense des monstres.
   📌 À toi de valider en partie test (équipe chaque arme et vérifie le journal de bord).
 
-- [ ] **1.10 — Effets d'armes manquants (lot 2 : distance et magie)**
-  ⏱️ 60 min · 🛠️ Claude Code · 🔋🔋
-  Arc court (distance min 3), Épée de sang (relance sur 6), Arc des Nécromanciens, Sceptre d'enchantement (vol de carte).
-  ✅ Fini quand : les 4 effets fonctionnent en partie test.
+- [x] **1.10 — Effets d'armes manquants (lot 2 : distance et magie)** → ✅ **FAIT** *(2026-06-16)*
+  🏹 Arc court : portée min 3 — la case adjacente/à 2 cases n'est plus une cible valide, même avec un bonus de Portée.
+  🩸 Épée de sang : chaque 6 obtenu « explose » — relance et s'additionne en dégâts bonus (peut s'enchaîner).
+  💀 Arc des Nécromanciens : la cible touchée tombe à 1 Magie pour son prochain tour (effacé à la fin de ce tour-là).
+  🔮 Sceptre d'enchantement : nouvelle phase `steal_card_choice` — la main de la cible s'affiche, elle clique la carte à céder.
+  📌 À toi de valider en partie test (équipe chaque arme et vérifie le journal de bord).
 
 - [ ] **1.11 — Effets de sorts et objets manquants (lot 3)**
   ⏱️ 90 min · 🛠️ Claude Code · 🔋🔋🔋

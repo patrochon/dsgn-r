@@ -209,6 +209,7 @@ function Game({ characters, onRestart }) {
               : g.phase === 'messager_exchange' ? '📨 Échange de carte'
               : g.phase === 'autodefense_counter' ? '🥊 Autodéfense — contre-attaquer ?'
               : g.phase === 'voodoo_reflect' ? '🧿 Voodoo — renvoyer les dégâts ?'
+              : g.phase === 'steal_card_choice' ? '🔮 Sceptre d\'enchantement — choisissez une carte à céder'
               : g.phase === 'voyage_astral_select' ? '🌌 Voyage Astral — choisissez un monstre'
               : g.phase === 'voyage_astral_move' ? '🌌 Voyage Astral — choisissez la destination'
               : g.phase === 'secretariat_move_choice' ? '📋 Secrétariat — ajuster le déplacement ?'
@@ -441,6 +442,11 @@ function Game({ characters, onRestart }) {
             <Btn label={`🧿 Renvoyer (${g.pendingVoodoo?.damage ?? 0}💰)`} onClick={g.voodooReflect} primary />
             <Btn label="❌ Absorber" onClick={g.voodooSkip} />
           </>)}
+          {g.phase === 'steal_card_choice' && (
+            <div style={{ color: '#cc66ff', fontSize: 13, padding: '8px 0' }}>
+              🔮 {g.pendingSteal ? g.players[g.pendingSteal.targetIdx]?.name : '...'} doit céder une carte de sa main à {g.pendingSteal ? g.players[g.pendingSteal.attackerIdx]?.name : '...'} — cliquez sur la carte ci-dessous.
+            </div>
+          )}
           {g.phase === 'voyage_astral_select' && (
             <div style={{ color: '#8855ff', fontSize: 13, padding: '8px 0' }}>🌌 Cliquez un monstre pour le déplacer</div>
           )}
@@ -511,18 +517,25 @@ function Game({ characters, onRestart }) {
         </div>
 
         {/* Card hand */}
-        <div style={{ color: '#444', fontSize: 10, textAlign: 'center', marginBottom: 8, letterSpacing: 1 }}>
-          MAIN DE {cp?.name?.toUpperCase()} — {cp?.hand?.length ?? 0} carte(s) · Sélectionnez une carte puis une action
-        </div>
-        <CardHand
-          hand={cp?.hand ?? []}
-          selected={g.phase === 'discard_overflow' ? null : g.selectedCard}
-          onSelect={card => {
-            if (g.phase === 'discard_overflow') { g.discardOverflowCard(card); return; }
-            g.setSelectedCard(g.selectedCard === card ? null : card);
-          }}
-          disabled={g.phase !== 'player_turn' && g.phase !== 'discard_overflow'}
-        />
+        {(() => {
+          const isSteal = g.phase === 'steal_card_choice' && g.pendingSteal;
+          const handOwner = isSteal ? g.players[g.pendingSteal.targetIdx] : cp;
+          return (<>
+            <div style={{ color: '#444', fontSize: 10, textAlign: 'center', marginBottom: 8, letterSpacing: 1 }}>
+              MAIN DE {handOwner?.name?.toUpperCase()} — {handOwner?.hand?.length ?? 0} carte(s){isSteal ? ' · Choisissez une carte à céder' : ' · Sélectionnez une carte puis une action'}
+            </div>
+            <CardHand
+              hand={handOwner?.hand ?? []}
+              selected={(g.phase === 'discard_overflow' || isSteal) ? null : g.selectedCard}
+              onSelect={card => {
+                if (g.phase === 'discard_overflow') { g.discardOverflowCard(card); return; }
+                if (isSteal) { g.stealCardChoose(card); return; }
+                g.setSelectedCard(g.selectedCard === card ? null : card);
+              }}
+              disabled={g.phase !== 'player_turn' && g.phase !== 'discard_overflow' && !isSteal}
+            />
+          </>);
+        })()}
       </div>
 
       {/* Log */}
