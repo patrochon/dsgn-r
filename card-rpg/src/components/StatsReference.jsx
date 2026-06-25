@@ -173,12 +173,6 @@ const SPECIALS = [
   { key: 'reveal_hands',          label: 'reveal_hands',          desc: 'Révèle les mains de tous les adversaires.' },
   { key: 'revive_50',             label: 'revive_50',             desc: 'Si le joueur tombe à 0 HP ce tour, revient à 50% HP. Usage unique.' },
   // Déplacement
-  { key: 'charge',                label: 'charge',                desc: 'Dé+2 cases. Si la case d\'arrivée est un ennemi, +2 Force ce tour.' },
-  { key: 'diagonal',              label: 'diagonal',              desc: 'Dé+2 cases, les diagonales sont autorisées.' },
-  { key: 'dodge',                 label: 'dodge',                 desc: 'Recule de dé+2 cases. Esquive la prochaine attaque reçue.' },
-  { key: 'roll_dodge',            label: 'roll_dodge',            desc: 'Dé+1. Si dé ≥ 4, immunité aux dégâts ce tour.' },
-  { key: 'stealth_move',          label: 'stealth_move',          desc: 'Dé+2 cases. Ne déclenche pas les ennemis adjacents en passant.' },
-  { key: 'jump',                  label: 'jump',                  desc: 'Saute par-dessus 3 cases (ignore obstacles et ennemis).' },
   { key: 'double_roll',           label: 'double_roll',           desc: 'Déplacement = dé × 2.' },
   { key: 'fixed_move',            label: 'fixed_move',            desc: 'Ignore le dé. Déplacement fixe (selon bonus de la carte).' },
   { key: 'wall_pass',             label: 'wall_pass',             desc: 'Peut traverser des murs ce tour.' },

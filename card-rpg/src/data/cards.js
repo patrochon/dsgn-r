@@ -58,15 +58,9 @@ function card(id, name, icon, cat, rarity, effectType, bonus, desc, special = nu
   };
 }
 
-// ─── DÉPLACEMENT (12) ─────────────────────────────────────────────────────────
+// ─── DÉPLACEMENT (6) ──────────────────────────────────────────────────────────
 const MOVE_CARDS = [
   card('sprint',      'Sprint',              '💨', C.MOVE, R.COMMON,   'move', 3, 'Dé + 3 cases de mouvement.',                                          null,          0, 'self'),
-  card('charge',      'Charge',              '⚡', C.MOVE, R.COMMON,   'move', 2, 'Dé + 2 cases. Si tu atteins un ennemi, +2 Force ce tour.',             'charge',      0, 'self'),
-  card('glissade',    'Glissade',            '🌊', C.MOVE, R.COMMON,   'move', 2, 'Dé + 2 cases en diagonale autorisée.',                                'diagonal',    0, 'self'),
-  card('retraite',    'Retraite tactique',   '🔙', C.MOVE, R.COMMON,   'move', 2, 'Recule de dé + 2 cases. Esquive la prochaine attaque.',                'dodge',       0, 'self'),
-  card('roulade',     'Roulade',             '🔄', C.MOVE, R.COMMON,   'move', 1, 'Dé + 1 case. Immunité aux dégâts ce tour si 4+.',                     'roll_dodge',  0, 'self'),
-  card('foulees',     'Foulées légères',     '🦶', C.MOVE, R.COMMON,   'move', 2, "Dé + 2 cases. Ne déclenche pas d'ennemis adjacents.",                 'stealth_move',0, 'self'),
-  card('bond',        'Bond',                '🐇', C.MOVE, R.UNCOMMON, 'move', 0, 'Saute par-dessus 3 cases (ignore obstacles), atterrit dé + 0.',        'jump',        0, 'self'),
   card('course',      'Course effrénée',     '🏃', C.MOVE, R.UNCOMMON, 'move', 0, 'Déplacement = dé × 2 cases.',                                         'double_roll', 0, 'self'),
   card('ailes_vent',  'Ailes du vent',       '🕊️', C.MOVE, R.UNCOMMON, 'move', 6, 'Ignore le dé. Déplace-toi de 6 cases exactement.',                    'fixed_move',  0, 'self'),
   card('escalade',    'Escalade',            '🧗', C.MOVE, R.UNCOMMON, 'move', 3, "Traverse un mur. Dé + 3 cases de l'autre côté.",                      'wall_pass',   0, 'self'),
