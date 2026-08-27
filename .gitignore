@@ -42,3 +42,7 @@ card-rpg/dist
 
 # Playwright browser binaries (accidentally placed here during dev)
 \[Function: resolve\]*
+epi-website/node_modules
+epi-website/.next
+epi-website/epi-database.db
+epi-website/.env.local
